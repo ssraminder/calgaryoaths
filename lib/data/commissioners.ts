@@ -1,0 +1,48 @@
+export const commissioners = [
+  {
+    id: 'raminder-shah',
+    name: 'Raminder Shah',
+    title: 'Commissioner of Oaths & Notary Public',
+    location: 'Downtown Calgary',
+    locationSlug: 'downtown-calgary',
+    address: '815 – 17th Ave SW, Calgary, AB T2T 0A1',
+    phone: '(587) 600-0746',
+    email: 'info@calgaryoaths.com',
+    calendlyUrl: 'https://calendly.com/raminder-cethos/commissioner-downtown',
+    languages: ['English', 'Punjabi', 'Hindi'],
+    credentials: ['Commissioner of Oaths (Alberta)', 'Notary Public'],
+    bio: 'Raminder has been serving Calgary residents and businesses since 2022, providing fast, professional document commissioning in Downtown Calgary. Fluent in English, Punjabi, and Hindi.',
+    nearbyNeighbourhoods: ['Beltline', '17th Ave SW', 'Mission', 'Cliff Bungalow', 'Victoria Park', 'Downtown Core'],
+    hours: {
+      weekdays: '9:00 AM – 9:00 PM',
+      saturday: '10:00 AM – 5:00 PM',
+      sunday: 'Closed',
+    },
+    googleMapsEmbed: 'https://maps.google.com/maps?q=815+17th+Ave+SW+Calgary&output=embed',
+    mapUrl: 'https://maps.google.com/maps?q=815+17th+Ave+SW+Calgary',
+  },
+  {
+    id: 'amrita-shah',
+    name: 'Amrita Shah',
+    title: 'Commissioner of Oaths',
+    location: 'NE Calgary — Redstone',
+    locationSlug: 'northeast-calgary',
+    address: '155 Redstone Walk NE, Calgary, AB T3J 0S4',
+    phone: '(587) 600-0746',
+    email: 'info@calgaryoaths.com',
+    calendlyUrl: 'https://calendly.com/raminder-cethos/commissioner-for-oaths-calgary-ne',
+    languages: ['English', 'Punjabi', 'Hindi', 'Gujarati'],
+    credentials: ['Commissioner of Oaths (Alberta)'],
+    bio: 'Amrita serves clients across NE Calgary from the Redstone office, offering same-day commissioning in a welcoming, multilingual environment. Fluent in English, Punjabi, Hindi, and Gujarati.',
+    nearbyNeighbourhoods: ['Redstone', 'Cornerstone', 'Cityscape', 'Country Hills', 'Saddle Ridge', 'Falconridge', 'Taradale'],
+    hours: {
+      weekdays: '9:00 AM – 9:00 PM',
+      saturday: '10:00 AM – 5:00 PM',
+      sunday: 'Closed',
+    },
+    googleMapsEmbed: 'https://maps.google.com/maps?q=155+Redstone+Walk+NE+Calgary&output=embed',
+    mapUrl: 'https://maps.google.com/maps?q=155+Redstone+Walk+NE+Calgary',
+  },
+] as const;
+
+export type Commissioner = (typeof commissioners)[number];
