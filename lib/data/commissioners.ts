@@ -2,7 +2,7 @@ export const commissioners = [
   {
     id: 'raminder-shah',
     name: 'Raminder Shah',
-    title: 'Commissioner of Oaths & Notary Public',
+    title: 'Commissioner of Oaths',
     location: 'Downtown Calgary',
     locationSlug: 'downtown-calgary',
     address: '815 – 17th Ave SW, Calgary, AB T2T 0A1',
@@ -10,7 +10,7 @@ export const commissioners = [
     email: 'info@calgaryoaths.com',
     calendlyUrl: 'https://calendly.com/raminder-cethos/commissioner-downtown',
     languages: ['English', 'Punjabi', 'Hindi'],
-    credentials: ['Commissioner of Oaths (Alberta)', 'Notary Public'],
+    credentials: ['Commissioner of Oaths (Alberta)'],
     bio: 'Raminder has been serving Calgary residents and businesses since 2022, providing fast, professional document commissioning in Downtown Calgary. Fluent in English, Punjabi, and Hindi.',
     nearbyNeighbourhoods: ['Beltline', '17th Ave SW', 'Mission', 'Cliff Bungalow', 'Victoria Park', 'Downtown Core'],
     hours: {

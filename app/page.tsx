@@ -10,7 +10,7 @@ import FaqPreview from '@/components/home/FaqPreview';
 import CtaBand from '@/components/home/CtaBand';
 import CommissionerCard from '@/components/shared/CommissionerCard';
 import SchemaSEO from '@/components/shared/SchemaSEO';
-import { commissioners } from '@/lib/data/commissioners';
+import { getCommissioners, getLocations, getSettings, dbToCommissioner } from '@/lib/data/db';
 
 export const metadata: Metadata = {
   title: 'Commissioner of Oaths Calgary | Same-Day Service | Calgary Oaths',
@@ -81,12 +81,27 @@ const homepageSchema = {
   ],
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [dbCommissioners, dbLocations, settings] = await Promise.all([
+    getCommissioners(),
+    getLocations(),
+    getSettings(),
+  ]);
+
+  const commissioners = dbCommissioners.map(dbToCommissioner);
+  const commissionerCount = commissioners.length || 2;
+  const locationCount = dbLocations.length || 2;
+  const startingPrice = parseInt(settings.starting_price ?? '30', 10);
+
   return (
     <>
       <SchemaSEO schema={homepageSchema} />
 
-      <Hero />
+      <Hero
+        commissionerCount={commissionerCount}
+        locationCount={locationCount}
+        startingPrice={startingPrice}
+      />
       <TrustBar />
 
       {/* Meet Our Commissioners */}
@@ -99,7 +114,7 @@ export default function HomePage() {
             </p>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {commissioners.map((c) => (
+            {(commissioners.length ? commissioners : []).map((c) => (
               <CommissionerCard key={c.id} commissioner={c} size="compact" />
             ))}
           </div>
