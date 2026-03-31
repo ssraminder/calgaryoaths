@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2, Calendar } from 'lucide-react';
 import { bookingServices, BOOKING_FEES, type BookingService } from '@/lib/data/booking';
 import { commissioners } from '@/lib/data/commissioners';
+import SlotPicker from '@/components/booking/SlotPicker';
 
 /* ── Validation ─────────────────────────────────────────────────────────── */
 const detailsSchema = z.object({
@@ -71,53 +72,6 @@ function ServiceCard({ service, selected, onSelect }: {
   );
 }
 
-/* ── Calendly embed ─────────────────────────────────────────────────────── */
-function CalendlyEmbed({
-  url,
-  onEventScheduled,
-}: {
-  url: string;
-  onEventScheduled: (eventUri: string) => void;
-}) {
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    const existing = document.querySelector('script[data-calendly]');
-    if (existing) {
-      setLoaded(true);
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://assets.calendly.com/assets/external/widget.js';
-      script.setAttribute('data-calendly', 'true');
-      script.async = true;
-      script.onload = () => setLoaded(true);
-      document.head.appendChild(script);
-    }
-
-    const handler = (e: MessageEvent) => {
-      if (e.data?.event === 'calendly.event_scheduled') {
-        onEventScheduled(e.data.payload?.event?.uri ?? '');
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [onEventScheduled]);
-
-  return (
-    <div className="relative">
-      {!loaded && (
-        <div className="flex items-center justify-center h-40 text-mid-grey text-sm gap-2">
-          <Loader2 size={16} className="animate-spin" /> Loading calendar…
-        </div>
-      )}
-      <div
-        className="calendly-inline-widget"
-        data-url={`${url}?hide_gdpr_banner=1&primary_color=B8962E`}
-        style={{ minWidth: '280px', height: '620px' }}
-      />
-    </div>
-  );
-}
 
 /* ── Main form ──────────────────────────────────────────────────────────── */
 type Step = 1 | 2 | 3;
@@ -126,11 +80,14 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>(1);
   const [selectedService, setSelectedService] = useState<BookingService | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
-  const [calendlyUrl, setCalendlyUrl] = useState<string>('');
+  const [selectedCommissionerIdForSlots, setSelectedCommissionerIdForSlots] = useState<string>('');
+  const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [pendingReview, setPendingReview] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slotError, setSlotError] = useState<string | null>(null);
 
   const totalSteps = selectedService?.requiresReview ? 2 : 3;
 
@@ -170,7 +127,7 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
       if (json.requiresReview) {
         setPendingReview(true);
       } else {
-        setCalendlyUrl(json.calendlyUrl);
+        setSelectedCommissionerIdForSlots(data.commissionerId);
         setStep(3);
       }
     } catch {
@@ -180,23 +137,33 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
     }
   }
 
-  /* ── Step 3: Calendly event scheduled → create Stripe session ─────── */
-  async function handleEventScheduled(eventUri: string) {
-    if (!bookingId) return;
-    setRedirecting(true);
+  /* ── Step 3: Confirm slot → Stripe deposit ────────────────────────── */
+  async function handleConfirmSlot() {
+    if (!bookingId || !selectedSlot) return;
+    setScheduling(true);
+    setSlotError(null);
 
     try {
-      const res = await fetch('/api/booking/charge', {
+      const res = await fetch('/api/booking/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, calendlyEventUri: eventUri }),
+        body: JSON.stringify({ bookingId, appointmentDatetime: selectedSlot }),
       });
       const json = await res.json();
+
+      if (!res.ok) {
+        setSlotError(json.error || 'Could not book this slot. Please try another.');
+        return;
+      }
+
       if (json.checkoutUrl) {
+        setRedirecting(true);
         window.location.href = json.checkoutUrl;
       }
     } catch {
-      setRedirecting(false);
+      setSlotError('Network error. Please try again.');
+    } finally {
+      setScheduling(false);
     }
   }
 
@@ -401,32 +368,56 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* ── Step 3: Schedule (auto-confirm only) ───────────────────── */}
+      {/* ── Step 3: Pick a time slot ───────────────────────────────── */}
       {step === 3 && (
-        <div>
-          <div className="px-6 pt-5 pb-3">
-            <StepDots step={3} total={3} />
-            <div className="flex items-center gap-2 mb-1">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="text-mid-grey hover:text-charcoal transition-colors"
-                aria-label="Back"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <div>
-                <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">
-                  Pick a date & time
-                </h3>
-                <p className="text-xs text-mid-grey">After booking your slot, you'll be taken to secure payment.</p>
-              </div>
+        <div className="p-6">
+          <StepDots step={3} total={3} />
+
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => { setStep(2); setSelectedSlot(''); setSlotError(null); }}
+              className="text-mid-grey hover:text-charcoal transition-colors"
+              aria-label="Back"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div>
+              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">
+                Pick a date & time
+              </h3>
+              <p className="text-xs text-mid-grey">{selectedService?.name}</p>
             </div>
           </div>
 
-          <div className="px-2 pb-4">
-            <CalendlyEmbed url={calendlyUrl} onEventScheduled={handleEventScheduled} />
-          </div>
+          <SlotPicker
+            commissionerId={selectedCommissionerIdForSlots}
+            onSelect={(iso) => { setSelectedSlot(iso); setSlotError(null); }}
+          />
+
+          {slotError && (
+            <div className="mt-3 flex items-start gap-2 bg-red-50 border border-red-200 rounded-card p-3 text-xs text-red-700">
+              <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+              <p>{slotError}</p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={!selectedSlot || scheduling}
+            onClick={handleConfirmSlot}
+            className="btn-primary w-full justify-center mt-4 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {scheduling ? (
+              <><Loader2 size={16} className="animate-spin" /> Confirming…</>
+            ) : (
+              <><Calendar size={16} /> Confirm & pay deposit {bookingFeeLabel ? `— ${bookingFeeLabel}` : ''}</>
+            )}
+          </button>
+
+          <p className="text-center text-xs text-mid-grey mt-2">
+            Final payment collected at your appointment based on number of documents.
+          </p>
         </div>
       )}
     </form>
