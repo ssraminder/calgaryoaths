@@ -10,7 +10,7 @@ const c = commissioners[0]; // Raminder Shah
 export const metadata: Metadata = {
   title: 'Commissioner of Oaths Downtown Calgary | Walk-Ins Welcome | Calgary Oaths',
   description:
-    'Commissioner of Oaths in Downtown Calgary (17th Ave SW). Raminder Shah — Commissioner of Oaths & Notary Public. Same-day service, walk-ins welcome. Open until 9 PM weekdays.',
+    'Commissioner of Oaths in Downtown Calgary (17th Ave SW). Raminder Shah — Commissioner of Oaths. Same-day service, walk-ins welcome. Open until 9 PM weekdays.',
   alternates: { canonical: 'https://calgaryoaths.com/locations/downtown-calgary' },
   openGraph: { title: 'Downtown Calgary Commissioner of Oaths | Calgary Oaths', url: 'https://calgaryoaths.com/locations/downtown-calgary' },
 };
@@ -35,7 +35,7 @@ export default function DowntownCalgaryPage() {
               </h1>
               <p className="text-mid-grey text-lg leading-relaxed">
                 Our Downtown Calgary location on 17th Ave SW serves clients from across the Beltline, Mission,
-                Victoria Park, and the Downtown Core. Raminder Shah is both a Commissioner of Oaths and a Notary Public,
+                Victoria Park, and the Downtown Core. Raminder Shah is a Commissioner of Oaths,
                 available for same-day appointments and walk-ins Monday through Saturday.
               </p>
             </div>

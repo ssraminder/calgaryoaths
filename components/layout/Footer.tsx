@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { commissioners } from '@/lib/data/commissioners';
 
 const quickLinks = [
@@ -18,15 +19,17 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
           {/* Column 1 — Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="14" cy="14" r="13" stroke="#C8922A" strokeWidth="2" />
-                <path d="M14 4 L16.5 10.5 L23 11 L18.5 15.5 L20 22 L14 18.5 L8 22 L9.5 15.5 L5 11 L11.5 10.5 Z" fill="#C8922A" />
-              </svg>
-              <span className="font-display font-bold text-white text-lg">Calgary Oaths</span>
+            <div className="mb-4">
+              <Image
+                src="https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/calgaryoaths.png"
+                alt="Calgary Oaths"
+                width={220}
+                height={74}
+                className="h-20 w-auto object-contain [filter:brightness(0)_invert(1)]"
+              />
             </div>
             <p className="text-white/70 text-sm leading-relaxed mb-5">
-              {"Calgary's trusted Commissioner of Oaths. Serving Downtown and NE Calgary."}
+              {"Calgary's trusted Commissioner of Oaths and Notary. Serving Downtown and NE Calgary."}
             </p>
             <div className="flex gap-3">
               <a

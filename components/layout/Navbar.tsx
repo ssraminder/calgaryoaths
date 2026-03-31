@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Menu, X, Phone } from 'lucide-react';
 import BookButton from '@/components/shared/BookButton';
@@ -38,23 +39,17 @@ export default function Navbar() {
           scrolled ? 'shadow-card' : 'border-b border-border'
         }`}
       >
-        <div className="max-content flex items-center justify-between h-16 lg:h-18">
+        <div className="max-content flex items-center justify-between py-3 lg:py-4">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 28 28"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="flex-shrink-0"
-            >
-              <circle cx="14" cy="14" r="13" stroke="#C8922A" strokeWidth="2" />
-              <path d="M14 4 L16.5 10.5 L23 11 L18.5 15.5 L20 22 L14 18.5 L8 22 L9.5 15.5 L5 11 L11.5 10.5 Z" fill="#C8922A" />
-            </svg>
-            <span className="font-display font-bold text-navy text-xl group-hover:text-gold transition-colors">
-              Calgary Oaths
-            </span>
+            <Image
+              src="https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/calgaryoaths.png"
+              alt="Calgary Oaths"
+              width={220}
+              height={74}
+              className="h-20 w-auto object-contain"
+              priority
+            />
           </Link>
 
           {/* Desktop nav */}
@@ -108,7 +103,13 @@ export default function Navbar() {
         }`}
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <span className="font-display font-bold text-navy text-lg">Calgary Oaths</span>
+          <Image
+            src="https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/calgaryoaths.png"
+            alt="Calgary Oaths"
+            width={140}
+            height={48}
+            className="h-12 w-auto object-contain"
+          />
           <button
             onClick={() => setMobileOpen(false)}
             className="p-2 text-mid-grey hover:text-charcoal"
