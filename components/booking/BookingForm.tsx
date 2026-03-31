@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2, Calendar } from 'lucide-react';
-import { bookingServices, BOOKING_FEES, type BookingService } from '@/lib/data/booking';
-import { commissioners } from '@/lib/data/commissioners';
+import { BOOKING_FEES, type BookingService } from '@/lib/data/booking';
 import SlotPicker from '@/components/booking/SlotPicker';
 
 /* ── Validation ─────────────────────────────────────────────────────────── */
@@ -73,12 +72,18 @@ function ServiceCard({ service, selected, onSelect }: {
 }
 
 
+type DbCommissioner = { id: string; name: string; location: string };
+
 /* ── Main form ──────────────────────────────────────────────────────────── */
 type Step = 1 | 2 | 3;
 
 export default function BookingForm({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>(1);
+  const [services, setServices] = useState<BookingService[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
   const [selectedService, setSelectedService] = useState<BookingService | null>(null);
+  const [availableCommissioners, setAvailableCommissioners] = useState<DbCommissioner[]>([]);
+  const [commissionersLoading, setCommissionersLoading] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [selectedCommissionerIdForSlots, setSelectedCommissionerIdForSlots] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<string>('');
@@ -88,6 +93,26 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
   const [pendingReview, setPendingReview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slotError, setSlotError] = useState<string | null>(null);
+
+  // Fetch services on mount
+  useEffect(() => {
+    fetch('/api/booking/services')
+      .then((r) => r.json())
+      .then((json) => setServices(json.services ?? []))
+      .finally(() => setServicesLoading(false));
+  }, []);
+
+  // Fetch commissioners when service is selected and user advances to step 2
+  async function loadCommissioners(serviceSlug: string) {
+    setCommissionersLoading(true);
+    try {
+      const res = await fetch(`/api/booking/commissioners?serviceSlug=${serviceSlug}`);
+      const json = await res.json();
+      setAvailableCommissioners(json.commissioners ?? []);
+    } finally {
+      setCommissionersLoading(false);
+    }
+  }
 
   const totalSteps = selectedService?.requiresReview ? 2 : 3;
 
@@ -211,14 +236,20 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
           <p className="text-mid-grey text-sm mb-4">Select the service you're booking today.</p>
 
           <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
-            {bookingServices.map((s) => (
-              <ServiceCard
-                key={s.slug}
-                service={s}
-                selected={selectedService?.slug === s.slug}
-                onSelect={() => setSelectedService(s)}
-              />
-            ))}
+            {servicesLoading ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-mid-grey text-sm">
+                <Loader2 size={15} className="animate-spin" /> Loading services…
+              </div>
+            ) : (
+              services.map((s) => (
+                <ServiceCard
+                  key={s.slug}
+                  service={s}
+                  selected={selectedService?.slug === s.slug}
+                  onSelect={() => setSelectedService(s)}
+                />
+              ))
+            )}
           </div>
 
           {selectedService?.requiresReview && (
@@ -230,8 +261,8 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
 
           <button
             type="button"
-            disabled={!selectedService}
-            onClick={() => setStep(2)}
+            disabled={!selectedService || servicesLoading}
+            onClick={() => { loadCommissioners(selectedService!.slug); setStep(2); }}
             className="btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Continue <ChevronRight size={16} />
@@ -299,10 +330,13 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
               <label className="block text-sm font-medium text-charcoal mb-1">Preferred location *</label>
               <select
                 {...register('commissionerId')}
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.commissionerId ? 'border-red-400' : 'border-border'}`}
+                disabled={commissionersLoading}
+                className={`w-full border rounded-btn px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold/40 transition disabled:opacity-60 ${errors.commissionerId ? 'border-red-400' : 'border-border'}`}
               >
-                <option value="">Select a location…</option>
-                {commissioners.map((c) => (
+                <option value="">
+                  {commissionersLoading ? 'Loading locations…' : 'Select a location…'}
+                </option>
+                {availableCommissioners.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} — {c.location}
                   </option>
