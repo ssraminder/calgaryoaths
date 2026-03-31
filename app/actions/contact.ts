@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { Resend } from 'resend';
+import { sendEmail } from '@/lib/email';
 
 const contactSchema = z.object({
   name: z.string().min(2, 'Name is required'),
@@ -35,7 +35,6 @@ export async function submitContactForm(
 
   const parsed = contactSchema.safeParse(raw);
   if (!parsed.success) {
-    // Silently reject bots
     if (raw.honeypot) {
       return { success: true, message: `Thanks ${raw.name} — we'll get back to you within 2 hours.` };
     }
@@ -48,13 +47,10 @@ export async function submitContactForm(
 
   const { name, phone, email, service, location, message } = parsed.data;
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
-
   try {
-    await resend.emails.send({
-      from: 'Calgary Oaths Website <noreply@calgaryoaths.com>',
-      to: ['info@calgaryoaths.com'],
-      reply_to: email,
+    await sendEmail({
+      to: 'info@calgaryoaths.com',
+      replyTo: email,
       subject: `New contact form submission — ${service}`,
       html: `
         <h2>New Contact Form Submission</h2>

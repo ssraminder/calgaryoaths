@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { Resend } from 'resend';
+import { sendEmail } from '@/lib/email';
 
 const joinSchema = z.object({
   fullName: z.string().min(2, 'Full name is required'),
@@ -44,13 +44,11 @@ export async function submitJoinForm(
   }
 
   const d = parsed.data;
-  const resend = new Resend(process.env.RESEND_API_KEY);
 
   try {
-    await resend.emails.send({
-      from: 'Calgary Oaths Network <noreply@calgaryoaths.com>',
-      to: ['info@calgaryoaths.com'],
-      reply_to: d.email,
+    await sendEmail({
+      to: 'info@calgaryoaths.com',
+      replyTo: d.email,
       subject: `New commissioner network application — ${d.fullName}`,
       html: `
         <h2>New Commissioner Network Application</h2>
