@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy: #1B3A5C;
+  --gold: #C8922A;
+  --gold-light: #E8B55A;
+  --teal: #1D9E75;
+  --bg: #F8F7F4;
+  --white: #FFFFFF;
+  --charcoal: #2C2C2A;
+  --mid-grey: #6B6B68;
+  --border: #E2E0DA;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-bg text-charcoal font-body;
+    line-height: 1.7;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display text-charcoal;
+    line-height: 1.25;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-gold text-white font-body font-medium px-6 py-3 rounded-btn transition-all duration-200 hover:bg-gold-light hover:shadow-card-hover inline-flex items-center gap-2 text-sm uppercase tracking-wide;
+  }
+
+  .btn-secondary {
+    @apply border-2 border-navy text-navy font-body font-medium px-6 py-3 rounded-btn transition-all duration-200 hover:bg-navy hover:text-white inline-flex items-center gap-2 text-sm uppercase tracking-wide;
+  }
+
+  .btn-ghost {
+    @apply text-gold font-body font-medium transition-all duration-200 hover:underline underline-offset-4 inline-flex items-center gap-1;
+  }
+
+  .card {
+    @apply bg-white rounded-card shadow-card p-6;
+  }
+
+  .section-heading {
+    @apply font-display font-semibold text-navy;
+  }
+
+  .max-content {
+    @apply max-w-content mx-auto px-4 sm:px-6 lg:px-8;
+  }
+}
+
+/* Grid texture for hero backgrounds */
+.grid-texture {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Smooth focus outlines for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
