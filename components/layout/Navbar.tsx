@@ -39,15 +39,15 @@ export default function Navbar() {
           scrolled ? 'shadow-card' : 'border-b border-border'
         }`}
       >
-        <div className="max-content flex items-center justify-between h-16 lg:h-18">
+        <div className="max-content flex items-center justify-between py-3 lg:py-4">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <Image
               src="https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/calgaryoaths.png"
               alt="Calgary Oaths"
-              width={120}
-              height={40}
-              className="h-14 w-auto object-contain"
+              width={220}
+              height={74}
+              className="h-20 w-auto object-contain"
               priority
             />
           </Link>
@@ -106,9 +106,9 @@ export default function Navbar() {
           <Image
             src="https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/calgaryoaths.png"
             alt="Calgary Oaths"
-            width={100}
-            height={34}
-            className="h-8 w-auto object-contain"
+            width={140}
+            height={48}
+            className="h-12 w-auto object-contain"
           />
           <button
             onClick={() => setMobileOpen(false)}

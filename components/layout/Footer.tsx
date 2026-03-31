@@ -23,9 +23,9 @@ export default function Footer() {
               <Image
                 src="https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/calgaryoaths.png"
                 alt="Calgary Oaths"
-                width={120}
-                height={40}
-                className="h-10 w-auto object-contain [filter:brightness(0)_invert(1)]"
+                width={220}
+                height={74}
+                className="h-20 w-auto object-contain [filter:brightness(0)_invert(1)]"
               />
             </div>
             <p className="text-white/70 text-sm leading-relaxed mb-5">
