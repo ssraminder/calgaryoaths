@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/cethos-app/**)",
+      "Bash(npx create-next-app@latest calgaryoaths --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --no-eslint)",
+      "Bash(printf \"\\\\n\\\\n\\\\n\\\\n\\\\n\")",
+      "Bash(yes \"\")"
+    ]
+  }
+}
