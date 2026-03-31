@@ -43,12 +43,9 @@ export default function BookingModal() {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border sticky top-0 bg-white z-10">
-          <div>
-            <h2 id="modal-title" className="font-display text-xl font-bold text-navy">
-              Book an appointment
-            </h2>
-            <p className="text-mid-grey text-xs mt-0.5">Calgary Oaths · From $30</p>
-          </div>
+          <h2 id="modal-title" className="font-display text-xl font-bold text-navy">
+            Book an appointment
+          </h2>
           <button
             onClick={closeModal}
             className="text-mid-grey hover:text-charcoal transition-colors p-2 rounded-btn hover:bg-bg"

@@ -1,47 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
-import { bookingServices, type BookingService } from '@/lib/data/booking';
+import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2, Calendar } from 'lucide-react';
+import { bookingServices, BOOKING_FEES, type BookingService } from '@/lib/data/booking';
 import { commissioners } from '@/lib/data/commissioners';
 
-/* ── Validation schema ─────────────────────────────────────────────────── */
+/* ── Validation ─────────────────────────────────────────────────────────── */
 const detailsSchema = z.object({
   name: z.string().min(2, 'Full name required'),
   email: z.string().email('Valid email required'),
   phone: z.string().min(10, 'Phone number required'),
   commissionerId: z.string().min(1, 'Please choose a location'),
-  numDocuments: z.coerce.number().int().min(1).max(20),
   notes: z.string().max(500).optional(),
 });
 type DetailsForm = z.infer<typeof detailsSchema>;
 
-/* ── Step indicator ─────────────────────────────────────────────────────── */
-function StepDots({ step }: { step: number }) {
+/* ── Step dots ──────────────────────────────────────────────────────────── */
+function StepDots({ step, total }: { step: number; total: number }) {
   return (
-    <div className="flex items-center gap-2 mb-6">
-      {[1, 2].map((s) => (
+    <div className="flex items-center gap-2 mb-5">
+      {Array.from({ length: total }).map((_, i) => (
         <div
-          key={s}
+          key={i}
           className={`h-1.5 rounded-full transition-all duration-300 ${
-            s <= step ? 'bg-gold w-8' : 'bg-border w-4'
+            i + 1 <= step ? 'bg-gold w-8' : 'bg-border w-4'
           }`}
         />
       ))}
-      <span className="text-xs text-mid-grey ml-2">Step {step} of 2</span>
+      <span className="text-xs text-mid-grey ml-2">Step {step} of {total}</span>
     </div>
   );
 }
 
 /* ── Service card ───────────────────────────────────────────────────────── */
-function ServiceCard({
-  service,
-  selected,
-  onSelect,
-}: {
+function ServiceCard({ service, selected, onSelect }: {
   service: BookingService;
   selected: boolean;
   onSelect: () => void;
@@ -51,9 +46,7 @@ function ServiceCard({
       type="button"
       onClick={onSelect}
       className={`w-full text-left p-4 rounded-card border-2 transition-all duration-150 ${
-        selected
-          ? 'border-gold bg-gold/5'
-          : 'border-border hover:border-gold/50 hover:bg-bg'
+        selected ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50 hover:bg-bg'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -78,33 +71,78 @@ function ServiceCard({
   );
 }
 
-/* ── Main component ─────────────────────────────────────────────────────── */
+/* ── Calendly embed ─────────────────────────────────────────────────────── */
+function CalendlyEmbed({
+  url,
+  onEventScheduled,
+}: {
+  url: string;
+  onEventScheduled: (eventUri: string) => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const existing = document.querySelector('script[data-calendly]');
+    if (existing) {
+      setLoaded(true);
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://assets.calendly.com/assets/external/widget.js';
+      script.setAttribute('data-calendly', 'true');
+      script.async = true;
+      script.onload = () => setLoaded(true);
+      document.head.appendChild(script);
+    }
+
+    const handler = (e: MessageEvent) => {
+      if (e.data?.event === 'calendly.event_scheduled') {
+        onEventScheduled(e.data.payload?.event?.uri ?? '');
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onEventScheduled]);
+
+  return (
+    <div className="relative">
+      {!loaded && (
+        <div className="flex items-center justify-center h-40 text-mid-grey text-sm gap-2">
+          <Loader2 size={16} className="animate-spin" /> Loading calendar…
+        </div>
+      )}
+      <div
+        className="calendly-inline-widget"
+        data-url={`${url}?hide_gdpr_banner=1&primary_color=B8962E`}
+        style={{ minWidth: '280px', height: '620px' }}
+      />
+    </div>
+  );
+}
+
+/* ── Main form ──────────────────────────────────────────────────────────── */
+type Step = 1 | 2 | 3;
+
 export default function BookingForm({ onClose }: { onClose: () => void }) {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<Step>(1);
   const [selectedService, setSelectedService] = useState<BookingService | null>(null);
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [calendlyUrl, setCalendlyUrl] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false); // for manual-review services
+  const [redirecting, setRedirecting] = useState(false);
+  const [pendingReview, setPendingReview] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-  } = useForm<DetailsForm>({
+  const totalSteps = selectedService?.requiresReview ? 2 : 3;
+
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<DetailsForm>({
     resolver: zodResolver(detailsSchema),
-    defaultValues: { numDocuments: 1 },
   });
 
-  const numDocuments = watch('numDocuments') || 1;
+  const selectedCommissionerId = watch('commissionerId');
+  const bookingFee = BOOKING_FEES[selectedCommissionerId] ?? null;
+  const bookingFeeLabel = bookingFee ? `$${bookingFee / 100}` : null;
 
-  /* ── Computed price label ─── */
-  const pricePreview =
-    selectedService?.price
-      ? `$${((selectedService.price * numDocuments) / 100).toFixed(0)}`
-      : selectedService?.priceLabel ?? '';
-
-  /* ── Submit ─────────────────────────────────────────────────────────── */
+  /* ── Step 2 submit: save booking ──────────────────────────────────── */
   async function onSubmit(data: DetailsForm) {
     if (!selectedService) return;
     setSubmitting(true);
@@ -121,33 +159,49 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
           email: data.email,
           phone: data.phone,
           notes: data.notes || '',
-          numDocuments: data.numDocuments,
         }),
       });
 
       const json = await res.json();
+      if (!res.ok) { setError(json.error || 'Something went wrong.'); return; }
 
-      if (!res.ok) {
-        setError(json.error || 'Something went wrong. Please try again.');
-        return;
-      }
+      setBookingId(json.bookingId);
 
       if (json.requiresReview) {
-        // Manual review — show confirmation screen
-        setSubmitted(true);
-      } else if (json.checkoutUrl) {
-        // Auto-confirm — redirect to Stripe Checkout
-        window.location.href = json.checkoutUrl;
+        setPendingReview(true);
+      } else {
+        setCalendlyUrl(json.calendlyUrl);
+        setStep(3);
       }
     } catch {
-      setError('Network error. Please check your connection and try again.');
+      setError('Network error. Please check your connection.');
     } finally {
       setSubmitting(false);
     }
   }
 
-  /* ── Manual review confirmed screen ──────────────────────────────────── */
-  if (submitted) {
+  /* ── Step 3: Calendly event scheduled → create Stripe session ─────── */
+  async function handleEventScheduled(eventUri: string) {
+    if (!bookingId) return;
+    setRedirecting(true);
+
+    try {
+      const res = await fetch('/api/booking/charge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId, calendlyEventUri: eventUri }),
+      });
+      const json = await res.json();
+      if (json.checkoutUrl) {
+        window.location.href = json.checkoutUrl;
+      }
+    } catch {
+      setRedirecting(false);
+    }
+  }
+
+  /* ── Pending review screen ────────────────────────────────────────── */
+  if (pendingReview) {
     return (
       <div className="p-6 text-center space-y-4">
         <div className="w-14 h-14 rounded-full bg-teal/10 flex items-center justify-center mx-auto">
@@ -155,34 +209,41 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
         </div>
         <h3 className="font-display font-bold text-xl text-charcoal">Request received!</h3>
         <p className="text-mid-grey text-sm leading-relaxed max-w-xs mx-auto">
-          We'll review your request and contact you within 2 hours to confirm your appointment and process payment.
+          We'll review your request and contact you within 2 hours to confirm your appointment and arrange payment.
         </p>
         <div className="flex items-center gap-2 justify-center text-xs text-mid-grey pt-2">
           <Clock size={13} />
           <span>Mon–Fri 9 AM – 9 PM · Sat 10 AM – 5 PM</span>
         </div>
-        <button
-          onClick={onClose}
-          className="btn-primary mx-auto mt-2"
-        >
-          Done
-        </button>
+        <button onClick={onClose} className="btn-primary mx-auto mt-2">Done</button>
+      </div>
+    );
+  }
+
+  /* ── Redirecting to Stripe ────────────────────────────────────────── */
+  if (redirecting) {
+    return (
+      <div className="p-10 flex flex-col items-center gap-4 text-center">
+        <Loader2 size={32} className="animate-spin text-gold" />
+        <p className="text-charcoal font-medium">Redirecting to secure payment…</p>
+        <p className="text-xs text-mid-grey">You'll be back in a moment to confirm your booking.</p>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate>
-      {/* ── Step 1: Service selection ──────────────────────────────────── */}
+
+      {/* ── Step 1: Service selection ──────────────────────────────── */}
       {step === 1 && (
         <div className="p-6">
-          <StepDots step={1} />
+          <StepDots step={1} total={totalSteps || 3} />
           <h3 className="font-display font-semibold text-lg text-charcoal mb-1">
             What service do you need?
           </h3>
           <p className="text-mid-grey text-sm mb-4">Select the service you're booking today.</p>
 
-          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
             {bookingServices.map((s) => (
               <ServiceCard
                 key={s.slug}
@@ -211,10 +272,10 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* ── Step 2: Details ────────────────────────────────────────────── */}
+      {/* ── Step 2: Details ────────────────────────────────────────── */}
       {step === 2 && (
         <div className="p-6">
-          <StepDots step={2} />
+          <StepDots step={2} total={totalSteps} />
 
           <div className="flex items-center gap-2 mb-4">
             <button
@@ -234,56 +295,44 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-4">
-            {/* Name */}
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Full name *</label>
               <input
                 {...register('name')}
                 type="text"
                 placeholder="Jane Smith"
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${
-                  errors.name ? 'border-red-400' : 'border-border'
-                }`}
+                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.name ? 'border-red-400' : 'border-border'}`}
               />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
             </div>
 
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Email *</label>
               <input
                 {...register('email')}
                 type="email"
                 placeholder="jane@example.com"
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${
-                  errors.email ? 'border-red-400' : 'border-border'
-                }`}
+                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.email ? 'border-red-400' : 'border-border'}`}
               />
               {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
             </div>
 
-            {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Phone *</label>
               <input
                 {...register('phone')}
                 type="tel"
                 placeholder="(403) 555-0123"
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${
-                  errors.phone ? 'border-red-400' : 'border-border'
-                }`}
+                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.phone ? 'border-red-400' : 'border-border'}`}
               />
               {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>}
             </div>
 
-            {/* Commissioner / Location */}
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Preferred location *</label>
               <select
                 {...register('commissionerId')}
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${
-                  errors.commissionerId ? 'border-red-400' : 'border-border'
-                }`}
+                className={`w-full border rounded-btn px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.commissionerId ? 'border-red-400' : 'border-border'}`}
               >
                 <option value="">Select a location…</option>
                 {commissioners.map((c) => (
@@ -297,29 +346,19 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
               )}
             </div>
 
-            {/* Number of documents */}
-            {selectedService && !selectedService.requiresReview && (
-              <div>
-                <label className="block text-sm font-medium text-charcoal mb-1">
-                  Number of documents
-                </label>
-                <input
-                  {...register('numDocuments')}
-                  type="number"
-                  min={1}
-                  max={20}
-                  className="w-full border border-border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition"
-                />
-                {selectedService.price && (
-                  <p className="text-xs text-mid-grey mt-1">
-                    Estimated total:{' '}
-                    <span className="font-semibold text-charcoal">{pricePreview}</span>
-                  </p>
-                )}
+            {selectedService && !selectedService.requiresReview && bookingFeeLabel && (
+              <div className="bg-navy/5 border border-navy/10 rounded-card p-4 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-charcoal">Booking deposit</span>
+                  <span className="text-base font-bold text-navy">{bookingFeeLabel}</span>
+                </div>
+                <p className="text-xs text-mid-grey leading-relaxed">
+                  Pricing is <span className="font-medium text-charcoal">$40 for the first document, $15 for each additional</span>.
+                  The deposit secures your appointment — <span className="font-medium text-charcoal">final payment is collected at your appointment</span> based on the actual number of documents.
+                </p>
               </div>
             )}
 
-            {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">
                 Notes <span className="text-mid-grey font-normal">(optional)</span>
@@ -345,22 +384,48 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
               className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Processing…
-                </>
+                <><Loader2 size={16} className="animate-spin" /> Saving…</>
               ) : selectedService?.requiresReview ? (
                 'Submit request'
               ) : (
-                <>Proceed to payment — {pricePreview}</>
+                <><Calendar size={16} /> Book time</>
               )}
             </button>
 
-            {!selectedService?.requiresReview && (
+            {selectedService && !selectedService.requiresReview && (
               <p className="text-center text-xs text-mid-grey">
-                Secure payment via Stripe. You will be redirected to complete payment.
+                A deposit of <strong>{bookingFeeLabel ?? '…'}</strong> will be charged after scheduling. Final payment at your appointment.
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 3: Schedule (auto-confirm only) ───────────────────── */}
+      {step === 3 && (
+        <div>
+          <div className="px-6 pt-5 pb-3">
+            <StepDots step={3} total={3} />
+            <div className="flex items-center gap-2 mb-1">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="text-mid-grey hover:text-charcoal transition-colors"
+                aria-label="Back"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <div>
+                <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">
+                  Pick a date & time
+                </h3>
+                <p className="text-xs text-mid-grey">After booking your slot, you'll be taken to secure payment.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-2 pb-4">
+            <CalendlyEmbed url={calendlyUrl} onEventScheduled={handleEventScheduled} />
           </div>
         </div>
       )}

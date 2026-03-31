@@ -9,6 +9,12 @@ export type BookingService = {
   reviewReason?: string;
 };
 
+/** Booking deposit fee (cents) charged upfront via Stripe, keyed by commissioner id */
+export const BOOKING_FEES: Record<string, number> = {
+  'raminder-shah': 4000,  // $40 — Downtown Calgary
+  'amrita-shah': 3000,    // $30 — NE Calgary
+};
+
 export const bookingServices: BookingService[] = [
   {
     slug: 'affidavit',
@@ -41,6 +47,15 @@ export const bookingServices: BookingService[] = [
     price: 4500,
     priceLabel: 'From $45',
     requiresReview: false,
+  },
+  {
+    slug: 'true-copy-attestation',
+    name: 'True Copy Attestation',
+    shortDescription: 'Certified copy of an original document attested by a commissioner.',
+    price: null,
+    priceLabel: 'From $20',
+    requiresReview: true,
+    reviewReason: 'True copy attestations require us to review the original document before confirming. We will contact you within 2 hours.',
   },
   {
     slug: 'apostille-legalization',

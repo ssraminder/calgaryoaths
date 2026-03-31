@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { supabase } from '@/lib/supabase';
 import { bookingServices } from '@/lib/data/booking';
 import { sendEmail } from '@/lib/email';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2026-03-25.dahlia',
-});
+import { commissioners } from '@/lib/data/commissioners';
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +14,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid service' }, { status: 400 });
     }
 
-    // Save booking to Supabase
     const { data: booking, error: dbError } = await supabase
       .from('co_bookings')
       .insert({
@@ -31,7 +26,7 @@ export async function POST(req: NextRequest) {
         notes: notes || null,
         num_documents: numDocuments || 1,
         requires_review: service.requiresReview,
-        status: service.requiresReview ? 'pending_review' : 'pending_payment',
+        status: service.requiresReview ? 'pending_review' : 'pending_scheduling',
       })
       .select('id')
       .single();
@@ -41,7 +36,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to save booking' }, { status: 500 });
     }
 
-    // Manual-review services: notify team by email, no Stripe session
+    // Manual-review: notify team, return without Calendly/Stripe
     if (service.requiresReview) {
       await sendEmail({
         to: 'info@calgaryoaths.com',
@@ -65,44 +60,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ bookingId: booking.id, requiresReview: true });
     }
 
-    // Auto-confirm: create Stripe Checkout session
-    const unitAmount = service.price! * (numDocuments || 1);
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer_email: email,
-      line_items: [
-        {
-          price_data: {
-            currency: 'cad',
-            unit_amount: unitAmount,
-            product_data: {
-              name: service.name,
-              description: numDocuments > 1
-                ? `${numDocuments} documents — ${service.priceLabel} each`
-                : service.shortDescription,
-            },
-          },
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        bookingId: booking.id,
-        commissionerId: commissionerId || '',
-        serviceSlug,
-      },
-      success_url: `${siteUrl}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/?booking_cancelled=1`,
+    // Auto-confirm: return booking id + the right Calendly URL for the chosen commissioner
+    const commissioner = commissioners.find((c) => c.id === commissionerId) ?? commissioners[0];
+    return NextResponse.json({
+      bookingId: booking.id,
+      requiresReview: false,
+      calendlyUrl: commissioner.calendlyUrl,
     });
-
-    // Store stripe session id
-    await supabase
-      .from('co_bookings')
-      .update({ stripe_session_id: session.id })
-      .eq('id', booking.id);
-
-    return NextResponse.json({ checkoutUrl: session.url, bookingId: booking.id });
   } catch (err) {
     console.error('Booking create error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
