@@ -49,6 +49,15 @@ export const bookingServices: BookingService[] = [
     requiresReview: false,
   },
   {
+    slug: 'document-drafting',
+    name: 'Document Drafting',
+    shortDescription: 'We draft affidavits, statutory declarations, travel consent letters, and invitation letters from scratch.',
+    price: null,
+    priceLabel: 'From $100/hour',
+    requiresReview: true,
+    reviewReason: 'Document drafting requires us to understand your needs before confirming. We will contact you within 2 hours to discuss and confirm.',
+  },
+  {
     slug: 'true-copy-attestation',
     name: 'True Copy Attestation',
     shortDescription: 'Certified copy of an original document attested by a commissioner.',

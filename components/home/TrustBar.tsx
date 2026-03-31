@@ -2,7 +2,7 @@ const trustItems = [
   { icon: '⭐', text: '106+ Five-Star Reviews' },
   { icon: '✓', text: '2 Certified Commissioners' },
   { icon: '⚡', text: 'Same-Day Service' },
-  { icon: '📋', text: 'Document Drafting Included' },
+  { icon: '📋', text: 'Document Drafting Available' },
   { icon: '📍', text: '2 Locations + Mobile' },
 ];
 
