@@ -1,0 +1,89 @@
+[build]
+  command   = "npm run build"
+  publish   = ".next"
+
+[build.environment]
+  NEXT_TELEMETRY_DISABLED = "1"
+  NODE_VERSION            = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Security headers — applied to all routes
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options             = "DENY"
+    X-Content-Type-Options      = "nosniff"
+    Referrer-Policy             = "strict-origin-when-cross-origin"
+    Permissions-Policy          = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security   = "max-age=63072000; includeSubDomains; preload"
+
+# Long-lived cache for hashed static assets
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Cache fonts and images
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# 301 redirects from old WordPress URL patterns
+[[redirects]]
+  from   = "/services/affidavit-calgary"
+  to     = "/services/affidavit"
+  status = 301
+
+[[redirects]]
+  from   = "/services/affidavit-calgary/"
+  to     = "/services/affidavit"
+  status = 301
+
+[[redirects]]
+  from   = "/calgary-oaths-service"
+  to     = "/locations"
+  status = 301
+
+[[redirects]]
+  from   = "/calgary-oaths-service/"
+  to     = "/locations"
+  status = 301
+
+[[redirects]]
+  from   = "/oaths-commissioner-appointment"
+  to     = "/contact"
+  status = 301
+
+[[redirects]]
+  from   = "/oaths-commissioner-appointment/"
+  to     = "/contact"
+  status = 301
+
+[[redirects]]
+  from   = "/notary-commissioner-services-in-downtown-calgary"
+  to     = "/locations/downtown-calgary"
+  status = 301
+
+[[redirects]]
+  from   = "/category/affidavits"
+  to     = "/resources"
+  status = 301
+
+[[redirects]]
+  from   = "/category/invitation-letters"
+  to     = "/resources"
+  status = 301
+
+[[redirects]]
+  from   = "/locations"
+  to     = "/locations"
+  status = 200
+
+# SPA fallback — let Next.js handle all routing
+[[redirects]]
+  from   = "/*"
+  to     = "/.netlify/functions/___netlify-handler"
+  status = 200
