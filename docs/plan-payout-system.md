@@ -1,5 +1,14 @@
 # Payout System Implementation Plan
 
+## Status
+
+- **Phase 1: DONE** — Appointment completion workflow (DB tables, upload APIs, vendor UI)
+- **Phase 2: DEFERRED** — Admin payout dashboard (build when external vendors onboard)
+- **Phase 3: DEFERRED** — Vendor payout history page (build when external vendors onboard)
+
+> Phases 2 & 3 are not needed while all commissioners are internal (Raminder & Amrita).
+> Build these when external/partner vendors join the platform and need automated payout tracking.
+
 ## Overview
 
 Appointment lifecycle: vendor confirms appointment → completes service → uploads customer ID + commissioned documents → marks as complete → payout becomes eligible → admin processes weekly manual payout (e-Transfer or bank transfer).
