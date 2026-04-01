@@ -1,11 +1,7 @@
 # ── CONFIRMED OLD WORDPRESS PAGES ────────────────────────────────
 
-# Trailing slash cleanup for pages that exist with same slug on new site
-/services/                                          /services                                   301
-/locations/                                         /locations                                  301
-/contact/                                           /contact                                    301
-/terms-and-conditions/                              /terms-and-conditions                       301
-/privacy-policy/                                    /privacy-policy                             301
+# Note: trailing slash redirects (/services/ → /services) are NOT needed here.
+# Next.js handles trailing slashes natively. Adding them here causes redirect loops.
 
 # Old WP: Commissioner for Oaths Services → Services index
 /commissioner-for-oaths-services                    /services                                   301
