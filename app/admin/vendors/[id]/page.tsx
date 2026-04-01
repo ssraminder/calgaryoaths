@@ -42,6 +42,18 @@ type AvailabilityRule = {
   active: boolean;
 };
 
+type VendorRate = {
+  service_slug: string;
+  service_name: string;
+  service_price: number | null;
+  service_price_label: string;
+  first_page_cents: number | null;
+  additional_page_cents: number;
+  drafting_fee_cents: number;
+  is_saved: boolean;
+  is_default: boolean;
+};
+
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function EditVendorPage() {
@@ -55,16 +67,32 @@ export default function EditVendorPage() {
   const [allServices, setAllServices] = useState<{ slug: string; name: string }[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
+  // Vendor rates
+  const [vendorRates, setVendorRates] = useState<VendorRate[]>([]);
+  const [savingRates, setSavingRates] = useState(false);
+  const [ratesError, setRatesError] = useState('');
+  const [ratesSaved, setRatesSaved] = useState(false);
+
   // Availability rules
   const [rules, setRules] = useState<AvailabilityRule[]>([]);
   const [newRule, setNewRule] = useState({ day_of_week: 1, start_time: '09:00', end_time: '12:00' });
+
+  function fetchVendorRates() {
+    fetch(`/api/admin/vendor-rates?commissionerId=${id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.rates)) setVendorRates(data.rates);
+      })
+      .catch(() => {});
+  }
 
   useEffect(() => {
     Promise.all([
       fetch(`/api/admin/vendors/${id}`).then((r) => r.json()),
       fetch('/api/booking/services').then((r) => r.json()),
       fetch(`/api/admin/availability?commissionerId=${id}`).then((r) => r.json()),
-    ]).then(([vendor, servicesRes, availRes]) => {
+      fetch(`/api/admin/vendor-rates?commissionerId=${id}`).then((r) => r.json()),
+    ]).then(([vendor, servicesRes, availRes, ratesRes]) => {
       if (vendor.id) {
         setCommissioner(vendor);
         setSelectedServices(
@@ -73,6 +101,7 @@ export default function EditVendorPage() {
       }
       setAllServices(Array.isArray(servicesRes?.services) ? servicesRes.services : Array.isArray(servicesRes) ? servicesRes : []);
       setRules(Array.isArray(availRes?.rules) ? availRes.rules : Array.isArray(availRes) ? availRes : []);
+      if (Array.isArray(ratesRes?.rates)) setVendorRates(ratesRes.rates);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [id]);
@@ -260,6 +289,152 @@ export default function EditVendorPage() {
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </form>
+
+      {/* Vendor Rates */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-medium text-gray-900">Service Pricing</h2>
+            <p className="text-sm text-gray-500">
+              Set per-service rates for this vendor. Defaults are 50% of the company service price.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={fetchVendorRates}
+            className="text-xs text-navy hover:underline"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {vendorRates.length === 0 ? (
+          <p className="text-sm text-gray-400">
+            No services assigned yet. Check services above and save to see pricing options.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
+                  <th className="pb-2 pr-4">Service</th>
+                  <th className="pb-2 pr-4 w-28">Company Rate</th>
+                  <th className="pb-2 pr-4 w-32">Vendor Rate ($)</th>
+                  <th className="pb-2 pr-4 w-32">Add&apos;l Page ($)</th>
+                  <th className="pb-2 w-24">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendorRates.map((rate, i) => (
+                  <tr key={rate.service_slug} className={`border-b border-gray-100 ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
+                    <td className="py-2 pr-4 font-medium text-gray-900">{rate.service_name}</td>
+                    <td className="py-2 pr-4 text-gray-500">
+                      {rate.service_price != null ? `$${(rate.service_price / 100).toFixed(0)}` : rate.service_price_label}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={rate.first_page_cents != null ? (rate.first_page_cents / 100).toFixed(2) : ''}
+                        onChange={(e) => {
+                          const cents = Math.round(parseFloat(e.target.value || '0') * 100);
+                          setVendorRates((prev) =>
+                            prev.map((r) =>
+                              r.service_slug === rate.service_slug
+                                ? { ...r, first_page_cents: cents, is_default: false }
+                                : r
+                            )
+                          );
+                        }}
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+                      />
+                    </td>
+                    <td className="py-2 pr-4">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={(rate.additional_page_cents / 100).toFixed(2)}
+                        onChange={(e) => {
+                          const cents = Math.round(parseFloat(e.target.value || '0') * 100);
+                          setVendorRates((prev) =>
+                            prev.map((r) =>
+                              r.service_slug === rate.service_slug
+                                ? { ...r, additional_page_cents: cents }
+                                : r
+                            )
+                          );
+                        }}
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+                      />
+                    </td>
+                    <td className="py-2">
+                      {rate.is_saved ? (
+                        <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                          Saved
+                        </span>
+                      ) : rate.is_default ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          Default
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          Modified
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {vendorRates.length > 0 && (
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              disabled={savingRates}
+              onClick={async () => {
+                setSavingRates(true);
+                setRatesError('');
+                setRatesSaved(false);
+                const payload = {
+                  commissionerId: id,
+                  rates: vendorRates
+                    .filter((r) => r.first_page_cents != null)
+                    .map((r) => ({
+                      service_slug: r.service_slug,
+                      first_page_cents: r.first_page_cents!,
+                      additional_page_cents: r.additional_page_cents,
+                      drafting_fee_cents: r.drafting_fee_cents,
+                    })),
+                };
+                const res = await fetch('/api/admin/vendor-rates', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                  const data = await res.json();
+                  setRatesError(data.error || 'Failed to save rates');
+                } else {
+                  setRatesSaved(true);
+                  fetchVendorRates();
+                  setTimeout(() => setRatesSaved(false), 3000);
+                }
+                setSavingRates(false);
+              }}
+              className="rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50"
+            >
+              {savingRates ? 'Saving Rates...' : 'Save All Rates'}
+            </button>
+            {ratesSaved && <span className="text-sm text-green-600">Rates saved successfully!</span>}
+            {ratesError && <span className="text-sm text-red-600">{ratesError}</span>}
+          </div>
+        )}
+      </div>
 
       {/* Vendor Account */}
       <VendorAccountSection commissionerId={id} commissionerName={commissioner.name} email={commissioner.email} hasAccount={!!commissioner.user_id} />
