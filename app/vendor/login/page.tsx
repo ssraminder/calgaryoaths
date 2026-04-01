@@ -34,7 +34,7 @@ function VendorLoginForm() {
     if (authError) { setError(authError.message); setLoading(false); return; }
 
     const next = searchParams.get('next') || '/vendor';
-    router.replace(next);
+    window.location.href = next;
   }
 
   return (

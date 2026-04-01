@@ -42,8 +42,8 @@ function AdminLoginForm() {
     }
 
     const next = searchParams.get('next') || '/admin';
-    router.refresh();
-    router.replace(next);
+    // Full page load ensures auth cookies are sent with the request
+    window.location.href = next;
   }
 
   return (
