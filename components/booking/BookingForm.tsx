@@ -160,6 +160,75 @@ function sortedOptions(list: LocationOption[], filter: 'all' | 'soonest' | 'pric
   return sorted;
 }
 
+/* ── Area search dropdown ─────────────────────────────────────────────── */
+function AreaSearch({ options, onFilter }: { options: LocationOption[]; onFilter: (q: string) => void }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Build unique area list from all location options
+  const allAreas = Array.from(
+    new Set(options.flatMap((o) => o.areas_served ?? []))
+  ).sort();
+
+  const filtered = query
+    ? allAreas.filter((a) => a.toLowerCase().includes(query.toLowerCase()))
+    : allAreas;
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  function select(area: string) {
+    setQuery(area);
+    onFilter(area);
+    setOpen(false);
+  }
+
+  function clear() {
+    setQuery('');
+    onFilter('');
+    setOpen(false);
+  }
+
+  return (
+    <div ref={ref} className="relative mb-3">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-mid-grey pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search by area, postal code, or neighbourhood…"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); onFilter(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          className="w-full pl-9 pr-8 py-2.5 border border-border rounded-btn text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition bg-white"
+        />
+        {query && (
+          <button type="button" onClick={clear} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-mid-grey hover:text-charcoal text-xs">
+            ✕
+          </button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-white shadow-lg max-h-44 overflow-y-auto">
+          {filtered.map((area) => (
+            <li key={area}>
+              <button type="button" onClick={() => select(area)}
+                className="w-full px-3 py-2 text-left text-sm text-charcoal hover:bg-bg transition-colors">
+                {area}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /* ── Main form ──────────────────────────────────────────────────────────── */
 type Step = 1 | 2 | 3 | 4;
 
@@ -182,6 +251,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   // Commissioner selection (step 2)
   const [selectedOption, setSelectedOption] = useState<LocationOption | null>(null);
   const [commFilter, setCommFilter] = useState<'all' | 'soonest' | 'price'>('soonest');
+  const [areaFilter, setAreaFilter] = useState<string>('');
   // Pricing config
   const [pricing, setPricing] = useState<PricingConfig>({ convenienceFeeCents: 499, tax: { total_rate: 0.05, gst_rate: 0.05, pst_rate: 0, hst_rate: 0 } });
 
@@ -421,8 +491,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             </div>
           </div>
 
-          {/* Sort tabs */}
-          <div className="flex gap-1.5 mb-3">
+          {/* Sort tabs + area search */}
+          <div className="flex items-center gap-1.5 mb-3 flex-wrap">
             {([['soonest', 'Soonest'], ['price', 'Lowest price'], ['all', 'All']] as const).map(([key, label]) => (
               <button key={key} type="button" onClick={() => setCommFilter(key)}
                 className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${commFilter === key ? 'bg-navy text-white' : 'bg-bg text-mid-grey hover:bg-border'}`}>
@@ -431,13 +501,26 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             ))}
           </div>
 
+          <AreaSearch
+            options={locationOptions}
+            onFilter={setAreaFilter}
+          />
+
           <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
             {optionsLoading ? (
               <div className="flex items-center justify-center py-8 gap-2 text-mid-grey text-sm">
                 <Loader2 size={15} className="animate-spin" /> Loading locations…
               </div>
             ) : (
-              sortedOptions(locationOptions, commFilter).map((opt) => {
+              sortedOptions(areaFilter ? locationOptions.filter((opt) => {
+                const q = areaFilter.toLowerCase();
+                // Match area name, postal code prefix, or location name/address
+                return (
+                  opt.locationName.toLowerCase().includes(q) ||
+                  opt.locationAddress?.toLowerCase().includes(q) ||
+                  (opt.areas_served ?? []).some((a) => a.toLowerCase().includes(q))
+                );
+              }) : locationOptions, commFilter).map((opt) => {
                 const basePrice = opt.first_page_cents ?? selectedService?.price ?? opt.booking_fee_cents;
                 const price = basePrice ? customerPrice(basePrice, opt) : null;
                 const priceLabel = price ? `$${(price / 100).toFixed(0)}` : 'Quote';
@@ -490,6 +573,12 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             )}
             {!optionsLoading && locationOptions.length === 0 && (
               <p className="text-center text-sm text-mid-grey py-6">No locations available for this service.</p>
+            )}
+            {!optionsLoading && locationOptions.length > 0 && areaFilter && sortedOptions(locationOptions.filter((opt) => {
+                const q = areaFilter.toLowerCase();
+                return opt.locationName.toLowerCase().includes(q) || opt.locationAddress?.toLowerCase().includes(q) || (opt.areas_served ?? []).some((a) => a.toLowerCase().includes(q));
+              }), commFilter).length === 0 && (
+              <p className="text-center text-sm text-mid-grey py-6">No locations match &ldquo;{areaFilter}&rdquo;. Try a different area or postal code.</p>
             )}
           </div>
 
