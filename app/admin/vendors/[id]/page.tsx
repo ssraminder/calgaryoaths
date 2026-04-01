@@ -27,6 +27,7 @@ type Commissioner = {
   booking_fee_cents: number | null;
   commission_rate: number | null;
   is_partner: boolean;
+  user_id: string | null;
   active: boolean;
   sort_order: number;
   co_commissioner_services: { service_slug: string }[];
@@ -244,6 +245,9 @@ export default function EditVendorPage() {
         </button>
       </form>
 
+      {/* Vendor Account */}
+      <VendorAccountSection commissionerId={id} commissionerName={commissioner.name} email={commissioner.email} hasAccount={!!commissioner.user_id} />
+
       {/* Availability Rules */}
       <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
         <h2 className="text-lg font-medium text-gray-900">Availability Rules</h2>
@@ -342,4 +346,55 @@ function Field({ name, label, type = 'text', defaultValue, required, textarea }:
 
 function splitTags(val: string): string[] {
   return val ? val.split(',').map((s) => s.trim()).filter(Boolean) : [];
+}
+
+function VendorAccountSection({ commissionerId, commissionerName, email, hasAccount }: {
+  commissionerId: string; commissionerName: string; email: string; hasAccount: boolean;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [done, setDone] = useState(hasAccount);
+  const [error, setError] = useState('');
+  const [accEmail, setAccEmail] = useState(email || '');
+  const [accPassword, setAccPassword] = useState('');
+
+  if (done) {
+    return (
+      <div className="rounded-lg border border-green-200 bg-green-50 p-5">
+        <p className="text-sm font-medium text-green-800">Vendor account active — can log in at /vendor/login</p>
+      </div>
+    );
+  }
+
+  async function handleCreate() {
+    if (!accEmail || !accPassword) { setError('Email and password required'); return; }
+    setCreating(true); setError('');
+    const res = await fetch(`/api/admin/vendors/${commissionerId}/create-account`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: accEmail, password: accPassword, full_name: commissionerName }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(data.error || 'Failed'); setCreating(false); return; }
+    setDone(true); setCreating(false);
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-3">
+      <h2 className="text-lg font-medium text-gray-900">Vendor Account</h2>
+      <p className="text-sm text-gray-500">Create login credentials so this vendor can access the Partner Portal.</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+          <input type="email" value={accEmail} onChange={(e) => setAccEmail(e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+          <input type="password" value={accPassword} onChange={(e) => setAccPassword(e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="Min 6 characters" />
+        </div>
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button onClick={handleCreate} disabled={creating} className="rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50">
+        {creating ? 'Creating...' : 'Create Vendor Account'}
+      </button>
+    </div>
+  );
 }

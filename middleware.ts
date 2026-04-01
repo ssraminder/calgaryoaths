@@ -4,8 +4,12 @@ import { createServerClient } from '@supabase/ssr';
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Only protect /admin routes (except /admin/login)
-  if (!pathname.startsWith('/admin') || pathname === '/admin/login') {
+  // Only protect /admin and /vendor routes (except login pages)
+  if (
+    (!pathname.startsWith('/admin') && !pathname.startsWith('/vendor')) ||
+    pathname === '/admin/login' ||
+    pathname === '/vendor/login'
+  ) {
     return NextResponse.next();
   }
 
@@ -33,7 +37,7 @@ export async function middleware(req: NextRequest) {
 
   if (!user) {
     const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = '/admin/login';
+    loginUrl.pathname = pathname.startsWith('/vendor') ? '/vendor/login' : '/admin/login';
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -42,5 +46,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/vendor/:path*'],
 };
