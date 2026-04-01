@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { BOOKING_FEES } from '@/lib/data/booking';
+import { getBookingFee } from '@/lib/data/booking';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       .eq('id', bookingId);
 
     // Create Stripe checkout for deposit
-    const bookingFee = BOOKING_FEES[booking.commissioner_id] ?? 4000;
+    const bookingFee = await getBookingFee(booking.commissioner_id);
     const feeLabel = `$${bookingFee / 100}`;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 

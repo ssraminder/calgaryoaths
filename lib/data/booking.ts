@@ -17,3 +17,18 @@ export const BOOKING_FEES: Record<string, number> = {
   'amrita-shah': 3000,    // $30 — NE Calgary
 };
 
+/** Look up booking fee from DB (co_commissioners.booking_fee_cents), falling back to hardcoded map */
+export async function getBookingFee(commissionerId: string): Promise<number> {
+  const { supabase } = await import('@/lib/supabase');
+  const { data } = await supabase
+    .from('co_commissioners')
+    .select('booking_fee_cents')
+    .eq('id', commissionerId)
+    .single();
+
+  if (data?.booking_fee_cents != null) {
+    return data.booking_fee_cents;
+  }
+  return BOOKING_FEES[commissionerId] ?? 4000;
+}
+
