@@ -50,7 +50,7 @@ export async function GET() {
         'X-Goog-FieldMask': 'places.id',
       },
       body: JSON.stringify({
-        textQuery: 'Calgary Oaths Commissioner',
+        textQuery: 'Calgary Oaths Commissioner for Oaths Notary Public Calgary AB',
         locationBias: {
           circle: { center: { latitude: 51.0447, longitude: -114.0719 }, radiusMeters: 50000 },
         },
@@ -58,6 +58,9 @@ export async function GET() {
     });
     const searchData = await searchRes.json();
     placeId = searchData.places?.[0]?.id;
+    if (placeId) {
+      console.log(`[Reviews] Found Google Place ID: ${placeId} — set GOOGLE_PLACE_ID env var for faster lookups`);
+    }
 
     if (!placeId) {
       return NextResponse.json({ error: 'Could not find business on Google' }, { status: 404 });
