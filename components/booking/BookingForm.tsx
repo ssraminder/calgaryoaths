@@ -130,7 +130,22 @@ type DbCommissioner = {
   mobile_available?: boolean;
   mobile_travel_fee_cents?: number | null;
   virtual_available?: boolean;
+  commission_rate?: number;
+  commission_mode?: 'absorb' | 'pass_to_customer';
 };
+
+type PricingConfig = {
+  convenienceFeeCents: number;
+  tax: { total_rate: number; gst_rate: number; pst_rate: number; hst_rate: number };
+};
+
+/** Calculate customer-facing price for a commissioner's service rate */
+function customerPrice(baseCents: number, comm: DbCommissioner): number {
+  if (comm.commission_mode === 'pass_to_customer' && comm.commission_rate) {
+    return Math.round(baseCents * (1 + comm.commission_rate / 100));
+  }
+  return baseCents;
+}
 
 /* ── Sort commissioners ────────────────────────────────────────────────── */
 function sortedCommissioners(list: DbCommissioner[], filter: 'all' | 'soonest' | 'price'): DbCommissioner[] {
@@ -174,13 +189,19 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   // Commissioner selection (step 2)
   const [selectedCommissioner, setSelectedCommissioner] = useState<DbCommissioner | null>(null);
   const [commFilter, setCommFilter] = useState<'all' | 'soonest' | 'price'>('soonest');
+  // Pricing config
+  const [pricing, setPricing] = useState<PricingConfig>({ convenienceFeeCents: 499, tax: { total_rate: 0.05, gst_rate: 0.05, pst_rate: 0, hst_rate: 0 } });
 
-  // Fetch services on mount
+  // Fetch services + pricing on mount
   useEffect(() => {
     fetch('/api/booking/services')
       .then((r) => r.json())
       .then((json) => setServices(json.services ?? []))
       .finally(() => setServicesLoading(false));
+    fetch('/api/booking/pricing')
+      .then((r) => r.json())
+      .then((data) => setPricing(data))
+      .catch(() => {});
   }, []);
 
   // Fetch commissioners when service is selected and user advances to step 2
@@ -201,12 +222,16 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
     resolver: zodResolver(detailsSchema),
   });
 
-  // Booking fee = minimum service charge (first document rate)
-  const bookingFee = selectedCommissioner?.first_page_cents
-    ?? selectedService?.price
-    ?? selectedCommissioner?.booking_fee_cents
-    ?? null;
-  const bookingFeeLabel = bookingFee ? `$${(bookingFee / 100).toFixed(0)}` : null;
+  // Booking fee = minimum service charge (first document rate), adjusted for commission mode
+  const baseServiceFee = selectedCommissioner?.first_page_cents ?? selectedService?.price ?? selectedCommissioner?.booking_fee_cents ?? null;
+  const bookingFee = baseServiceFee && selectedCommissioner ? customerPrice(baseServiceFee, selectedCommissioner) : baseServiceFee;
+  const bookingFeeLabel = bookingFee ? `$${(bookingFee / 100).toFixed(2)}` : null;
+
+  // Full breakdown for display
+  const convFee = pricing.convenienceFeeCents;
+  const subtotal = (bookingFee ?? 0) + convFee;
+  const taxAmount = Math.round(subtotal * pricing.tax.total_rate);
+  const totalCharged = subtotal + taxAmount;
 
   /* ── Step 2 submit: save booking ──────────────────────────────────── */
   async function onSubmit(data: DetailsForm) {
@@ -404,7 +429,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
               </div>
             ) : (
               sortedCommissioners(availableCommissioners, commFilter).map((c) => {
-                const price = c.first_page_cents ?? selectedService?.price ?? c.booking_fee_cents;
+                const basePrice = c.first_page_cents ?? selectedService?.price ?? c.booking_fee_cents;
+                const price = basePrice ? customerPrice(basePrice, c) : null;
                 const priceLabel = price ? `$${(price / 100).toFixed(0)}` : 'Quote';
                 const soonest = c.soonestSlot
                   ? new Date(c.soonestSlot).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', weekday: 'short', month: 'short', day: 'numeric' })
@@ -504,36 +530,50 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
             {selectedService && !selectedService.requiresReview && selectedCommissioner && bookingFee && (
               <div className="bg-navy/5 border border-navy/10 rounded-card p-4 space-y-3">
-                {/* Charged now */}
+                {/* Charged now — full breakdown */}
                 <div>
                   <p className="text-xs font-medium text-mid-grey uppercase tracking-wide mb-2">Charged now</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-charcoal">First document (booking fee)</span>
-                    <span className="text-base font-bold text-navy">{bookingFeeLabel}</span>
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between text-charcoal">
+                      <span>Service fee (first document)</span>
+                      <span>{bookingFeeLabel}</span>
+                    </div>
+                    <div className="flex justify-between text-charcoal">
+                      <span>Convenience fee</span>
+                      <span>${(convFee / 100).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-charcoal">
+                      <span>Tax ({(pricing.tax.total_rate * 100).toFixed(0)}%{pricing.tax.gst_rate > 0 && pricing.tax.pst_rate === 0 && pricing.tax.hst_rate === 0 ? ' GST' : pricing.tax.hst_rate > 0 ? ' HST' : ' GST+PST'})</span>
+                      <span>${(taxAmount / 100).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-navy border-t border-navy/10 pt-1.5">
+                      <span>Total</span>
+                      <span>${(totalCharged / 100).toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Additional charges at appointment */}
                 {(selectedCommissioner.additional_page_cents != null || selectedCommissioner.drafting_fee_cents != null || selectedCommissioner.mobile_travel_fee_cents != null) && (
                   <div className="border-t border-navy/10 pt-3">
-                    <p className="text-xs font-medium text-mid-grey uppercase tracking-wide mb-2">Charged at appointment (if applicable)</p>
+                    <p className="text-xs font-medium text-mid-grey uppercase tracking-wide mb-2">At appointment (if applicable)</p>
                     <div className="space-y-1.5 text-xs">
                       {selectedCommissioner.additional_page_cents != null && (
                         <div className="flex justify-between text-charcoal">
                           <span>Each additional document</span>
-                          <span className="font-medium">${(selectedCommissioner.additional_page_cents / 100).toFixed(0)}</span>
+                          <span className="font-medium">${(customerPrice(selectedCommissioner.additional_page_cents, selectedCommissioner) / 100).toFixed(2)}</span>
                         </div>
                       )}
                       {selectedCommissioner.drafting_fee_cents != null && selectedCommissioner.drafting_fee_cents > 0 && (
                         <div className="flex justify-between text-charcoal">
                           <span>Document drafting</span>
-                          <span className="font-medium">${(selectedCommissioner.drafting_fee_cents / 100).toFixed(0)}</span>
+                          <span className="font-medium">${(customerPrice(selectedCommissioner.drafting_fee_cents, selectedCommissioner) / 100).toFixed(2)}</span>
                         </div>
                       )}
                       {selectedCommissioner.mobile_available && selectedCommissioner.mobile_travel_fee_cents != null && (
                         <div className="flex justify-between text-charcoal">
-                          <span>Mobile service travel fee</span>
-                          <span className="font-medium">${(selectedCommissioner.mobile_travel_fee_cents / 100).toFixed(0)}</span>
+                          <span>Mobile travel fee</span>
+                          <span className="font-medium">${(selectedCommissioner.mobile_travel_fee_cents / 100).toFixed(2)}</span>
                         </div>
                       )}
                     </div>
@@ -541,7 +581,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 )}
 
                 <p className="text-[11px] text-mid-grey leading-relaxed border-t border-navy/10 pt-2">
-                  The booking fee covers your first document and secures your appointment. Any additional charges are collected when the service is rendered.
+                  The booking fee secures your appointment and covers the first document. Additional charges are collected when the service is rendered. All prices include applicable platform fees.
                 </p>
               </div>
             )}
@@ -581,7 +621,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
             {selectedService && !selectedService.requiresReview && (
               <p className="text-center text-xs text-mid-grey">
-                A booking fee of <strong>{bookingFeeLabel ?? '…'}</strong> will be charged after scheduling. Final price collected when service is rendered.
+                Total of <strong>${(totalCharged / 100).toFixed(2)}</strong> (incl. convenience fee + tax) will be charged after scheduling. Additional documents charged at appointment.
               </p>
             )}
           </div>
@@ -631,12 +671,12 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             {scheduling ? (
               <><Loader2 size={16} className="animate-spin" /> Confirming…</>
             ) : (
-              <><Calendar size={16} /> Confirm & pay booking fee {bookingFeeLabel ? `— ${bookingFeeLabel}` : ''}</>
+              <><Calendar size={16} /> Confirm & pay — ${totalCharged ? `$${(totalCharged / 100).toFixed(2)}` : '…'}</>
             )}
           </button>
 
           <p className="text-center text-xs text-mid-grey mt-2">
-            Final price collected when service is rendered, based on the number of documents.
+            Additional documents charged at your appointment.
           </p>
         </div>
       )}

@@ -50,14 +50,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ paymentTransferred: true });
     }
 
-    // Fetch commissioner for commission rate
+    // Fetch commissioner for commission rate + mode
     const { data: commissioner } = await supabase
       .from('co_commissioners')
-      .select('booking_fee_cents, commission_rate, is_partner')
+      .select('booking_fee_cents, commission_rate, is_partner, commission_mode')
       .eq('id', booking.commissioner_id)
       .single();
 
-    // Booking fee = first document rate from vendor rates, falling back to service price, then commissioner fee
+    // Booking fee = first document rate (vendor rate → service price → legacy)
     const { data: vendorRate } = await supabase
       .from('co_vendor_rates')
       .select('first_page_cents')
@@ -65,30 +65,67 @@ export async function POST(req: NextRequest) {
       .eq('service_slug', booking.service_slug)
       .single();
 
-    let bookingFee = vendorRate?.first_page_cents ?? null;
-    if (!bookingFee) {
+    let baseServiceFee = vendorRate?.first_page_cents ?? null;
+    if (!baseServiceFee) {
       const { data: service } = await supabase
         .from('co_services')
         .select('price')
         .eq('slug', booking.service_slug)
         .single();
-      bookingFee = service?.price ?? commissioner?.booking_fee_cents ?? (await getBookingFee(booking.commissioner_id));
+      baseServiceFee = service?.price ?? commissioner?.booking_fee_cents ?? (await getBookingFee(booking.commissioner_id));
     }
-    const commissionRate = commissioner?.is_partner ? (commissioner.commission_rate ?? 20) : 0;
-    const platformFeeCents = Math.round(bookingFee * (commissionRate / 100));
-    const vendorPayoutCents = bookingFee - platformFeeCents;
 
-    // Save appointment datetime + commission info
+    // Commission calculation
+    const commissionRate = commissioner?.is_partner ? (commissioner.commission_rate ?? 20) : 0;
+    const commissionMode = commissioner?.commission_mode || 'absorb';
+
+    // Customer-facing service fee (includes commission markup if pass_to_customer)
+    const customerServiceFee = commissionMode === 'pass_to_customer'
+      ? Math.round(baseServiceFee * (1 + commissionRate / 100))
+      : baseServiceFee;
+
+    // Platform fee is always commission on the base rate
+    const platformFeeCents = Math.round(baseServiceFee * (commissionRate / 100));
+    const vendorPayoutCents = baseServiceFee - (commissionMode === 'absorb' ? platformFeeCents : 0);
+
+    // Convenience fee + tax
+    const { data: settingsData } = await supabase
+      .from('co_settings')
+      .select('key, value')
+      .in('key', ['convenience_fee_cents', 'default_province']);
+    const settingsMap = Object.fromEntries((settingsData ?? []).map((r) => [r.key, r.value]));
+    const convenienceFeeCents = parseInt(settingsMap.convenience_fee_cents || '499', 10);
+    const province = settingsMap.default_province || 'AB';
+
+    const { data: taxData } = await supabase
+      .from('co_tax_rates')
+      .select('total_rate')
+      .eq('province_code', province)
+      .single();
+    const taxRate = taxData?.total_rate ?? 0.05;
+
+    const subtotal = customerServiceFee + convenienceFeeCents;
+    const taxCents = Math.round(subtotal * taxRate);
+    const totalChargedCents = subtotal + taxCents;
+
+    // Save appointment datetime + all fee info
     await supabase
       .from('co_bookings')
       .update({
         appointment_datetime: appointmentDatetime,
         status: 'pending_payment',
         commission_rate: commissionRate,
+        commission_mode: commissionMode,
         platform_fee_cents: platformFeeCents,
         vendor_payout_cents: vendorPayoutCents,
+        convenience_fee_cents: convenienceFeeCents,
+        tax_rate: taxRate,
+        tax_cents: taxCents,
+        total_charged_cents: totalChargedCents,
       })
       .eq('id', bookingId);
+
+    const bookingFee = totalChargedCents;
     const feeLabel = `$${bookingFee / 100}`;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
@@ -98,6 +135,8 @@ export async function POST(req: NextRequest) {
       timeStyle: 'short',
     });
 
+    const taxLabel = `Tax (${(taxRate * 100).toFixed(0)}%)`;
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_email: booking.email,
@@ -105,11 +144,27 @@ export async function POST(req: NextRequest) {
         {
           price_data: {
             currency: 'cad',
-            unit_amount: bookingFee,
+            unit_amount: customerServiceFee,
             product_data: {
-              name: `Booking deposit — ${booking.service_name}`,
-              description: `Appointment: ${apptDate}. ${feeLabel} deposit secures your slot. Final payment collected at your appointment.`,
+              name: `${booking.service_name} — First document`,
+              description: `Appointment: ${apptDate}. Additional documents charged at appointment.`,
             },
+          },
+          quantity: 1,
+        },
+        {
+          price_data: {
+            currency: 'cad',
+            unit_amount: convenienceFeeCents,
+            product_data: { name: 'Convenience fee' },
+          },
+          quantity: 1,
+        },
+        {
+          price_data: {
+            currency: 'cad',
+            unit_amount: taxCents,
+            product_data: { name: taxLabel },
           },
           quantity: 1,
         },
