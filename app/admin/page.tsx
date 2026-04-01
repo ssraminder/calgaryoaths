@@ -72,9 +72,18 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetch('/api/admin/stats')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error('Unauthorized');
+        return res.json();
+      })
       .then((data) => {
-        setStats(data);
+        setStats({
+          todayBookings: data.todayBookings ?? 0,
+          pendingReviews: data.pendingReviews ?? 0,
+          monthlyRevenue: data.monthlyRevenue ?? 0,
+          monthlyBookings: data.monthlyBookings ?? 0,
+          recentBookings: data.recentBookings ?? [],
+        });
         setLoading(false);
       })
       .catch(() => setLoading(false));
