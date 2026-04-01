@@ -10,7 +10,7 @@ const c = commissioners[1]; // Amrita Shah
 export const metadata: Metadata = {
   title: 'Commissioner of Oaths NE Calgary (Redstone) | Walk-Ins Welcome | Calgary Oaths',
   description:
-    'Commissioner of Oaths in NE Calgary — Redstone. Amrita Shah. Same-day service, walk-ins welcome. Serving Redstone, Cornerstone, Cityscape, Country Hills and surrounding areas.',
+    'Commissioner of Oaths in NE Calgary — Red Sky. Amrita Shah. Same-day service, by appointment. Serving Redstone, Cornerstone, Cityscape, Country Hills and surrounding areas.',
   alternates: { canonical: 'https://calgaryoaths.com/locations/northeast-calgary' },
   openGraph: { title: 'NE Calgary Commissioner of Oaths | Calgary Oaths', url: 'https://calgaryoaths.com/locations/northeast-calgary' },
 };
@@ -62,8 +62,8 @@ export default function NortheastCalgaryPage() {
                 Serving NE Calgary and surrounding communities
               </h2>
               <p className="text-mid-grey leading-relaxed mb-4">
-                Located at 155 Redstone Walk NE within the Redstone community, this office is convenient for
-                residents of Northeast Calgary. Free parking is available in the Redstone Walk complex.
+                Located at 220 Red Sky Terrace NE within the NE Calgary community, this office is convenient for
+                residents of Northeast Calgary. Free parking is available nearby.
               </p>
               <p className="text-mid-grey leading-relaxed">
                 NE Calgary has one of the most diverse and multicultural populations in Calgary. Amrita Shah&apos;s
@@ -87,7 +87,7 @@ export default function NortheastCalgaryPage() {
               commissionerName={c.name}
               commissionerTitle={c.title}
               address={c.address}
-              parking="Free parking available in the Redstone Walk complex."
+              parking="Free parking available nearby."
               nearbyNeighbourhoods={c.nearbyNeighbourhoods}
               googleMapsEmbed={c.googleMapsEmbed}
               mapUrl={c.mapUrl}

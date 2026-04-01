@@ -391,11 +391,12 @@ export default function EditVendorPage() {
                       {rate.offered ? (
                         <input
                           type="number"
-                          step="0.01"
+                          step="1"
                           min="0"
-                          value={rate.first_page_cents != null ? (rate.first_page_cents / 100).toFixed(2) : ''}
+                          value={rate.first_page_cents != null ? Math.round(rate.first_page_cents / 100) : ''}
                           onChange={(e) => {
-                            const cents = Math.round(parseFloat(e.target.value || '0') * 100);
+                            const dollars = parseInt(e.target.value || '0', 10);
+                            const cents = dollars * 100;
                             setVendorRates((prev) =>
                               prev.map((r) =>
                                 r.service_slug === rate.service_slug
@@ -414,11 +415,12 @@ export default function EditVendorPage() {
                       {rate.offered ? (
                         <input
                           type="number"
-                          step="0.01"
+                          step="1"
                           min="0"
-                          value={(rate.additional_page_cents / 100).toFixed(2)}
+                          value={Math.round(rate.additional_page_cents / 100)}
                           onChange={(e) => {
-                            const cents = Math.round(parseFloat(e.target.value || '0') * 100);
+                            const dollars = parseInt(e.target.value || '0', 10);
+                            const cents = dollars * 100;
                             setVendorRates((prev) =>
                               prev.map((r) =>
                                 r.service_slug === rate.service_slug

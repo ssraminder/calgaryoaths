@@ -5,7 +5,7 @@ export const commissioners = [
     title: 'Commissioner of Oaths',
     location: 'Downtown Calgary',
     locationSlug: 'downtown-calgary',
-    address: '421 7th Ave SW, Floor 30, Calgary, AB T2P 4K9',
+    address: '421 7th Ave SW, #3000, Calgary, AB T2P 4K9',
     phone: '(587) 600-0746',
     email: 'info@calgaryoaths.com',
     calendlyUrl: 'https://calendly.com/raminder-cethos/commissioner-downtown',
@@ -27,7 +27,7 @@ export const commissioners = [
     title: 'Commissioner of Oaths',
     location: 'NE Calgary — Redstone',
     locationSlug: 'northeast-calgary',
-    address: '155 Redstone Walk NE, Calgary, AB T3J 0S4',
+    address: '220 Red Sky Terrace NE, Calgary, AB T3N 1M9',
     phone: '(587) 600-0746',
     email: 'info@calgaryoaths.com',
     calendlyUrl: 'https://calendly.com/raminder-cethos/commissioner-for-oaths-calgary-ne',
@@ -40,8 +40,8 @@ export const commissioners = [
       saturday: '10:00 AM – 5:00 PM',
       sunday: 'Closed',
     },
-    googleMapsEmbed: 'https://maps.google.com/maps?q=155+Redstone+Walk+NE+Calgary&output=embed',
-    mapUrl: 'https://maps.google.com/maps?q=155+Redstone+Walk+NE+Calgary',
+    googleMapsEmbed: 'https://maps.google.com/maps?q=220+Red+Sky+Terrace+NE+Calgary+AB&output=embed',
+    mapUrl: 'https://maps.google.com/maps?q=220+Red+Sky+Terrace+NE+Calgary+AB',
   },
 ] as const;
 
