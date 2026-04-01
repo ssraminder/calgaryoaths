@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CalendarCheck, Clock, AlertTriangle } from 'lucide-react';
+import { CalendarCheck, Clock, AlertTriangle, Link as LinkIcon, Copy, Check } from 'lucide-react';
 import StatCard from '@/components/admin/StatCard';
 import StatusBadge from '@/components/admin/StatusBadge';
 
@@ -12,6 +12,7 @@ type Booking = {
   service_name: string;
   appointment_datetime: string | null;
   status: string;
+  commissioner_id?: string;
   created_at: string;
 };
 
@@ -46,6 +47,9 @@ export default function VendorDashboard() {
         <StatCard label="Today's Appointments" value={today.length} icon={CalendarCheck} />
         <StatCard label="Confirmed Upcoming" value={confirmed.length} icon={Clock} />
       </div>
+
+      {/* Booking link */}
+      <BookingLinkCard bookings={bookings} />
 
       {pending.length > 0 && (
         <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3">
@@ -87,6 +91,49 @@ export default function VendorDashboard() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function BookingLinkCard({ bookings }: { bookings: Booking[] }) {
+  const [copied, setCopied] = useState(false);
+  // Get commissioner ID from bookings or fetch from profile API
+  const [vendorId, setVendorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Try to get from bookings first
+    const id = bookings.find((b) => b.commissioner_id)?.commissioner_id;
+    if (id) { setVendorId(id); return; }
+    // Fallback: fetch from vendor profile endpoint
+    fetch('/api/vendor/bookings').then((r) => r.json()).then((d) => {
+      const cid = (Array.isArray(d) ? d : []).find((b: Booking) => b.commissioner_id)?.commissioner_id;
+      if (cid) setVendorId(cid);
+    }).catch(() => {});
+  }, [bookings]);
+
+  if (!vendorId) return null;
+
+  const bookingUrl = `https://calgaryoaths.com/book/${vendorId}`;
+
+  function handleCopy() {
+    navigator.clipboard.writeText(bookingUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 flex items-center gap-4">
+      <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center flex-shrink-0">
+        <LinkIcon size={18} className="text-gold" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900">Your booking link</p>
+        <p className="text-xs text-gray-500 truncate">{bookingUrl}</p>
+      </div>
+      <button onClick={handleCopy}
+        className="inline-flex items-center gap-1.5 rounded-md bg-navy px-3 py-1.5 text-xs font-medium text-white hover:bg-navy/90 flex-shrink-0">
+        {copied ? <><Check size={12} /> Copied!</> : <><Copy size={12} /> Copy</>}
+      </button>
     </div>
   );
 }

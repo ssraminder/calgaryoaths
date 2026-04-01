@@ -258,6 +258,22 @@ export default function EditVendorPage() {
       </button>
       <h1 className="text-2xl font-semibold text-gray-900">Edit: {commissioner.name}</h1>
 
+      {/* Booking link */}
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-gray-500 mb-1">Direct booking link</p>
+          <a href={`/book/${id}`} target="_blank" rel="noopener noreferrer"
+            className="text-sm text-navy hover:text-gold break-all">
+            calgaryoaths.com/book/{id}
+          </a>
+        </div>
+        <button type="button"
+          onClick={() => navigator.clipboard.writeText(`https://calgaryoaths.com/book/${id}`)}
+          className="rounded-md bg-navy px-3 py-1.5 text-xs font-medium text-white hover:bg-navy/90 flex-shrink-0">
+          Copy
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
         <div className="grid grid-cols-2 gap-4">
           <Field name="name" label="Full Name" defaultValue={commissioner.name} required />
