@@ -7,6 +7,8 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import BookingModal from '@/components/layout/BookingModal';
 import WhatsAppButton from '@/components/layout/WhatsAppButton';
+import { GTMHead, GTMNoScript } from '@/components/shared/GoogleTagManager';
+import { getAnalyticsSettings } from '@/lib/data/db';
 
 const playfair = Playfair_Display({
   variable: '--font-playfair',
@@ -41,17 +43,23 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const analytics = await getAnalyticsSettings();
+  const ga4Id = analytics.ga4Id || process.env.NEXT_PUBLIC_GA4_ID;
+  const gtmId = analytics.gtmId || process.env.NEXT_PUBLIC_GTM_ID;
+
   return (
     <html
       lang="en"
       className={`${playfair.variable} ${inter.variable} h-full antialiased`}
     >
+      {gtmId && <GTMHead gtmId={gtmId} />}
       <body className="min-h-full flex flex-col bg-bg text-charcoal font-body">
+        {gtmId && <GTMNoScript gtmId={gtmId} />}
         <BookingModalProvider>
           <Navbar />
           <main className="flex-1">{children}</main>
@@ -59,9 +67,7 @@ export default function RootLayout({
           <BookingModal />
           <WhatsAppButton />
         </BookingModalProvider>
-        {process.env.NEXT_PUBLIC_GA4_ID && (
-          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA4_ID} />
-        )}
+        {ga4Id && <GoogleAnalytics gaId={ga4Id} />}
       </body>
     </html>
   );

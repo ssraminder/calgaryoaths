@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2, Calendar } from 'lucide-react';
 import { BOOKING_FEES, type BookingService } from '@/lib/data/booking';
 import SlotPicker from '@/components/booking/SlotPicker';
+import { trackServiceSelected, trackBookingCreated, trackSlotConfirmed, trackConversion } from '@/lib/analytics';
 
 /* ── Validation ─────────────────────────────────────────────────────────── */
 const detailsSchema = z.object({
@@ -148,6 +149,7 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
       if (!res.ok) { setError(json.error || 'Something went wrong.'); return; }
 
       setBookingId(json.bookingId);
+      trackBookingCreated(selectedService.name, data.commissionerId);
 
       if (json.requiresReview) {
         setPendingReview(true);
@@ -182,6 +184,9 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
       }
 
       if (json.checkoutUrl) {
+        const fee = BOOKING_FEES[selectedCommissionerIdForSlots] ?? 0;
+        trackSlotConfirmed(fee);
+        trackConversion(fee);
         setRedirecting(true);
         window.location.href = json.checkoutUrl;
       }
@@ -262,7 +267,7 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             disabled={!selectedService || servicesLoading}
-            onClick={() => { loadCommissioners(selectedService!.slug); setStep(2); }}
+            onClick={() => { trackServiceSelected(selectedService!.name); loadCommissioners(selectedService!.slug); setStep(2); }}
             className="btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Continue <ChevronRight size={16} />

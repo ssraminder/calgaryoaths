@@ -129,6 +129,19 @@ export function dbToLocation(row: DbLocation): Location {
   } as unknown as Location;
 }
 
+export type AnalyticsSettings = {
+  ga4Id: string | null;
+  gtmId: string | null;
+};
+
+export async function getAnalyticsSettings(): Promise<AnalyticsSettings> {
+  const settings = await getSettings();
+  return {
+    ga4Id: settings.ga4_id ?? null,
+    gtmId: settings.gtm_id ?? null,
+  };
+}
+
 export async function getSettings(): Promise<DbSettings> {
   const { data, error } = await supabase
     .from('co_settings')
