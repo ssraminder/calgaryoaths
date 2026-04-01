@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MapPin, Clock, ExternalLink } from 'lucide-react';
-import { commissioners } from '@/lib/data/commissioners';
+import { supabase } from '@/lib/supabase';
+import { commissioners as fallbackCommissioners } from '@/lib/data/commissioners';
 import BookButton from '@/components/shared/BookButton';
 
 export const metadata: Metadata = {
@@ -12,7 +13,51 @@ export const metadata: Metadata = {
   openGraph: { title: 'Calgary Oaths Locations | Calgary Oaths', url: 'https://calgaryoaths.com/locations' },
 };
 
-export default function LocationsPage() {
+type LocationCommissioner = {
+  id: string;
+  name: string;
+  title: string;
+  location: string;
+  location_slug: string;
+  address: string;
+  calendly_url: string;
+  hours_weekdays: string;
+  hours_saturday: string;
+  hours_sunday: string;
+  google_maps_embed: string;
+  map_url: string;
+};
+
+async function getCommissioners() {
+  const { data, error } = await supabase
+    .from('co_commissioners')
+    .select('id, name, title, location, location_slug, address, calendly_url, hours_weekdays, hours_saturday, hours_sunday, google_maps_embed, map_url')
+    .eq('active', true)
+    .order('sort_order', { ascending: true });
+
+  if (error || !data?.length) {
+    // Fall back to hardcoded data if Supabase is unreachable
+    return fallbackCommissioners.map((c) => ({
+      id: c.id,
+      name: c.name,
+      title: c.title,
+      location: c.location,
+      location_slug: c.locationSlug,
+      address: c.address,
+      calendly_url: c.calendlyUrl,
+      hours_weekdays: c.hours.weekdays,
+      hours_saturday: c.hours.saturday,
+      hours_sunday: c.hours.sunday,
+      google_maps_embed: c.googleMapsEmbed,
+      map_url: c.mapUrl,
+    }));
+  }
+  return data as LocationCommissioner[];
+}
+
+export default async function LocationsPage() {
+  const commissioners = await getCommissioners();
+
   return (
     <div className="py-12 lg:py-20">
       <div className="max-content">
@@ -31,7 +76,7 @@ export default function LocationsPage() {
               {/* Map embed */}
               <div className="h-56 -mx-6 -mt-6 mb-6 overflow-hidden rounded-t-card">
                 <iframe
-                  src={c.googleMapsEmbed}
+                  src={c.google_maps_embed}
                   width="100%"
                   height="224"
                   style={{ border: 0 }}
@@ -47,7 +92,7 @@ export default function LocationsPage() {
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center flex-shrink-0">
                       <span className="text-white font-display font-bold">
-                        {c.name.split(' ').map((n) => n[0]).join('')}
+                        {c.name.split(' ').map((n: string) => n[0]).join('')}
                       </span>
                     </div>
                     <div>
@@ -58,25 +103,25 @@ export default function LocationsPage() {
                   <div className="space-y-2 text-sm text-charcoal">
                     <div className="flex items-start gap-2">
                       <MapPin size={15} className="text-gold mt-0.5 flex-shrink-0" />
-                      <a href={c.mapUrl} target="_blank" rel="noopener noreferrer" className="hover:text-gold flex items-center gap-1">
+                      <a href={c.map_url} target="_blank" rel="noopener noreferrer" className="hover:text-gold flex items-center gap-1">
                         {c.address} <ExternalLink size={11} />
                       </a>
                     </div>
                     <div className="flex items-start gap-2">
                       <Clock size={15} className="text-gold mt-0.5 flex-shrink-0" />
                       <div>
-                        <p>Mon–Fri: {c.hours.weekdays}</p>
-                        <p>Sat: {c.hours.saturday} · Sun: {c.hours.sunday}</p>
+                        <p>Mon–Fri: {c.hours_weekdays}</p>
+                        <p>Sat: {c.hours_saturday} · Sun: {c.hours_sunday}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-3 justify-end">
-                  <a href={c.calendlyUrl} target="_blank" rel="noopener noreferrer" className="btn-primary justify-center">
+                  <a href={c.calendly_url} target="_blank" rel="noopener noreferrer" className="btn-primary justify-center">
                     Book with {c.name.split(' ')[0]}
                   </a>
-                  <Link href={`/locations/${c.locationSlug}`} className="btn-secondary justify-center">
+                  <Link href={`/locations/${c.location_slug}`} className="btn-secondary justify-center">
                     View location details
                   </Link>
                 </div>

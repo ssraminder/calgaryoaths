@@ -1,8 +1,52 @@
 import Link from 'next/link';
 import { MapPin, Clock, ExternalLink } from 'lucide-react';
-import { commissioners } from '@/lib/data/commissioners';
+import { supabase } from '@/lib/supabase';
+import { commissioners as fallbackCommissioners } from '@/lib/data/commissioners';
 
-export default function LocationsSection() {
+type LocationCommissioner = {
+  id: string;
+  name: string;
+  title: string;
+  location: string;
+  location_slug: string;
+  address: string;
+  calendly_url: string;
+  hours_weekdays: string;
+  hours_saturday: string;
+  hours_sunday: string;
+  google_maps_embed: string;
+  map_url: string;
+};
+
+async function getCommissioners(): Promise<LocationCommissioner[]> {
+  const { data, error } = await supabase
+    .from('co_commissioners')
+    .select('id, name, title, location, location_slug, address, calendly_url, hours_weekdays, hours_saturday, hours_sunday, google_maps_embed, map_url')
+    .eq('active', true)
+    .order('sort_order', { ascending: true });
+
+  if (error || !data?.length) {
+    return fallbackCommissioners.map((c) => ({
+      id: c.id,
+      name: c.name,
+      title: c.title,
+      location: c.location,
+      location_slug: c.locationSlug,
+      address: c.address,
+      calendly_url: c.calendlyUrl,
+      hours_weekdays: c.hours.weekdays,
+      hours_saturday: c.hours.saturday,
+      hours_sunday: c.hours.sunday,
+      google_maps_embed: c.googleMapsEmbed,
+      map_url: c.mapUrl,
+    }));
+  }
+  return data as LocationCommissioner[];
+}
+
+export default async function LocationsSection() {
+  const commissioners = await getCommissioners();
+
   return (
     <section className="py-16 lg:py-24 bg-white">
       <div className="max-content">
@@ -19,7 +63,7 @@ export default function LocationsSection() {
               {/* Map embed */}
               <div className="h-48 -mx-6 -mt-6 mb-6 overflow-hidden">
                 <iframe
-                  src={c.googleMapsEmbed}
+                  src={c.google_maps_embed}
                   width="100%"
                   height="192"
                   style={{ border: 0 }}
@@ -33,7 +77,7 @@ export default function LocationsSection() {
               <div className="flex items-start gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-navy flex items-center justify-center flex-shrink-0">
                   <span className="text-white font-display font-bold text-sm">
-                    {c.name.split(' ').map((n) => n[0]).join('')}
+                    {c.name.split(' ').map((n: string) => n[0]).join('')}
                   </span>
                 </div>
                 <div>
@@ -46,7 +90,7 @@ export default function LocationsSection() {
                 <div className="flex items-start gap-2">
                   <MapPin size={14} className="text-gold mt-0.5 flex-shrink-0" />
                   <a
-                    href={c.mapUrl}
+                    href={c.map_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-gold transition-colors flex items-center gap-1"
@@ -58,15 +102,15 @@ export default function LocationsSection() {
                 <div className="flex items-start gap-2">
                   <Clock size={14} className="text-gold mt-0.5 flex-shrink-0" />
                   <div>
-                    <p>Mon–Fri: {c.hours.weekdays}</p>
-                    <p>Sat: {c.hours.saturday} · Sun: {c.hours.sunday}</p>
+                    <p>Mon–Fri: {c.hours_weekdays}</p>
+                    <p>Sat: {c.hours_saturday} · Sun: {c.hours_sunday}</p>
                   </div>
                 </div>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-border">
                 <a
-                  href={c.calendlyUrl}
+                  href={c.calendly_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-primary flex-1 justify-center text-xs py-2.5"
@@ -74,7 +118,7 @@ export default function LocationsSection() {
                   Book with {c.name.split(' ')[0]}
                 </a>
                 <Link
-                  href={`/locations/${c.locationSlug}`}
+                  href={`/locations/${c.location_slug}`}
                   className="btn-secondary flex-1 justify-center text-xs py-2.5"
                 >
                   View details

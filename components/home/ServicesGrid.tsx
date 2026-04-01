@@ -21,6 +21,29 @@ async function getActiveServices(): Promise<DbService[]> {
     console.error('Failed to fetch services for grid:', error.message);
     return [];
   }
+
+  // Use lowest vendor rate as "From $X" price where available
+  const { data: rates } = await supabase
+    .from('co_vendor_rates')
+    .select('service_slug, first_page_cents');
+
+  if (rates?.length) {
+    const minRateMap = new Map<string, number>();
+    for (const r of rates) {
+      if (r.first_page_cents == null) continue;
+      const current = minRateMap.get(r.service_slug);
+      if (current == null || r.first_page_cents < current) {
+        minRateMap.set(r.service_slug, r.first_page_cents);
+      }
+    }
+    for (const svc of data ?? []) {
+      const minRate = minRateMap.get(svc.slug);
+      if (minRate != null) {
+        svc.price = minRate;
+      }
+    }
+  }
+
   return data ?? [];
 }
 

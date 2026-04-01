@@ -10,6 +10,11 @@ type Service = {
   is_in_house: boolean;
 };
 
+type VendorRate = {
+  service_slug: string;
+  first_page_cents: number;
+};
+
 async function getServices(): Promise<Service[]> {
   const { data, error } = await supabase
     .from('co_services')
@@ -21,6 +26,30 @@ async function getServices(): Promise<Service[]> {
     console.error('Failed to fetch services for pricing:', error.message);
     return [];
   }
+
+  // Fetch lowest vendor rate per service to use as the "From $X" price
+  const { data: rates } = await supabase
+    .from('co_vendor_rates')
+    .select('service_slug, first_page_cents');
+
+  if (rates?.length) {
+    const minRateMap = new Map<string, number>();
+    for (const r of rates) {
+      if (r.first_page_cents == null) continue;
+      const current = minRateMap.get(r.service_slug);
+      if (current == null || r.first_page_cents < current) {
+        minRateMap.set(r.service_slug, r.first_page_cents);
+      }
+    }
+    // Override co_services.price with the lowest vendor rate where available
+    for (const svc of data ?? []) {
+      const minRate = minRateMap.get(svc.slug);
+      if (minRate != null) {
+        svc.price = minRate;
+      }
+    }
+  }
+
   return data ?? [];
 }
 

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import CommissionerCard from '@/components/shared/CommissionerCard';
-import { commissioners } from '@/lib/data/commissioners';
+import { getCommissioners, dbToCommissioner } from '@/lib/data/db';
+import { commissioners as fallbackCommissioners } from '@/lib/data/commissioners';
 
 export const metadata: Metadata = {
   title: 'About Calgary Oaths | Two Certified Commissioners in Calgary',
@@ -17,7 +18,12 @@ const languages = [
   { lang: 'Gujarati (ગુજરાતી)', flag: '🌏', note: 'Fluent — Amrita Shah' },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const dbRows = await getCommissioners();
+  const commissioners = dbRows.length > 0
+    ? dbRows.map(dbToCommissioner)
+    : fallbackCommissioners;
+
   return (
     <div className="py-12 lg:py-20">
       <div className="max-content">
