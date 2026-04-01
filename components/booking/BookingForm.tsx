@@ -115,7 +115,18 @@ function ServiceSearch({ services, selected, onSelect }: {
 }
 
 
-type DbCommissioner = { id: string; name: string; location: string; booking_fee_cents?: number; soonestSlot?: string | null };
+type DbCommissioner = {
+  id: string;
+  name: string;
+  location: string;
+  booking_fee_cents?: number;
+  soonestSlot?: string | null;
+  first_page_cents?: number | null;
+  additional_page_cents?: number | null;
+  drafting_fee_cents?: number | null;
+  mobile_available?: boolean;
+  mobile_travel_fee_cents?: number | null;
+};
 
 /* ── Main form ──────────────────────────────────────────────────────────── */
 type Step = 1 | 2 | 3;
@@ -423,15 +434,58 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
               )}
             </div>
 
-            {selectedService && !selectedService.requiresReview && bookingFeeLabel && (
-              <div className="bg-navy/5 border border-navy/10 rounded-card p-4 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-charcoal">Booking deposit</span>
-                  <span className="text-base font-bold text-navy">{bookingFeeLabel}</span>
+            {selectedService && !selectedService.requiresReview && selectedCommObj && (
+              <div className="bg-navy/5 border border-navy/10 rounded-card p-4 space-y-3">
+                {/* Booking fee */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-charcoal">Booking fee</span>
+                    <span className="text-base font-bold text-navy">{bookingFeeLabel ?? '—'}</span>
+                  </div>
+                  <p className="text-xs text-mid-grey mt-0.5">
+                    Charged now to secure your appointment slot.
+                  </p>
                 </div>
-                <p className="text-xs text-mid-grey leading-relaxed">
-                  Pricing is <span className="font-medium text-charcoal">$40 for the first document, $15 for each additional</span>.
-                  The deposit secures your appointment — <span className="font-medium text-charcoal">final payment is collected at your appointment</span> based on the actual number of documents.
+
+                {/* Service rates */}
+                {(selectedCommObj.first_page_cents != null || selectedService.price != null) && (
+                  <div className="border-t border-navy/10 pt-3">
+                    <p className="text-xs font-medium text-charcoal mb-1.5">Service rates</p>
+                    <div className="space-y-1 text-xs text-mid-grey">
+                      <div className="flex justify-between">
+                        <span>First document</span>
+                        <span className="font-medium text-charcoal">
+                          {selectedCommObj.first_page_cents != null
+                            ? `$${(selectedCommObj.first_page_cents / 100).toFixed(0)}`
+                            : selectedService.price != null
+                              ? `$${(selectedService.price / 100).toFixed(0)}`
+                              : 'Quote'}
+                        </span>
+                      </div>
+                      {selectedCommObj.additional_page_cents != null && (
+                        <div className="flex justify-between">
+                          <span>Each additional document</span>
+                          <span className="font-medium text-charcoal">${(selectedCommObj.additional_page_cents / 100).toFixed(0)}</span>
+                        </div>
+                      )}
+                      {selectedCommObj.drafting_fee_cents != null && selectedCommObj.drafting_fee_cents > 0 && (
+                        <div className="flex justify-between">
+                          <span>Document drafting</span>
+                          <span className="font-medium text-charcoal">${(selectedCommObj.drafting_fee_cents / 100).toFixed(0)}</span>
+                        </div>
+                      )}
+                      {selectedCommObj.mobile_available && selectedCommObj.mobile_travel_fee_cents != null && (
+                        <div className="flex justify-between">
+                          <span>Mobile travel fee</span>
+                          <span className="font-medium text-charcoal">${(selectedCommObj.mobile_travel_fee_cents / 100).toFixed(0)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs text-mid-grey leading-relaxed border-t border-navy/10 pt-2">
+                  The booking fee secures your appointment. <span className="font-medium text-charcoal">Final price is collected when the service is rendered</span> based on the actual number of documents.
                 </p>
               </div>
             )}
@@ -471,7 +525,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
             {selectedService && !selectedService.requiresReview && (
               <p className="text-center text-xs text-mid-grey">
-                A deposit of <strong>{bookingFeeLabel ?? '…'}</strong> will be charged after scheduling. Final payment at your appointment.
+                A booking fee of <strong>{bookingFeeLabel ?? '…'}</strong> will be charged after scheduling. Final price collected when service is rendered.
               </p>
             )}
           </div>
@@ -521,12 +575,12 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             {scheduling ? (
               <><Loader2 size={16} className="animate-spin" /> Confirming…</>
             ) : (
-              <><Calendar size={16} /> Confirm & pay deposit {bookingFeeLabel ? `— ${bookingFeeLabel}` : ''}</>
+              <><Calendar size={16} /> Confirm & pay booking fee {bookingFeeLabel ? `— ${bookingFeeLabel}` : ''}</>
             )}
           </button>
 
           <p className="text-center text-xs text-mid-grey mt-2">
-            Final payment collected at your appointment based on number of documents.
+            Final price collected when service is rendered, based on the number of documents.
           </p>
         </div>
       )}

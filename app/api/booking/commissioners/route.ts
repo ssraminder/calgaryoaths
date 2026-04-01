@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   const { data: commissioners, error: comError } = await supabase
     .from('co_commissioners')
-    .select('id, name, location, booking_fee_cents, languages')
+    .select('id, name, location, booking_fee_cents, languages, mobile_available, mobile_travel_fee_cents')
     .in('id', ids)
     .eq('active', true)
     .order('sort_order', { ascending: true });
@@ -33,6 +33,17 @@ export async function GET(req: NextRequest) {
   if (comError) {
     return NextResponse.json({ error: 'Failed to load commissioners' }, { status: 500 });
   }
+
+  // Fetch vendor rates for this service
+  const { data: rates } = await supabase
+    .from('co_vendor_rates')
+    .select('commissioner_id, first_page_cents, additional_page_cents, drafting_fee_cents')
+    .eq('service_slug', serviceSlug)
+    .in('commissioner_id', ids);
+
+  const rateMap = new Map(
+    (rates ?? []).map((r) => [r.commissioner_id, r])
+  );
 
   // For each commissioner, find the soonest available slot
   const now = new Date();
@@ -99,7 +110,14 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      return { ...c, soonestSlot };
+      const rate = rateMap.get(c.id);
+      return {
+        ...c,
+        soonestSlot,
+        first_page_cents: rate?.first_page_cents ?? null,
+        additional_page_cents: rate?.additional_page_cents ?? null,
+        drafting_fee_cents: rate?.drafting_fee_cents ?? null,
+      };
     })
   );
 
