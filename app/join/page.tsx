@@ -10,9 +10,9 @@ export const metadata: Metadata = {
 };
 
 const valueProps = [
-  { icon: '📱', title: 'Get client bookings', desc: 'We handle marketing and lead generation. You focus on commissioning.' },
-  { icon: '📣', title: 'We handle the marketing', desc: 'Your name appears on our site and clients find you through our SEO.' },
-  { icon: '🕐', title: 'Flexible hours', desc: 'Set your own availability. Accept bookings that fit your schedule.' },
+  { icon: '📱', title: 'Get client bookings', desc: 'We handle marketing, SEO, and lead generation — clients book directly with you.' },
+  { icon: '💰', title: 'Set your own rates', desc: 'Configure per-service pricing in your partner portal. Get paid weekly.' },
+  { icon: '🕐', title: 'Flexible schedule', desc: 'Set your own availability. Accept in-office, mobile, or virtual appointments.' },
 ];
 
 export default function JoinPage() {
