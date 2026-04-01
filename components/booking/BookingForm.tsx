@@ -105,27 +105,26 @@ function ServiceGrid({ services, selected, onSelect }: {
 }
 
 
-type CommLocation = { id: string; name: string; address: string };
-
-type DbCommissioner = {
-  id: string;
-  name: string;
-  location: string;
-  address?: string;
-  booking_fee_cents?: number;
-  languages?: string[];
+/** Each option is a location + its commissioner's info */
+type LocationOption = {
+  locationId: string;
+  locationName: string;
+  locationAddress: string;
   areas_served?: string[];
-  soonestSlot?: string | null;
-  soonestLocationId?: string | null;
-  locations?: CommLocation[];
-  first_page_cents?: number | null;
-  additional_page_cents?: number | null;
-  drafting_fee_cents?: number | null;
+  commissionerId: string;
+  commissionerName: string;
+  languages?: string[];
   mobile_available?: boolean;
   mobile_travel_fee_cents?: number | null;
   virtual_available?: boolean;
   commission_rate?: number;
   commission_mode?: 'absorb' | 'pass_to_customer';
+  booking_fee_cents?: number;
+  first_page_cents?: number | null;
+  additional_page_cents?: number | null;
+  drafting_fee_cents?: number | null;
+  soonestSlot?: string | null;
+  hasAvailability?: boolean;
 };
 
 type PricingConfig = {
@@ -134,15 +133,15 @@ type PricingConfig = {
 };
 
 /** Calculate customer-facing price for a commissioner's service rate */
-function customerPrice(baseCents: number, comm: DbCommissioner): number {
+function customerPrice(baseCents: number, comm: { commission_mode?: string; commission_rate?: number }): number {
   if (comm.commission_mode === 'pass_to_customer' && comm.commission_rate) {
     return Math.round(baseCents * (1 + comm.commission_rate / 100));
   }
   return baseCents;
 }
 
-/* ── Sort commissioners ────────────────────────────────────────────────── */
-function sortedCommissioners(list: DbCommissioner[], filter: 'all' | 'soonest' | 'price'): DbCommissioner[] {
+/* ── Sort location options ─────────────────────────────────────────────── */
+function sortedOptions(list: LocationOption[], filter: 'all' | 'soonest' | 'price'): LocationOption[] {
   const sorted = [...list];
   if (filter === 'soonest') {
     sorted.sort((a, b) => {
@@ -169,10 +168,10 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   const [services, setServices] = useState<BookingService[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [selectedService, setSelectedService] = useState<BookingService | null>(null);
-  const [availableCommissioners, setAvailableCommissioners] = useState<DbCommissioner[]>([]);
-  const [commissionersLoading, setCommissionersLoading] = useState(false);
+  const [locationOptions, setLocationOptions] = useState<LocationOption[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
-  const [selectedCommissionerIdForSlots, setSelectedCommissionerIdForSlots] = useState<string>('');
+  const [selectedCommIdForSlots, setSelectedCommIdForSlots] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [scheduling, setScheduling] = useState(false);
@@ -181,8 +180,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   const [error, setError] = useState<string | null>(null);
   const [slotError, setSlotError] = useState<string | null>(null);
   // Commissioner selection (step 2)
-  const [selectedCommissioner, setSelectedCommissioner] = useState<DbCommissioner | null>(null);
-  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const [selectedOption, setSelectedOption] = useState<LocationOption | null>(null);
   const [commFilter, setCommFilter] = useState<'all' | 'soonest' | 'price'>('soonest');
   // Pricing config
   const [pricing, setPricing] = useState<PricingConfig>({ convenienceFeeCents: 499, tax: { total_rate: 0.05, gst_rate: 0.05, pst_rate: 0, hst_rate: 0 } });
@@ -200,14 +198,14 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   }, []);
 
   // Fetch commissioners when service is selected and user advances to step 2
-  async function loadCommissioners(serviceSlug: string) {
-    setCommissionersLoading(true);
+  async function loadOptions(serviceSlug: string) {
+    setOptionsLoading(true);
     try {
       const res = await fetch(`/api/booking/commissioners?serviceSlug=${serviceSlug}`);
       const json = await res.json();
-      setAvailableCommissioners(json.commissioners ?? []);
+      setLocationOptions(json.options ?? []);
     } finally {
-      setCommissionersLoading(false);
+      setOptionsLoading(false);
     }
   }
 
@@ -223,13 +221,13 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   const [travelFeeData, setTravelFeeData] = useState<{ travelFeeCents: number; distanceKm: number | null; distanceText?: string; durationText?: string } | null>(null);
   const [travelFeeLoading, setTravelFeeLoading] = useState(false);
   const [customerAddr, setCustomerAddr] = useState('');
-  const travelFee = isMobile ? (travelFeeData?.travelFeeCents ?? selectedCommissioner?.mobile_travel_fee_cents ?? 3000) : 0;
+  const travelFee = isMobile ? (travelFeeData?.travelFeeCents ?? selectedOption?.mobile_travel_fee_cents ?? 3000) : 0;
 
   async function calcTravelFee(address: string) {
-    if (!address || !selectedCommissioner) return;
+    if (!address || !selectedOption) return;
     setTravelFeeLoading(true);
     try {
-      const params = new URLSearchParams({ commissionerId: selectedCommissioner.id, address });
+      const params = new URLSearchParams({ commissionerId: selectedOption.commissionerId, address });
       const res = await fetch(`/api/booking/travel-fee?${params}`);
       const data = await res.json();
       setTravelFeeData(data);
@@ -241,8 +239,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   }
 
   // Booking fee = minimum service charge (first document rate), adjusted for commission mode
-  const baseServiceFee = selectedCommissioner?.first_page_cents ?? selectedService?.price ?? selectedCommissioner?.booking_fee_cents ?? null;
-  const bookingFee = baseServiceFee && selectedCommissioner ? customerPrice(baseServiceFee, selectedCommissioner) : baseServiceFee;
+  const baseServiceFee = selectedOption?.first_page_cents ?? selectedService?.price ?? selectedOption?.booking_fee_cents ?? null;
+  const bookingFee = baseServiceFee && selectedOption ? customerPrice(baseServiceFee, selectedOption) : baseServiceFee;
   const bookingFeeLabel = bookingFee ? `$${(bookingFee / 100).toFixed(2)}` : null;
 
   // Full breakdown for display
@@ -272,7 +270,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           customerAddress: data.customerAddress || '',
           travelFeeCents: isMobile ? travelFee : 0,
           travelDistanceKm: travelFeeData?.distanceKm ?? null,
-          locationId: selectedLocationId || null,
+          locationId: selectedOption?.locationId || null,
           ...(rebookToken ? { rebookToken } : {}),
         }),
       });
@@ -286,10 +284,10 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
       if (json.requiresReview) {
         setPendingReview(true);
       } else if (json.paymentTransferred) {
-        setSelectedCommissionerIdForSlots(data.commissionerId);
+        setSelectedCommIdForSlots(data.commissionerId);
         setStep(4);
       } else {
-        setSelectedCommissionerIdForSlots(data.commissionerId);
+        setSelectedCommIdForSlots(data.commissionerId);
         setStep(4);
       }
     } catch {
@@ -323,7 +321,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
         setRedirecting(true);
         window.location.href = `${window.location.origin}/booking/success?appointment=confirmed`;
       } else if (json.checkoutUrl) {
-        const fee = BOOKING_FEES[selectedCommissionerIdForSlots] ?? 0;
+        const fee = BOOKING_FEES[selectedCommIdForSlots] ?? 0;
         trackSlotConfirmed(fee);
         trackConversion(fee);
         setRedirecting(true);
@@ -401,7 +399,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           <button
             type="button"
             disabled={!selectedService || servicesLoading}
-            onClick={() => { trackServiceSelected(selectedService!.name); loadCommissioners(selectedService!.slug); setStep(2); }}
+            onClick={() => { trackServiceSelected(selectedService!.name); loadOptions(selectedService!.slug); setStep(2); }}
             className="btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Continue <ChevronRight size={16} />
@@ -418,7 +416,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
               <ChevronLeft size={18} />
             </button>
             <div>
-              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">Choose a commissioner</h3>
+              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">Choose a location</h3>
               <p className="text-xs text-mid-grey">{selectedService?.name}</p>
             </div>
           </div>
@@ -434,40 +432,37 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           </div>
 
           <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
-            {commissionersLoading ? (
+            {optionsLoading ? (
               <div className="flex items-center justify-center py-8 gap-2 text-mid-grey text-sm">
-                <Loader2 size={15} className="animate-spin" /> Loading commissioners…
+                <Loader2 size={15} className="animate-spin" /> Loading locations…
               </div>
             ) : (
-              sortedCommissioners(availableCommissioners, commFilter).map((c) => {
-                const basePrice = c.first_page_cents ?? selectedService?.price ?? c.booking_fee_cents;
-                const price = basePrice ? customerPrice(basePrice, c) : null;
+              sortedOptions(locationOptions, commFilter).map((opt) => {
+                const basePrice = opt.first_page_cents ?? selectedService?.price ?? opt.booking_fee_cents;
+                const price = basePrice ? customerPrice(basePrice, opt) : null;
                 const priceLabel = price ? `$${(price / 100).toFixed(0)}` : 'Quote';
-                const soonest = c.soonestSlot
-                  ? new Date(c.soonestSlot).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', weekday: 'short', month: 'short', day: 'numeric' })
+                const soonest = opt.soonestSlot
+                  ? new Date(opt.soonestSlot).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', weekday: 'short', month: 'short', day: 'numeric' })
                   : null;
-                const isSelected = selectedCommissioner?.id === c.id;
+                const isSelected = selectedOption?.locationId === opt.locationId;
 
                 return (
-                  <button key={c.id} type="button" onClick={() => setSelectedCommissioner(c)}
+                  <button key={opt.locationId} type="button" onClick={() => setSelectedOption(opt)}
                     className={`w-full text-left p-4 rounded-card border-2 transition-all duration-150 ${isSelected ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50 hover:bg-bg'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-charcoal text-sm">{c.name}</p>
-                        <p className="text-xs text-mid-grey mt-0.5">
-                          {(c.locations ?? []).length > 1
-                            ? `${(c.locations ?? []).length} locations: ${(c.locations ?? []).map((l) => l.name).join(', ')}`
-                            : c.location}{c.address && (c.locations ?? []).length <= 1 ? ` · ${c.address}` : ''}
-                        </p>
-                        {c.languages && c.languages.length > 0 && (
-                          <p className="text-[11px] text-mid-grey mt-1">{c.languages.join(', ')}</p>
+                        <p className="font-medium text-charcoal text-sm">{opt.locationName}</p>
+                        {opt.locationAddress && <p className="text-xs text-mid-grey mt-0.5">{opt.locationAddress}</p>}
+                        <p className="text-[11px] text-mid-grey mt-1">Commissioner: {opt.commissionerName}</p>
+                        {opt.languages && opt.languages.length > 0 && (
+                          <p className="text-[11px] text-mid-grey">{opt.languages.join(', ')}</p>
                         )}
-                        {c.areas_served && c.areas_served.length > 0 && (
+                        {opt.areas_served && opt.areas_served.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
-                            {c.areas_served.slice(0, 4).map((a) => (
+                            {opt.areas_served.slice(0, 4).map((a) => (
                               <span key={a} className="text-[10px] bg-bg text-mid-grey px-1.5 py-0.5 rounded-pill">{a}</span>
                             ))}
-                            {c.areas_served.length > 4 && <span className="text-[10px] text-mid-grey">+{c.areas_served.length - 4} more</span>}
+                            {opt.areas_served.length > 4 && <span className="text-[10px] text-mid-grey">+{opt.areas_served.length - 4} more</span>}
                           </div>
                         )}
                       </div>
@@ -484,8 +479,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                           </span>
                         )}
                         <div className="flex gap-1 mt-0.5">
-                          {c.mobile_available && <span className="text-[10px] bg-navy/5 text-navy px-1.5 py-0.5 rounded-pill">Mobile</span>}
-                          {c.virtual_available && <span className="text-[10px] bg-navy/5 text-navy px-1.5 py-0.5 rounded-pill">Virtual</span>}
+                          {opt.mobile_available && <span className="text-[10px] bg-navy/5 text-navy px-1.5 py-0.5 rounded-pill">Mobile</span>}
+                          {opt.virtual_available && <span className="text-[10px] bg-navy/5 text-navy px-1.5 py-0.5 rounded-pill">Virtual</span>}
                         </div>
                       </div>
                     </div>
@@ -493,17 +488,14 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 );
               })
             )}
-            {!commissionersLoading && availableCommissioners.length === 0 && (
-              <p className="text-center text-sm text-mid-grey py-6">No commissioners available for this service.</p>
+            {!optionsLoading && locationOptions.length === 0 && (
+              <p className="text-center text-sm text-mid-grey py-6">No locations available for this service.</p>
             )}
           </div>
 
-          <button type="button" disabled={!selectedCommissioner}
+          <button type="button" disabled={!selectedOption}
             onClick={() => {
-              setValue('commissionerId', selectedCommissioner!.id);
-              const locs = selectedCommissioner!.locations ?? [];
-              if (locs.length === 1) setSelectedLocationId(locs[0].id);
-              else if (locs.length === 0) setSelectedLocationId('');
+              setValue('commissionerId', selectedOption!.commissionerId);
               setStep(3);
             }}
             className="btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -523,7 +515,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             </button>
             <div>
               <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">Your details</h3>
-              <p className="text-xs text-mid-grey">{selectedService?.name} · {selectedCommissioner?.name}</p>
+              <p className="text-xs text-mid-grey">{selectedService?.name} · {selectedOption?.locationName} · {selectedOption?.commissionerName}</p>
             </div>
           </div>
 
@@ -549,33 +541,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
             <input type="hidden" {...register('commissionerId')} />
 
-            {/* Location selection — if commissioner has multiple locations */}
-            {selectedCommissioner && (selectedCommissioner.locations ?? []).length > 1 && (
-              <div>
-                <label className="block text-sm font-medium text-charcoal mb-2">Location *</label>
-                <div className="space-y-2">
-                  {(selectedCommissioner.locations ?? []).map((loc) => (
-                    <label key={loc.id} className={`flex items-center gap-3 p-3 rounded-card border-2 cursor-pointer transition-all ${selectedLocationId === loc.id ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'}`}>
-                      <input
-                        type="radio"
-                        name="locationId"
-                        value={loc.id}
-                        checked={selectedLocationId === loc.id}
-                        onChange={() => setSelectedLocationId(loc.id)}
-                        className="sr-only"
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-charcoal">{loc.name}</p>
-                        {loc.address && <p className="text-xs text-mid-grey">{loc.address}</p>}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Delivery mode — only if commissioner offers mobile */}
-            {selectedCommissioner?.mobile_available && (
+            {selectedOption?.mobile_available && (
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-charcoal mb-2">Appointment type *</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -631,7 +598,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
               </div>
             )}
 
-            {selectedService && !selectedService.requiresReview && selectedCommissioner && bookingFee && (
+            {selectedService && !selectedService.requiresReview && selectedOption && bookingFee && (
               <div className="bg-navy/5 border border-navy/10 rounded-card p-4 space-y-3">
                 {/* Charged now — full breakdown */}
                 <div>
@@ -663,20 +630,20 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 </div>
 
                 {/* Additional charges at appointment */}
-                {(selectedCommissioner.additional_page_cents != null || selectedCommissioner.drafting_fee_cents != null || selectedCommissioner.mobile_travel_fee_cents != null) && (
+                {(selectedOption.additional_page_cents != null || selectedOption.drafting_fee_cents != null || selectedOption.mobile_travel_fee_cents != null) && (
                   <div className="border-t border-navy/10 pt-3">
                     <p className="text-xs font-medium text-mid-grey uppercase tracking-wide mb-2">At appointment (if applicable)</p>
                     <div className="space-y-1.5 text-xs">
-                      {selectedCommissioner.additional_page_cents != null && (
+                      {selectedOption.additional_page_cents != null && (
                         <div className="flex justify-between text-charcoal">
                           <span>Each additional document</span>
-                          <span className="font-medium">${(customerPrice(selectedCommissioner.additional_page_cents, selectedCommissioner) / 100).toFixed(2)}</span>
+                          <span className="font-medium">${(customerPrice(selectedOption.additional_page_cents, selectedOption) / 100).toFixed(2)}</span>
                         </div>
                       )}
-                      {selectedCommissioner.drafting_fee_cents != null && selectedCommissioner.drafting_fee_cents > 0 && (
+                      {selectedOption.drafting_fee_cents != null && selectedOption.drafting_fee_cents > 0 && (
                         <div className="flex justify-between text-charcoal">
                           <span>Document drafting</span>
-                          <span className="font-medium">${(customerPrice(selectedCommissioner.drafting_fee_cents, selectedCommissioner) / 100).toFixed(2)}</span>
+                          <span className="font-medium">${(customerPrice(selectedOption.drafting_fee_cents, selectedOption) / 100).toFixed(2)}</span>
                         </div>
                       )}
                       {/* Mobile travel fee is charged upfront, not at appointment */}
@@ -755,8 +722,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           </div>
 
           <SlotPicker
-            commissionerId={selectedCommissionerIdForSlots}
-            locationId={selectedLocationId || undefined}
+            commissionerId={selectedCommIdForSlots}
+            locationId={selectedOption?.locationId || undefined}
             onSelect={(iso) => { setSelectedSlot(iso); setSlotError(null); }}
           />
 
