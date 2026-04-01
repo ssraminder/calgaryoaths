@@ -42,118 +42,190 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', bookingId);
 
-      // Fetch booking details
-      const { data: booking } = await supabaseAdmin
-        .from('co_bookings')
-        .select('*')
-        .eq('id', bookingId)
+      const { data: booking } = await supabaseAdmin.from('co_bookings').select('*').eq('id', bookingId).single();
+      if (!booking) return NextResponse.json({ received: true });
+
+      const { data: commissioner } = await supabaseAdmin
+        .from('co_commissioners')
+        .select('name, email, address, phone')
+        .eq('id', booking.commissioner_id)
         .single();
 
-      if (booking) {
-        const { data: commissioner } = await supabaseAdmin
-          .from('co_commissioners')
-          .select('name, email, address, phone')
-          .eq('id', booking.commissioner_id)
-          .single();
+      const { data: service } = await supabaseAdmin
+        .from('co_services')
+        .select('what_to_bring, important_notes, what_is_included, signers_required')
+        .eq('slug', booking.service_slug)
+        .single();
 
-        // Get location details
-        const { data: location } = booking.location_id
-          ? await supabaseAdmin.from('co_locations').select('name, address').eq('id', booking.location_id).single()
-          : { data: null };
+      const { data: location } = booking.location_id
+        ? await supabaseAdmin.from('co_locations').select('name, address').eq('id', booking.location_id).single()
+        : { data: null };
 
-        const vendorEmail = commissioner?.email || '';
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-        const actionUrl = `${siteUrl}/booking/vendor-action?token=${vendorToken}`;
-        const acceptUrl = `${actionUrl}&action=accept`;
-        const isMobile = booking.delivery_mode === 'mobile';
+      const vendorEmail = commissioner?.email || '';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const actionUrl = `${siteUrl}/booking/vendor-action?token=${vendorToken}`;
+      const acceptUrl = `${actionUrl}&action=accept`;
+      const isMobile = booking.delivery_mode === 'mobile';
 
-        const apptDate = booking.appointment_datetime
-          ? new Date(booking.appointment_datetime).toLocaleString('en-CA', {
-              timeZone: 'America/Edmonton', dateStyle: 'full', timeStyle: 'short',
-            })
-          : 'Not specified';
+      const apptDate = booking.appointment_datetime
+        ? new Date(booking.appointment_datetime).toLocaleString('en-CA', {
+            timeZone: 'America/Edmonton', dateStyle: 'full', timeStyle: 'short',
+          })
+        : 'To be confirmed';
 
-        const locationText = isMobile
-          ? `Mobile — ${booking.customer_address || 'Customer location'}`
-          : location?.name ? `${location.name} — ${location.address}` : commissioner?.address || '';
+      const locationText = isMobile
+        ? `Mobile service — ${booking.customer_address || 'Customer location'}`
+        : location?.name ? `${location.name} — ${location.address}` : commissioner?.address || '';
 
-        const bookingTable = `
-          <table style="border-collapse:collapse;width:100%;margin:16px 0">
-            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Service</td><td style="padding:8px;border:1px solid #ddd">${booking.service_name}</td></tr>
-            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Customer</td><td style="padding:8px;border:1px solid #ddd">${booking.name}</td></tr>
-            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #ddd"><a href="mailto:${booking.email}">${booking.email}</a></td></tr>
-            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Phone</td><td style="padding:8px;border:1px solid #ddd"><a href="tel:${booking.phone}">${booking.phone}</a></td></tr>
-            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Requested Time</td><td style="padding:8px;border:1px solid #ddd"><strong>${apptDate}</strong></td></tr>
-            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Location</td><td style="padding:8px;border:1px solid #ddd">${locationText}</td></tr>
-            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Documents</td><td style="padding:8px;border:1px solid #ddd">${booking.num_documents}</td></tr>
-            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Amount Paid</td><td style="padding:8px;border:1px solid #ddd">$${((booking.amount_paid || 0) / 100).toFixed(2)}</td></tr>
-            ${booking.notes ? `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Notes</td><td style="padding:8px;border:1px solid #ddd">${booking.notes}</td></tr>` : ''}
-          </table>`;
+      const whatToBring = service?.what_to_bring ?? ['Valid government-issued photo ID', 'Your documents — unsigned'];
+      const importantNotes = service?.important_notes ?? ['Do NOT sign documents before the appointment'];
+      const whatIsIncluded = service?.what_is_included ?? [];
+      const signersRequired = service?.signers_required ?? 1;
 
-        // 1. CUSTOMER confirmation email
-        try {
-          await sendEmail({
-            to: booking.email,
-            subject: `Booking received — ${booking.service_name} — Calgary Oaths`,
-            html: `
-              <h2>Your Booking Has Been Received!</h2>
-              <p>Hi ${booking.name},</p>
-              <p>Thank you for your payment. Here are your booking details:</p>
-              ${bookingTable}
-              <p><strong>Commissioner:</strong> ${commissioner?.name || ''}</p>
-              <p><strong>What happens next:</strong></p>
-              <ol>
-                <li>Your commissioner will review and confirm your appointment time.</li>
-                <li>You'll receive a confirmation email with the final details and what to bring.</li>
-                <li>If the time doesn't work, they'll propose an alternative — you can accept, choose another vendor, or request a refund.</li>
-              </ol>
-              <p style="margin-top:16px;padding:12px;background:#f8f7f4;border-radius:8px;">
-                <strong>Important:</strong> Bring a valid government-issued photo ID and your documents <strong>unsigned</strong>.
-              </p>
-              <p>Questions? Contact us at <a href="mailto:info@calgaryoaths.com">info@calgaryoaths.com</a> or <a href="tel:5876000746">(587) 600-0746</a>.</p>
-              <p>Thank you,<br/>Calgary Oaths</p>
-            `,
-          });
-        } catch (e) { console.error('Customer payment email error:', e); }
+      const bringListHtml = whatToBring.map((item: string) => `<li style="margin-bottom:4px;">${item}</li>`).join('');
+      const notesHtml = importantNotes.map((item: string) => `<li style="margin-bottom:4px;color:#b45309;"><strong>${item}</strong></li>`).join('');
+      const includedHtml = whatIsIncluded.map((item: string) => `<li style="margin-bottom:4px;">${item}</li>`).join('');
 
-        // 2. VENDOR notification email (with accept/suggest actions)
-        if (vendorEmail) {
-          try {
-            await sendEmail({
-              to: vendorEmail,
-              subject: `New booking — ${booking.name} — ${booking.service_name}`,
-              html: `
-                <h2>New Booking Received</h2>
-                <p>A customer has paid and is waiting for your confirmation.</p>
-                ${bookingTable}
-                <div style="margin:24px 0;">
-                  <a href="${acceptUrl}" style="display:inline-block;padding:14px 28px;background:#1B3A5C;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;margin-right:12px;">Confirm This Time</a>
-                  <a href="${actionUrl}" style="display:inline-block;padding:14px 28px;background:#C8922A;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">Suggest Another Time</a>
+      const signersNote = signersRequired > 1
+        ? `<p style="margin-top:12px;padding:10px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;font-size:14px;"><strong>⚠ ${signersRequired} people required:</strong> This service requires ${signersRequired} people to be present, each with valid government-issued photo ID.</p>`
+        : '';
+
+      const bookingDetailsTable = `
+        <table style="border-collapse:collapse;width:100%;margin:16px 0;font-size:14px;">
+          <tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4;width:35%">Service</td><td style="padding:10px;border:1px solid #e2e0da">${booking.service_name}</td></tr>
+          <tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Customer</td><td style="padding:10px;border:1px solid #e2e0da">${booking.name}</td></tr>
+          <tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Email</td><td style="padding:10px;border:1px solid #e2e0da"><a href="mailto:${booking.email}">${booking.email}</a></td></tr>
+          <tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Phone</td><td style="padding:10px;border:1px solid #e2e0da"><a href="tel:${booking.phone}">${booking.phone}</a></td></tr>
+          <tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Appointment</td><td style="padding:10px;border:1px solid #e2e0da"><strong>${apptDate}</strong></td></tr>
+          <tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Location</td><td style="padding:10px;border:1px solid #e2e0da">${locationText}</td></tr>
+          <tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Documents</td><td style="padding:10px;border:1px solid #e2e0da">${booking.num_documents}</td></tr>
+          <tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Amount Paid</td><td style="padding:10px;border:1px solid #e2e0da;color:#1D9E75;font-weight:bold">$${((booking.amount_paid || 0) / 100).toFixed(2)} CAD</td></tr>
+          ${booking.notes ? `<tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Customer Notes</td><td style="padding:10px;border:1px solid #e2e0da">${booking.notes}</td></tr>` : ''}
+        </table>`;
+
+      // ──────── 1. CUSTOMER EMAIL ────────
+      try {
+        await sendEmail({
+          to: booking.email,
+          subject: `Booking received — ${booking.service_name} — Calgary Oaths`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+              <div style="background:#1B3A5C;padding:24px;border-radius:8px 8px 0 0;">
+                <h1 style="color:white;margin:0;font-size:22px;">Booking Received</h1>
+              </div>
+              <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
+                <p style="font-size:16px;">Hi ${booking.name},</p>
+                <p>Thank you for your booking. Your payment of <strong>$${((booking.amount_paid || 0) / 100).toFixed(2)}</strong> has been received.</p>
+
+                ${bookingDetailsTable}
+
+                <p><strong>Commissioner:</strong> ${commissioner?.name || ''}</p>
+                ${commissioner?.phone ? `<p><strong>Commissioner Phone:</strong> <a href="tel:${commissioner.phone}">${commissioner.phone}</a></p>` : ''}
+
+                ${signersNote}
+
+                <h3 style="color:#1B3A5C;margin-top:24px;border-bottom:2px solid #C8922A;padding-bottom:8px;">📋 What to Bring</h3>
+                <ul style="padding-left:20px;">${bringListHtml}</ul>
+
+                <h3 style="color:#b45309;margin-top:20px;">⚠ Important</h3>
+                <ul style="padding-left:20px;list-style:none;">${notesHtml}</ul>
+
+                ${includedHtml ? `<h3 style="color:#1B3A5C;margin-top:20px;">✓ What's Included</h3><ul style="padding-left:20px;">${includedHtml}</ul>` : ''}
+
+                <div style="margin-top:24px;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
+                  <p style="margin:0;font-size:14px;"><strong>What happens next?</strong></p>
+                  <ol style="margin:8px 0 0;padding-left:20px;font-size:14px;">
+                    <li>Your commissioner will confirm your appointment time.</li>
+                    <li>You'll receive a confirmation email with final details.</li>
+                    <li>If the time doesn't work, you'll be offered alternatives or a refund.</li>
+                  </ol>
                 </div>
-                <p style="color:#888;font-size:13px;">You can also manage this booking from your <a href="${siteUrl}/vendor/bookings">Partner Portal</a>.</p>
-              `,
-            });
-          } catch (e) { console.error('Vendor notification email error:', e); }
-        }
 
-        // 3. ADMIN notification email
+                <p style="margin-top:20px;font-size:13px;color:#6B6B68;">Questions? <a href="mailto:info@calgaryoaths.com">info@calgaryoaths.com</a> or <a href="tel:5876000746">(587) 600-0746</a></p>
+              </div>
+            </div>
+          `,
+        });
+      } catch (e) { console.error('Customer email error:', e); }
+
+      // ──────── 2. VENDOR EMAIL ────────
+      if (vendorEmail) {
         try {
           await sendEmail({
-            to: 'info@calgaryoaths.com',
-            subject: `[Admin] New paid booking — ${booking.name} — ${booking.service_name}`,
+            to: vendorEmail,
+            subject: `New booking — ${booking.name} — ${booking.service_name}`,
             html: `
-              <h2>New Paid Booking</h2>
-              <p>A new booking has been paid and is awaiting commissioner confirmation.</p>
-              ${bookingTable}
-              <p><strong>Commissioner:</strong> ${commissioner?.name || booking.commissioner_id} (${vendorEmail || 'no email'})</p>
-              <p><strong>Booking ID:</strong> ${bookingId}</p>
-              <div style="margin:16px 0;">
-                <a href="${siteUrl}/admin/bookings/${bookingId}" style="display:inline-block;padding:10px 20px;background:#1B3A5C;color:white;text-decoration:none;border-radius:6px;font-size:14px;">View in Admin Panel</a>
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                <div style="background:#1B3A5C;padding:24px;border-radius:8px 8px 0 0;">
+                  <h1 style="color:white;margin:0;font-size:22px;">New Booking — Action Required</h1>
+                </div>
+                <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
+                  <p>A customer has booked and paid. Please confirm or suggest a different time.</p>
+
+                  ${bookingDetailsTable}
+
+                  ${signersNote}
+
+                  <h3 style="color:#1B3A5C;">Service includes:</h3>
+                  <ul style="padding-left:20px;">${includedHtml || '<li>Standard commissioning</li>'}</ul>
+
+                  <div style="margin:24px 0;text-align:center;">
+                    <a href="${acceptUrl}" style="display:inline-block;padding:14px 32px;background:#1B3A5C;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;margin-right:12px;">✓ Confirm This Time</a>
+                    <a href="${actionUrl}" style="display:inline-block;padding:14px 32px;background:#C8922A;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">⏰ Suggest Another Time</a>
+                  </div>
+
+                  <p style="color:#888;font-size:13px;text-align:center;">Or manage from your <a href="${siteUrl}/vendor/bookings">Partner Portal</a></p>
+                </div>
               </div>
             `,
           });
-        } catch (e) { console.error('Admin notification email error:', e); }
+        } catch (e) { console.error('Vendor email error:', e); }
       }
+
+      // ──────── 3. ADMIN EMAIL ────────
+      try {
+        await sendEmail({
+          to: 'info@calgaryoaths.com',
+          subject: `[Admin] Paid booking — ${booking.name} — ${booking.service_name} — ${commissioner?.name || booking.commissioner_id}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+              <div style="background:#2C2C2A;padding:24px;border-radius:8px 8px 0 0;">
+                <h1 style="color:white;margin:0;font-size:22px;">New Paid Booking</h1>
+              </div>
+              <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
+                <p>A booking has been paid and is awaiting commissioner confirmation.</p>
+
+                ${bookingDetailsTable}
+
+                <h3 style="color:#1B3A5C;">Commissioner Details</h3>
+                <table style="border-collapse:collapse;width:100%;font-size:14px;">
+                  <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Name</td><td style="padding:8px;border:1px solid #e2e0da">${commissioner?.name || booking.commissioner_id}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Email</td><td style="padding:8px;border:1px solid #e2e0da">${vendorEmail || 'Not set'}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Phone</td><td style="padding:8px;border:1px solid #e2e0da">${commissioner?.phone || 'Not set'}</td></tr>
+                </table>
+
+                <h3 style="color:#1B3A5C;margin-top:16px;">Financial Breakdown</h3>
+                <table style="border-collapse:collapse;width:100%;font-size:14px;">
+                  <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Total Charged</td><td style="padding:8px;border:1px solid #e2e0da">$${((booking.total_charged_cents || booking.amount_paid || 0) / 100).toFixed(2)}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Convenience Fee</td><td style="padding:8px;border:1px solid #e2e0da">$${((booking.convenience_fee_cents || 0) / 100).toFixed(2)}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Tax</td><td style="padding:8px;border:1px solid #e2e0da">$${((booking.tax_cents || 0) / 100).toFixed(2)}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Platform Fee</td><td style="padding:8px;border:1px solid #e2e0da">$${((booking.platform_fee_cents || 0) / 100).toFixed(2)}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Vendor Payout</td><td style="padding:8px;border:1px solid #e2e0da">$${((booking.vendor_payout_cents || 0) / 100).toFixed(2)}</td></tr>
+                  ${booking.travel_fee_cents ? `<tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Travel Fee</td><td style="padding:8px;border:1px solid #e2e0da">$${(booking.travel_fee_cents / 100).toFixed(2)}</td></tr>` : ''}
+                  <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Commission Rate</td><td style="padding:8px;border:1px solid #e2e0da">${booking.commission_rate || 0}% (${booking.commission_mode || 'n/a'})</td></tr>
+                </table>
+
+                <p style="margin-top:16px;"><strong>Booking ID:</strong> <code>${bookingId}</code></p>
+                <p><strong>Stripe PI:</strong> <code>${booking.stripe_payment_intent_id || 'n/a'}</code></p>
+
+                <div style="margin:20px 0;text-align:center;">
+                  <a href="${siteUrl}/admin/bookings/${bookingId}" style="display:inline-block;padding:12px 24px;background:#1B3A5C;color:white;text-decoration:none;border-radius:6px;font-size:14px;">View in Admin Panel</a>
+                </div>
+              </div>
+            </div>
+          `,
+        });
+      } catch (e) { console.error('Admin email error:', e); }
     }
   }
 
