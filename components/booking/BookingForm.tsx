@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2, Calendar } from 'lucide-react';
+import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2, Calendar, Search } from 'lucide-react';
 import { BOOKING_FEES, type BookingService } from '@/lib/data/booking';
 import SlotPicker from '@/components/booking/SlotPicker';
 import { trackServiceSelected, trackBookingCreated, trackSlotConfirmed, trackConversion } from '@/lib/analytics';
@@ -36,39 +36,81 @@ function StepDots({ step, total }: { step: number; total: number }) {
   );
 }
 
-/* ── Service card ───────────────────────────────────────────────────────── */
-function ServiceCard({ service, selected, onSelect }: {
-  service: BookingService;
-  selected: boolean;
-  onSelect: () => void;
+/* ── Searchable service dropdown ───────────────────────────────────────── */
+function ServiceSearch({ services, selected, onSelect }: {
+  services: BookingService[];
+  selected: BookingService | null;
+  onSelect: (s: BookingService) => void;
 }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const filtered = query
+    ? services.filter((s) => s.name.toLowerCase().includes(query.toLowerCase()) || s.shortDescription.toLowerCase().includes(query.toLowerCase()))
+    : services;
+
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`w-full text-left p-4 rounded-card border-2 transition-all duration-150 ${
-        selected ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50 hover:bg-bg'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-charcoal text-sm leading-snug">{service.name}</p>
-          <p className="text-xs text-mid-grey mt-0.5 leading-relaxed">{service.shortDescription}</p>
-        </div>
-        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          <span className="text-sm font-semibold text-gold">{service.priceLabel}</span>
-          {service.requiresReview ? (
-            <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-pill font-medium whitespace-nowrap">
-              Manual review
-            </span>
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-3.5 text-mid-grey pointer-events-none" />
+        <input
+          type="text"
+          placeholder={selected ? selected.name : 'Search services…'}
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          className={`w-full pl-9 pr-4 py-3 border rounded-btn text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${
+            selected ? 'border-gold bg-gold/5' : 'border-border bg-white'
+          }`}
+        />
+      </div>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-[40vh] overflow-y-auto rounded-card border border-border bg-white shadow-card">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-mid-grey">No services found</div>
           ) : (
-            <span className="text-[10px] bg-teal/10 text-teal border border-teal/20 px-1.5 py-0.5 rounded-pill font-medium whitespace-nowrap">
-              Book instantly
-            </span>
+            filtered.map((s) => (
+              <button
+                key={s.slug}
+                type="button"
+                onClick={() => { onSelect(s); setQuery(''); setOpen(false); }}
+                className={`w-full text-left px-4 py-3 border-b border-border/50 last:border-0 hover:bg-bg transition-colors ${
+                  selected?.slug === s.slug ? 'bg-gold/5' : ''
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-charcoal text-sm leading-snug">{s.name}</p>
+                    <p className="text-xs text-mid-grey mt-0.5 leading-relaxed">{s.shortDescription}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="text-sm font-semibold text-gold">{s.priceLabel}</span>
+                    {s.requiresReview ? (
+                      <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-pill font-medium whitespace-nowrap">
+                        Manual review
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-teal/10 text-teal border border-teal/20 px-1.5 py-0.5 rounded-pill font-medium whitespace-nowrap">
+                        Book instantly
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))
           )}
         </div>
-      </div>
-    </button>
+      )}
+    </div>
   );
 }
 
@@ -241,22 +283,29 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
           </h3>
           <p className="text-mid-grey text-sm mb-4">Select the service you're booking today.</p>
 
-          <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
-            {servicesLoading ? (
-              <div className="flex items-center justify-center py-8 gap-2 text-mid-grey text-sm">
-                <Loader2 size={15} className="animate-spin" /> Loading services…
+          {servicesLoading ? (
+            <div className="flex items-center justify-center py-8 gap-2 text-mid-grey text-sm">
+              <Loader2 size={15} className="animate-spin" /> Loading services…
+            </div>
+          ) : (
+            <ServiceSearch
+              services={services}
+              selected={selectedService}
+              onSelect={(s) => setSelectedService(s)}
+            />
+          )}
+
+          {selectedService && (
+            <div className="mt-3 p-3 rounded-card border border-gold/30 bg-gold/5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium text-charcoal text-sm">{selectedService.name}</p>
+                  <p className="text-xs text-mid-grey mt-0.5">{selectedService.shortDescription}</p>
+                </div>
+                <span className="text-sm font-semibold text-gold flex-shrink-0">{selectedService.priceLabel}</span>
               </div>
-            ) : (
-              services.map((s) => (
-                <ServiceCard
-                  key={s.slug}
-                  service={s}
-                  selected={selectedService?.slug === s.slug}
-                  onSelect={() => setSelectedService(s)}
-                />
-              ))
-            )}
-          </div>
+            </div>
+          )}
 
           {selectedService?.requiresReview && (
             <div className="mt-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-card p-3 text-xs text-amber-800">
