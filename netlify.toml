@@ -81,9 +81,3 @@
   from   = "/locations"
   to     = "/locations"
   status = 200
-
-# SPA fallback — let Next.js handle all routing
-[[redirects]]
-  from   = "/*"
-  to     = "/.netlify/functions/___netlify-handler"
-  status = 200
