@@ -38,80 +38,68 @@ function StepDots({ step, total }: { step: number; total: number }) {
   );
 }
 
-/* ── Searchable service dropdown ───────────────────────────────────────── */
-function ServiceSearch({ services, selected, onSelect }: {
+/* ── Service card grid ─────────────────────────────────────────────────── */
+function ServiceGrid({ services, selected, onSelect }: {
   services: BookingService[];
   selected: BookingService | null;
   onSelect: (s: BookingService) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
 
   const filtered = query
     ? services.filter((s) => s.name.toLowerCase().includes(query.toLowerCase()) || s.shortDescription.toLowerCase().includes(query.toLowerCase()))
     : services;
 
   return (
-    <div ref={ref} className="relative">
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-3.5 text-mid-grey pointer-events-none" />
-        <input
-          type="text"
-          placeholder={selected ? selected.name : 'Search services…'}
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          className={`w-full pl-9 pr-4 py-3 border rounded-btn text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${
-            selected ? 'border-gold bg-gold/5' : 'border-border bg-white'
-          }`}
-        />
-      </div>
-      {open && (
-        <div className="absolute z-20 mt-1 w-full max-h-[40vh] overflow-y-auto rounded-card border border-border bg-white shadow-card">
-          {filtered.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-mid-grey">No services found</div>
-          ) : (
-            filtered.map((s) => (
+    <div>
+      {services.length > 6 && (
+        <div className="relative mb-3">
+          <Search size={15} className="absolute left-3 top-3.5 text-mid-grey pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search services…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-3 border border-border rounded-btn text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition bg-white"
+          />
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[55vh] overflow-y-auto">
+        {filtered.length === 0 ? (
+          <div className="col-span-full px-4 py-3 text-sm text-mid-grey">No services found</div>
+        ) : (
+          filtered.map((s) => {
+            const isSelected = selected?.slug === s.slug;
+            return (
               <button
                 key={s.slug}
                 type="button"
-                onClick={() => { onSelect(s); setQuery(''); setOpen(false); }}
-                className={`w-full text-left px-4 py-3 border-b border-border/50 last:border-0 hover:bg-bg transition-colors ${
-                  selected?.slug === s.slug ? 'bg-gold/5' : ''
+                onClick={() => onSelect(s)}
+                className={`w-full text-left p-3 rounded-card border-2 transition-all ${
+                  isSelected
+                    ? 'border-gold bg-gold/5 shadow-sm'
+                    : 'border-border bg-white hover:border-gold/40 hover:bg-bg'
                 }`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-charcoal text-sm leading-snug">{s.name}</p>
-                    <p className="text-xs text-mid-grey mt-0.5 leading-relaxed">{s.shortDescription}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className="text-sm font-semibold text-gold">{s.priceLabel}</span>
-                    {s.requiresReview ? (
-                      <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-pill font-medium whitespace-nowrap">
-                        Manual review
-                      </span>
-                    ) : (
-                      <span className="text-[10px] bg-teal/10 text-teal border border-teal/20 px-1.5 py-0.5 rounded-pill font-medium whitespace-nowrap">
-                        Book instantly
-                      </span>
-                    )}
-                  </div>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium text-charcoal text-sm leading-snug flex-1 min-w-0">{s.name}</p>
+                  {isSelected && <CheckCircle size={16} className="text-gold flex-shrink-0 mt-0.5" />}
                 </div>
+                <span className="text-sm font-semibold text-gold mt-1 block">{s.priceLabel}</span>
+                {s.requiresReview ? (
+                  <span className="inline-block text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-pill font-medium mt-1.5">
+                    Manual review
+                  </span>
+                ) : (
+                  <span className="inline-block text-[10px] bg-teal/10 text-teal border border-teal/20 px-1.5 py-0.5 rounded-pill font-medium mt-1.5">
+                    Book instantly
+                  </span>
+                )}
               </button>
-            ))
-          )}
-        </div>
-      )}
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
@@ -384,7 +372,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
       {/* ── Step 1: Service selection ──────────────────────────────── */}
       {step === 1 && (
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <StepDots step={1} total={totalSteps || 3} />
           <h3 className="font-display font-semibold text-lg text-charcoal mb-1">
             What service do you need?
@@ -396,23 +384,11 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
               <Loader2 size={15} className="animate-spin" /> Loading services…
             </div>
           ) : (
-            <ServiceSearch
+            <ServiceGrid
               services={services}
               selected={selectedService}
               onSelect={(s) => setSelectedService(s)}
             />
-          )}
-
-          {selectedService && (
-            <div className="mt-3 p-3 rounded-card border border-gold/30 bg-gold/5">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium text-charcoal text-sm">{selectedService.name}</p>
-                  <p className="text-xs text-mid-grey mt-0.5">{selectedService.shortDescription}</p>
-                </div>
-                <span className="text-sm font-semibold text-gold flex-shrink-0">{selectedService.priceLabel}</span>
-              </div>
-            </div>
           )}
 
           {selectedService?.requiresReview && (
@@ -435,7 +411,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
       {/* ── Step 2: Choose commissioner ─────────────────────────────── */}
       {step === 2 && (
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <StepDots step={2} total={totalSteps} />
           <div className="flex items-center gap-2 mb-4">
             <button type="button" onClick={() => setStep(1)} className="text-mid-grey hover:text-charcoal transition-colors" aria-label="Back">
@@ -538,7 +514,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
       {/* ── Step 3: Details ────────────────────────────────────────── */}
       {step === 3 && (
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <StepDots step={3} total={totalSteps} />
 
           <div className="flex items-center gap-2 mb-4">
@@ -555,19 +531,19 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Full name *</label>
               <input {...register('name')} type="text" placeholder="Jane Smith"
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.name ? 'border-red-400' : 'border-border'}`} />
+                className={`w-full border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.name ? 'border-red-400' : 'border-border'}`} />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Email *</label>
               <input {...register('email')} type="email" placeholder="jane@example.com"
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.email ? 'border-red-400' : 'border-border'}`} />
+                className={`w-full border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.email ? 'border-red-400' : 'border-border'}`} />
               {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Phone *</label>
               <input {...register('phone')} type="tel" placeholder="(403) 555-0123"
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.phone ? 'border-red-400' : 'border-border'}`} />
+                className={`w-full border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.phone ? 'border-red-400' : 'border-border'}`} />
               {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>}
             </div>
 
@@ -624,7 +600,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                         placeholder="123 Main St, Calgary, AB"
                         value={customerAddr}
                         onChange={(e) => { setCustomerAddr(e.target.value); setValue('customerAddress', e.target.value); }}
-                        className="flex-1 border border-border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
+                        className="flex-1 border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
                       />
                       <button
                         type="button"
@@ -722,7 +698,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 {...register('notes')}
                 rows={3}
                 placeholder="Any details we should know — urgency, document type, language preference…"
-                className="w-full border border-border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition resize-none"
+                className="w-full border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition resize-none"
               />
             </div>
 
@@ -758,7 +734,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
       {/* ── Step 4: Pick a time slot ───────────────────────────────── */}
       {step === 4 && (
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <StepDots step={4} total={4} />
 
           <div className="flex items-center gap-2 mb-4">
