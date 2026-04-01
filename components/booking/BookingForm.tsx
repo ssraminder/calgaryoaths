@@ -337,6 +337,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           notes: data.notes || '',
           deliveryMode: data.deliveryMode || 'in_office',
           customerAddress: data.customerAddress || '',
+          facilityName: isMobile ? (document.querySelector<HTMLInputElement>('[name="facilityName"]')?.value || '') : '',
+          customerUnit: isMobile ? (document.querySelector<HTMLInputElement>('[name="customerUnit"]')?.value || '') : '',
           travelFeeCents: isMobile ? travelFee : 0,
           travelDistanceKm: travelFeeData?.distanceKm ?? null,
           locationId: selectedOption?.locationId || null,
@@ -644,27 +646,49 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                   </label>
                 </div>
 
-                {/* Address input for mobile */}
+                {/* Address + facility for mobile */}
                 {isMobile && (
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-charcoal">Your address *</label>
-                    <div className="flex gap-2">
-                      <input
-                        {...register('customerAddress')}
-                        type="text"
-                        placeholder="123 Main St, Calgary, AB"
-                        value={customerAddr}
-                        onChange={(e) => { setCustomerAddr(e.target.value); setValue('customerAddress', e.target.value); }}
-                        className="flex-1 border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
-                      />
-                      <button
-                        type="button"
-                        disabled={!customerAddr || travelFeeLoading}
-                        onClick={() => calcTravelFee(customerAddr)}
-                        className="rounded-btn bg-navy px-4 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 flex-shrink-0"
-                      >
-                        {travelFeeLoading ? 'Calculating...' : 'Calculate'}
-                      </button>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-charcoal mb-1">Your address *</label>
+                      <div className="flex gap-2">
+                        <input
+                          {...register('customerAddress')}
+                          type="text"
+                          placeholder="123 Main St, Calgary, AB"
+                          value={customerAddr}
+                          onChange={(e) => { setCustomerAddr(e.target.value); setValue('customerAddress', e.target.value); }}
+                          className="flex-1 border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
+                        />
+                        <button
+                          type="button"
+                          disabled={!customerAddr || travelFeeLoading}
+                          onClick={() => calcTravelFee(customerAddr)}
+                          className="rounded-btn bg-navy px-4 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 flex-shrink-0"
+                        >
+                          {travelFeeLoading ? 'Calculating...' : 'Calculate'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-charcoal mb-1">Facility name</label>
+                        <input
+                          type="text"
+                          name="facilityName"
+                          placeholder="e.g. Foothills Hospital"
+                          className="w-full border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-charcoal mb-1">Unit / Room #</label>
+                        <input
+                          type="text"
+                          name="customerUnit"
+                          placeholder="e.g. Suite 200, Room 4B"
+                          className="w-full border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
+                        />
+                      </div>
                     </div>
 
                     {travelFeeData && (
