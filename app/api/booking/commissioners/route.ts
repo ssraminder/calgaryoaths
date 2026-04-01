@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
         // Commissioner info
         commissionerId: comm.id,
         commissionerName: comm.name,
-        languages: comm.languages,
+        languages: comm.languages ?? [],
         mobile_available: comm.mobile_available,
         mobile_travel_fee_cents: comm.mobile_travel_fee_cents,
         virtual_available: comm.virtual_available,
