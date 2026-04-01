@@ -168,9 +168,6 @@ export default function EditVendorPage() {
       calendly_url: fd.get('calendly_url'),
       languages,
       credentials,
-      hours_weekdays: fd.get('hours_weekdays'),
-      hours_saturday: fd.get('hours_saturday'),
-      hours_sunday: fd.get('hours_sunday'),
       google_maps_embed: fd.get('google_maps_embed'),
       map_url: fd.get('map_url'),
       areas_served: neighbourhoods,
@@ -285,12 +282,6 @@ export default function EditVendorPage() {
           suggestions={NEIGHBOURHOOD_SUGGESTIONS}
           placeholder="Add neighbourhood or area…"
         />
-
-        <div className="grid grid-cols-3 gap-4">
-          <Field name="hours_weekdays" label="Weekday Hours" defaultValue={commissioner.hours_weekdays} />
-          <Field name="hours_saturday" label="Saturday Hours" defaultValue={commissioner.hours_saturday} />
-          <Field name="hours_sunday" label="Sunday Hours" defaultValue={commissioner.hours_sunday} />
-        </div>
 
         <Field name="google_maps_embed" label="Google Maps Embed URL" defaultValue={commissioner.google_maps_embed} />
         <Field name="map_url" label="Google Maps Link" defaultValue={commissioner.map_url} />

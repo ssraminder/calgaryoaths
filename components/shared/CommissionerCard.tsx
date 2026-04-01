@@ -76,13 +76,9 @@ export default function CommissionerCard({ commissioner: c, size = 'full' }: Com
             <p className="text-mid-grey">{c.address}</p>
           </div>
         </div>
-        <div className="flex items-start gap-3">
-          <Clock size={16} className="text-gold mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-charcoal">Mon–Fri: {c.hours.weekdays}</p>
-            <p className="text-charcoal">Sat: {c.hours.saturday}</p>
-            <p className="text-mid-grey">Sun: {c.hours.sunday}</p>
-          </div>
+        <div className="flex items-center gap-3">
+          <Clock size={16} className="text-gold flex-shrink-0" />
+          <p className="text-charcoal">By appointment only</p>
         </div>
         <div className="flex items-center gap-3">
           <Globe size={16} className="text-gold flex-shrink-0" />
