@@ -63,15 +63,15 @@ export default function EditVendorPage() {
       fetch(`/api/admin/vendors/${id}`).then((r) => r.json()),
       fetch('/api/booking/services').then((r) => r.json()),
       fetch(`/api/admin/availability?commissionerId=${id}`).then((r) => r.json()),
-    ]).then(([vendor, services, availRules]) => {
+    ]).then(([vendor, servicesRes, availRes]) => {
       if (vendor.id) {
         setCommissioner(vendor);
         setSelectedServices(
           (vendor.co_commissioner_services || []).map((s: { service_slug: string }) => s.service_slug)
         );
       }
-      setAllServices(services ?? []);
-      setRules(availRules ?? []);
+      setAllServices(Array.isArray(servicesRes?.services) ? servicesRes.services : Array.isArray(servicesRes) ? servicesRes : []);
+      setRules(Array.isArray(availRes?.rules) ? availRes.rules : Array.isArray(availRes) ? availRes : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [id]);
