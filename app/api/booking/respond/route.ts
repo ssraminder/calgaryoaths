@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token');
   const action = req.nextUrl.searchParams.get('action');
 
-  if (!token || !['accept', 'refund'].includes(action || '')) {
+  if (!token || !['accept', 'refund', 'rebook'].includes(action || '')) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
@@ -28,7 +28,6 @@ export async function GET(req: NextRequest) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
   if (action === 'accept') {
-    // Customer accepts the proposed time
     await supabaseAdmin
       .from('co_bookings')
       .update({
@@ -40,7 +39,6 @@ export async function GET(req: NextRequest) {
       })
       .eq('id', booking.id);
 
-    // Notify admin/vendor
     try {
       await sendEmail({
         to: 'info@calgaryoaths.com',
@@ -53,7 +51,6 @@ export async function GET(req: NextRequest) {
   }
 
   if (action === 'refund') {
-    // Customer wants a refund
     let refundId: string | null = null;
     if (booking.stripe_payment_intent_id) {
       try {
@@ -73,7 +70,6 @@ export async function GET(req: NextRequest) {
       })
       .eq('id', booking.id);
 
-    // Notify admin
     try {
       await sendEmail({
         to: 'info@calgaryoaths.com',
@@ -83,6 +79,38 @@ export async function GET(req: NextRequest) {
     } catch (e) { console.error('Refund notification error:', e); }
 
     return NextResponse.redirect(`${siteUrl}/booking/respond?result=refunded`);
+  }
+
+  if (action === 'rebook') {
+    // Refund the current booking and redirect to booking flow with service pre-selected
+    let refundId: string | null = null;
+    if (booking.stripe_payment_intent_id) {
+      try {
+        const refund = await stripe.refunds.create({ payment_intent: booking.stripe_payment_intent_id });
+        refundId = refund.id;
+      } catch (e) { console.error('Rebook refund error:', e); }
+    }
+
+    await supabaseAdmin
+      .from('co_bookings')
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        cancelled_reason: 'Customer chose to rebook with a different vendor',
+        confirmation_token: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', booking.id);
+
+    try {
+      await sendEmail({
+        to: 'info@calgaryoaths.com',
+        subject: `Customer rebooking with different vendor — ${booking.name}`,
+        html: `<p>${booking.name} (${booking.email}) declined the proposed time for ${booking.service_name} and is rebooking with a different vendor. ${refundId ? `Refund ID: ${refundId}` : 'Manual refund may be needed.'}</p>`,
+      });
+    } catch (e) { console.error('Rebook notification error:', e); }
+
+    return NextResponse.redirect(`${siteUrl}/booking/respond?result=rebook&service=${booking.service_slug}`);
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

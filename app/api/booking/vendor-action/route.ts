@@ -148,9 +148,11 @@ export async function POST(req: NextRequest) {
           <p>New proposed time:</p>
           <p style="font-size:18px;font-weight:bold;color:#1B3A5C;">${newDate}</p>
           <div style="margin:20px 0;">
-            <a href="${respondUrl}&action=accept" style="display:inline-block;padding:12px 24px;background:#1B3A5C;color:white;text-decoration:none;border-radius:6px;margin-right:12px;">Accept New Time</a>
-            <a href="${respondUrl}&action=refund" style="display:inline-block;padding:12px 24px;background:#dc2626;color:white;text-decoration:none;border-radius:6px;">Request Refund</a>
+            <a href="${respondUrl}&action=accept" style="display:inline-block;padding:12px 24px;background:#1B3A5C;color:white;text-decoration:none;border-radius:6px;margin-right:8px;margin-bottom:8px;">Accept New Time</a>
+            <a href="${respondUrl}&action=rebook" style="display:inline-block;padding:12px 24px;background:#C8922A;color:white;text-decoration:none;border-radius:6px;margin-right:8px;margin-bottom:8px;">Choose Another Vendor</a>
+            <a href="${respondUrl}&action=refund" style="display:inline-block;padding:12px 24px;background:#dc2626;color:white;text-decoration:none;border-radius:6px;margin-bottom:8px;">Request Refund</a>
           </div>
+          <p style="color:#888;font-size:13px;">Choosing another vendor will refund your current payment and let you book with a different commissioner.</p>
           <p>Thank you,<br/>Calgary Oaths</p>
         `,
       });
