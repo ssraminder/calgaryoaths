@@ -176,8 +176,13 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
   const selectedCommissionerId = watch('commissionerId');
   const selectedCommObj = availableCommissioners.find((c) => c.id === selectedCommissionerId);
-  const bookingFee = selectedCommObj?.booking_fee_cents ?? BOOKING_FEES[selectedCommissionerId] ?? null;
-  const bookingFeeLabel = bookingFee ? `$${bookingFee / 100}` : null;
+  // Booking fee = minimum service charge (first document rate)
+  const bookingFee = selectedCommObj?.first_page_cents
+    ?? selectedService?.price
+    ?? selectedCommObj?.booking_fee_cents
+    ?? BOOKING_FEES[selectedCommissionerId]
+    ?? null;
+  const bookingFeeLabel = bookingFee ? `$${(bookingFee / 100).toFixed(0)}` : null;
 
   /* ── Step 2 submit: save booking ──────────────────────────────────── */
   async function onSubmit(data: DetailsForm) {
@@ -434,58 +439,46 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
               )}
             </div>
 
-            {selectedService && !selectedService.requiresReview && selectedCommObj && (
+            {selectedService && !selectedService.requiresReview && selectedCommObj && bookingFee && (
               <div className="bg-navy/5 border border-navy/10 rounded-card p-4 space-y-3">
-                {/* Booking fee */}
+                {/* Charged now */}
                 <div>
+                  <p className="text-xs font-medium text-mid-grey uppercase tracking-wide mb-2">Charged now</p>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-charcoal">Booking fee</span>
-                    <span className="text-base font-bold text-navy">{bookingFeeLabel ?? '—'}</span>
+                    <span className="text-sm text-charcoal">First document (booking fee)</span>
+                    <span className="text-base font-bold text-navy">{bookingFeeLabel}</span>
                   </div>
-                  <p className="text-xs text-mid-grey mt-0.5">
-                    Charged now to secure your appointment slot.
-                  </p>
                 </div>
 
-                {/* Service rates */}
-                {(selectedCommObj.first_page_cents != null || selectedService.price != null) && (
+                {/* Additional charges at appointment */}
+                {(selectedCommObj.additional_page_cents != null || selectedCommObj.drafting_fee_cents != null || selectedCommObj.mobile_travel_fee_cents != null) && (
                   <div className="border-t border-navy/10 pt-3">
-                    <p className="text-xs font-medium text-charcoal mb-1.5">Service rates</p>
-                    <div className="space-y-1 text-xs text-mid-grey">
-                      <div className="flex justify-between">
-                        <span>First document</span>
-                        <span className="font-medium text-charcoal">
-                          {selectedCommObj.first_page_cents != null
-                            ? `$${(selectedCommObj.first_page_cents / 100).toFixed(0)}`
-                            : selectedService.price != null
-                              ? `$${(selectedService.price / 100).toFixed(0)}`
-                              : 'Quote'}
-                        </span>
-                      </div>
+                    <p className="text-xs font-medium text-mid-grey uppercase tracking-wide mb-2">Charged at appointment (if applicable)</p>
+                    <div className="space-y-1.5 text-xs">
                       {selectedCommObj.additional_page_cents != null && (
-                        <div className="flex justify-between">
+                        <div className="flex justify-between text-charcoal">
                           <span>Each additional document</span>
-                          <span className="font-medium text-charcoal">${(selectedCommObj.additional_page_cents / 100).toFixed(0)}</span>
+                          <span className="font-medium">${(selectedCommObj.additional_page_cents / 100).toFixed(0)}</span>
                         </div>
                       )}
                       {selectedCommObj.drafting_fee_cents != null && selectedCommObj.drafting_fee_cents > 0 && (
-                        <div className="flex justify-between">
+                        <div className="flex justify-between text-charcoal">
                           <span>Document drafting</span>
-                          <span className="font-medium text-charcoal">${(selectedCommObj.drafting_fee_cents / 100).toFixed(0)}</span>
+                          <span className="font-medium">${(selectedCommObj.drafting_fee_cents / 100).toFixed(0)}</span>
                         </div>
                       )}
                       {selectedCommObj.mobile_available && selectedCommObj.mobile_travel_fee_cents != null && (
-                        <div className="flex justify-between">
-                          <span>Mobile travel fee</span>
-                          <span className="font-medium text-charcoal">${(selectedCommObj.mobile_travel_fee_cents / 100).toFixed(0)}</span>
+                        <div className="flex justify-between text-charcoal">
+                          <span>Mobile service travel fee</span>
+                          <span className="font-medium">${(selectedCommObj.mobile_travel_fee_cents / 100).toFixed(0)}</span>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
 
-                <p className="text-xs text-mid-grey leading-relaxed border-t border-navy/10 pt-2">
-                  The booking fee secures your appointment. <span className="font-medium text-charcoal">Final price is collected when the service is rendered</span> based on the actual number of documents.
+                <p className="text-[11px] text-mid-grey leading-relaxed border-t border-navy/10 pt-2">
+                  The booking fee covers your first document and secures your appointment. Any additional charges are collected when the service is rendered.
                 </p>
               </div>
             )}

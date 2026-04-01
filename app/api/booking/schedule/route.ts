@@ -50,14 +50,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ paymentTransferred: true });
     }
 
-    // Fetch commissioner for fee + commission rate
+    // Fetch commissioner for commission rate
     const { data: commissioner } = await supabase
       .from('co_commissioners')
       .select('booking_fee_cents, commission_rate, is_partner')
       .eq('id', booking.commissioner_id)
       .single();
 
-    const bookingFee = commissioner?.booking_fee_cents ?? (await getBookingFee(booking.commissioner_id));
+    // Booking fee = first document rate from vendor rates, falling back to service price, then commissioner fee
+    const { data: vendorRate } = await supabase
+      .from('co_vendor_rates')
+      .select('first_page_cents')
+      .eq('commissioner_id', booking.commissioner_id)
+      .eq('service_slug', booking.service_slug)
+      .single();
+
+    let bookingFee = vendorRate?.first_page_cents ?? null;
+    if (!bookingFee) {
+      const { data: service } = await supabase
+        .from('co_services')
+        .select('price')
+        .eq('slug', booking.service_slug)
+        .single();
+      bookingFee = service?.price ?? commissioner?.booking_fee_cents ?? (await getBookingFee(booking.commissioner_id));
+    }
     const commissionRate = commissioner?.is_partner ? (commissioner.commission_rate ?? 20) : 0;
     const platformFeeCents = Math.round(bookingFee * (commissionRate / 100));
     const vendorPayoutCents = bookingFee - platformFeeCents;
