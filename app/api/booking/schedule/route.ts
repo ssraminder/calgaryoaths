@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     // Fetch commissioner for commission rate + mode + travel fee
     const { data: commissioner } = await supabase
       .from('co_commissioners')
-      .select('booking_fee_cents, commission_rate, is_partner, commission_mode, mobile_travel_fee_cents')
+      .select('booking_fee_cents, commission_rate, is_partner, commission_mode, mobile_travel_fee_cents, gst_registered')
       .eq('id', booking.commissioner_id)
       .single();
 
@@ -88,6 +88,12 @@ export async function POST(req: NextRequest) {
     const platformFeeCents = Math.round(baseServiceFee * (commissionRate / 100));
     const vendorPayoutCents = baseServiceFee - (commissionMode === 'absorb' ? platformFeeCents : 0);
 
+    // Vendor GST: if vendor is GST-registered, add 5% GST to their payout
+    const vendorGstCents = commissioner?.gst_registered
+      ? Math.round(vendorPayoutCents * 0.05)
+      : 0;
+    const vendorTotalPayoutCents = vendorPayoutCents + vendorGstCents;
+
     // Convenience fee + tax
     const { data: settingsData } = await supabase
       .from('co_settings')
@@ -121,6 +127,8 @@ export async function POST(req: NextRequest) {
         commission_mode: commissionMode,
         platform_fee_cents: platformFeeCents,
         vendor_payout_cents: vendorPayoutCents,
+        vendor_gst_cents: vendorGstCents,
+        vendor_total_payout_cents: vendorTotalPayoutCents,
         travel_fee_cents: travelFeeCents,
         convenience_fee_cents: convenienceFeeCents,
         tax_rate: taxRate,

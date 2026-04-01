@@ -13,6 +13,7 @@ type Booking = {
   proposed_datetime: string | null;
   status: string;
   vendor_payout_cents: number | null;
+  vendor_total_payout_cents: number | null;
   created_at: string;
 };
 
@@ -77,7 +78,7 @@ function VendorBookingsContent() {
                     {b.appointment_datetime ? new Date(b.appointment_datetime).toLocaleString('en-CA', { timeZone: 'America/Edmonton', dateStyle: 'medium', timeStyle: 'short' }) : '—'}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm"><StatusBadge status={b.status} /></td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{b.vendor_payout_cents != null ? `$${(b.vendor_payout_cents / 100).toFixed(2)}` : '—'}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{b.vendor_total_payout_cents != null ? `$${(b.vendor_total_payout_cents / 100).toFixed(2)}` : b.vendor_payout_cents != null ? `$${(b.vendor_payout_cents / 100).toFixed(2)}` : '—'}</td>
                 </tr>
               ))}
               {bookings.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">No bookings found</td></tr>}

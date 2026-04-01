@@ -3,8 +3,27 @@
 import { useEffect, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { submitJoinForm } from '@/app/actions/join';
+import TagInput from '@/components/shared/TagInput';
 
 const credentialOptions = ['Commissioner of Oaths', 'Notary Public', 'Barrister & Solicitor'];
+
+const LANGUAGE_SUGGESTIONS = [
+  'English', 'Punjabi', 'Hindi', 'Gujarati', 'Urdu', 'Arabic', 'French',
+  'Spanish', 'Mandarin', 'Cantonese', 'Tagalog', 'Korean', 'Vietnamese',
+  'Farsi', 'Turkish', 'Somali', 'Amharic', 'Tigrinya',
+];
+
+const NEIGHBOURHOOD_SUGGESTIONS = [
+  'Beltline', '17th Ave SW', 'Mission', 'Cliff Bungalow', 'Victoria Park',
+  'Downtown Core', 'Downtown Calgary', 'South Calgary', 'Sunalta', 'Bankview',
+  'Redstone', 'Cornerstone', 'Cityscape', 'Country Hills', 'Saddle Ridge',
+  'Falconridge', 'Taradale', 'NE Calgary', 'Martindale', 'Pineridge',
+  'Rundle', 'Temple', 'Castleridge', 'Bridgeland', 'Kensington',
+  'Marda Loop', 'Inglewood', 'Ramsay', 'Airdrie', 'Cochrane', 'Chestermere',
+  'Panorama Hills', 'Evanston', 'Nolan Hill', 'Sage Hill', 'Coventry Hills',
+  'Cranston', 'Auburn Bay', 'Mahogany', 'McKenzie Towne', 'New Brighton',
+  'Seton', 'Copperfield', 'Chaparral', 'Shawnessy', 'Evergreen',
+];
 
 const inputCls = 'w-full px-4 py-3 border border-border rounded-btn bg-white text-sm focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold';
 const selectCls = inputCls;
@@ -13,7 +32,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending} className="btn-primary w-full justify-center py-4 text-base disabled:opacity-60 disabled:cursor-not-allowed">
-      {pending ? 'Submitting...' : 'Submit Application'}
+      {pending ? 'Creating your account...' : 'Submit Application & Create Account'}
     </button>
   );
 }
@@ -25,13 +44,13 @@ export default function JoinForm() {
   const [services, setServices] = useState<Service[]>([]);
   const [mobileAvail, setMobileAvail] = useState('');
   const [selectedCreds, setSelectedCreds] = useState<string[]>([]);
+  const [languages, setLanguages] = useState<string[]>(['English']);
+  const [areas, setAreas] = useState<string[]>([]);
 
   useEffect(() => {
-    // Fetch services from DB, excluding in-house and inactive
     fetch('/api/booking/services')
       .then((r) => r.json())
       .then((data) => {
-        // The API returns services that are active; filter out mobile-service as it's a delivery mode
         const filtered = (data.services || data || []).filter(
           (s: Service & { slug: string }) => s.slug !== 'mobile-service' && s.slug !== 'apostille-legalization'
         );
@@ -44,9 +63,10 @@ export default function JoinForm() {
 
   if (state.success) {
     return (
-      <div className="bg-teal/10 border border-teal/30 rounded-card p-8 text-center">
-        <p className="text-teal font-display font-semibold text-xl mb-2">Application received!</p>
+      <div className="bg-teal/10 border border-teal/30 rounded-card p-8 text-center space-y-3">
+        <p className="text-teal font-display font-semibold text-xl">Application received!</p>
         <p className="text-charcoal">{state.message}</p>
+        <p className="text-mid-grey text-sm">You can log in to the partner portal once your application is approved.</p>
       </div>
     );
   }
@@ -59,7 +79,7 @@ export default function JoinForm() {
 
       {/* Section A — Personal */}
       <section>
-        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">A. Personal Information</h2>
+        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">Personal Information</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <label htmlFor="fullName" className="block text-sm font-medium text-charcoal mb-1.5">Full legal name <span className="text-red-500">*</span></label>
@@ -69,6 +89,7 @@ export default function JoinForm() {
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-charcoal mb-1.5">Email <span className="text-red-500">*</span></label>
             <input id="email" name="email" type="email" required className={inputCls} />
+            <p className="text-mid-grey text-xs mt-1">This will be your login email for the partner portal.</p>
             {state.errors?.email && <p className="text-red-500 text-xs mt-1">{state.errors.email[0]}</p>}
           </div>
           <div>
@@ -81,16 +102,30 @@ export default function JoinForm() {
             <input id="address" name="address" type="text" required placeholder="123 Main St, Calgary, AB T2X 0A1" className={inputCls} />
             {state.errors?.address && <p className="text-red-500 text-xs mt-1">{state.errors.address[0]}</p>}
           </div>
+        </div>
+      </section>
+
+      {/* Section B — Account Password */}
+      <section>
+        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">Partner Portal Account</h2>
+        <p className="text-mid-grey text-sm mb-4">Create your login credentials. You&apos;ll use these to access the partner portal after approval.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="city" className="block text-sm font-medium text-charcoal mb-1.5">City <span className="text-red-500">*</span></label>
-            <input id="city" name="city" type="text" required className={inputCls} />
+            <label htmlFor="password" className="block text-sm font-medium text-charcoal mb-1.5">Password <span className="text-red-500">*</span></label>
+            <input id="password" name="password" type="password" required minLength={8} placeholder="Min 8 characters" className={inputCls} />
+            {state.errors?.password && <p className="text-red-500 text-xs mt-1">{state.errors.password[0]}</p>}
+          </div>
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-charcoal mb-1.5">Confirm password <span className="text-red-500">*</span></label>
+            <input id="confirmPassword" name="confirmPassword" type="password" required minLength={8} className={inputCls} />
+            {state.errors?.confirmPassword && <p className="text-red-500 text-xs mt-1">{state.errors.confirmPassword[0]}</p>}
           </div>
         </div>
       </section>
 
-      {/* Section B — Credentials */}
+      {/* Section C — Credentials */}
       <section>
-        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">B. Credentials</h2>
+        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">Credentials</h2>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-charcoal mb-2">Credential type(s) <span className="text-red-500">*</span></label>
@@ -129,7 +164,7 @@ export default function JoinForm() {
               </select>
             </div>
             <div>
-              <label htmlFor="insurance" className="block text-sm font-medium text-charcoal mb-1.5">Prof. liability insurance? <span className="text-red-500">*</span></label>
+              <label htmlFor="insurance" className="block text-sm font-medium text-charcoal mb-1.5">Liability insurance? <span className="text-red-500">*</span></label>
               <select id="insurance" name="insurance" className={selectCls}>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
@@ -138,15 +173,29 @@ export default function JoinForm() {
               </select>
             </div>
           </div>
+          <div>
+            <label htmlFor="credentialFile" className="block text-sm font-medium text-charcoal mb-1.5">
+              Upload credential certificate <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="credentialFile"
+              name="credentialFile"
+              type="file"
+              accept="image/*,.pdf"
+              required
+              className="w-full text-sm text-charcoal file:mr-4 file:py-2 file:px-4 file:rounded-btn file:border file:border-border file:text-sm file:font-medium file:bg-white file:text-charcoal hover:file:bg-bg file:cursor-pointer"
+            />
+            <p className="text-mid-grey text-xs mt-1">Scan or photo of your Commissioner of Oaths certificate, Notary Public appointment, or law society card. (PDF, JPG, PNG — max 10MB)</p>
+          </div>
         </div>
       </section>
 
-      {/* Section C — Services */}
+      {/* Section D — Services & Languages */}
       <section>
-        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">C. Services You Offer</h2>
+        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">Services & Languages</h2>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-charcoal mb-2">Select the services you can provide <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-charcoal mb-2">Services you can provide <span className="text-red-500">*</span></label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {services.length === 0 ? (
                 <p className="text-mid-grey text-sm col-span-2">Loading services...</p>
@@ -161,53 +210,26 @@ export default function JoinForm() {
             </div>
             <input type="hidden" name="servicesOffered" value="" />
           </div>
-          <div>
-            <label htmlFor="languages" className="block text-sm font-medium text-charcoal mb-1.5">Languages spoken <span className="text-red-500">*</span></label>
-            <input id="languages" name="languages" type="text" placeholder="e.g. English, Punjabi, Hindi" className={inputCls} />
-          </div>
+          <TagInput
+            name="languages"
+            label="Languages spoken"
+            value={languages}
+            onChange={setLanguages}
+            suggestions={LANGUAGE_SUGGESTIONS}
+            placeholder="Add language..."
+          />
+          <input type="hidden" name="languagesJson" value={JSON.stringify(languages)} />
         </div>
       </section>
 
-      {/* Section D — Pricing */}
+      {/* Section E — Delivery & Coverage */}
       <section>
-        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">D. Your Rates</h2>
-        <p className="text-mid-grey text-sm mb-4">Set your standard rates. You can adjust per-service rates in your partner portal after approval.</p>
+        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">Delivery & Coverage Area</h2>
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="firstPageRate" className="block text-sm font-medium text-charcoal mb-1.5">
-                First page / document rate ($) <span className="text-red-500">*</span>
-              </label>
-              <input id="firstPageRate" name="firstPageRate" type="number" min="0" step="1" placeholder="e.g. 40" className={inputCls} />
-              {state.errors?.firstPageRate && <p className="text-red-500 text-xs mt-1">{state.errors.firstPageRate[0]}</p>}
-            </div>
-            <div>
-              <label htmlFor="additionalPageRate" className="block text-sm font-medium text-charcoal mb-1.5">
-                Additional page rate ($) <span className="text-red-500">*</span>
-              </label>
-              <input id="additionalPageRate" name="additionalPageRate" type="number" min="0" step="1" placeholder="e.g. 15" className={inputCls} />
-              {state.errors?.additionalPageRate && <p className="text-red-500 text-xs mt-1">{state.errors.additionalPageRate[0]}</p>}
-            </div>
-          </div>
-          <div>
-            <label htmlFor="draftingRate" className="block text-sm font-medium text-charcoal mb-1.5">
-              Document drafting rate ($) <span className="text-mid-grey font-normal">(if you offer drafting)</span>
-            </label>
-            <input id="draftingRate" name="draftingRate" type="number" min="0" step="1" placeholder="e.g. 60" className={inputCls} />
-            <p className="text-mid-grey text-xs mt-1">Separate fee for drafting affidavits, declarations, or other documents from scratch.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Section E — Delivery & Location */}
-      <section>
-        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">E. Delivery & Location</h2>
-        <div className="space-y-4">
-          {/* Mobile service */}
-          <div className="rounded-card border border-border p-4 space-y-3">
-            <div>
+            <div className="rounded-card border border-border p-4">
               <label htmlFor="mobileAvailable" className="block text-sm font-medium text-charcoal mb-1.5">
-                Do you offer mobile (in-person travel) service? <span className="text-red-500">*</span>
+                Offer mobile (travel to client)?
               </label>
               <select
                 id="mobileAvailable"
@@ -219,69 +241,81 @@ export default function JoinForm() {
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
-                <option value="Sometimes">Sometimes / Case-by-case</option>
+                <option value="Sometimes">Case-by-case</option>
               </select>
             </div>
-            {(mobileAvail === 'Yes' || mobileAvail === 'Sometimes') && (
-              <div>
-                <label htmlFor="mobileTravelFee" className="block text-sm font-medium text-charcoal mb-1.5">
-                  Travel fee ($) <span className="text-mid-grey font-normal">(added on top of service charge)</span>
+
+            {showVirtualOption ? (
+              <div className="rounded-card border border-border p-4">
+                <label htmlFor="virtualAvailable" className="block text-sm font-medium text-charcoal mb-1.5">
+                  Offer virtual commissioning?
                 </label>
-                <input id="mobileTravelFee" name="mobileTravelFee" type="number" min="0" step="1" placeholder="e.g. 25" className={inputCls} />
+                <select id="virtualAvailable" name="virtualAvailable" className={selectCls}>
+                  <option value="">Select</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+            ) : (
+              <div className="rounded-card border border-border p-4 opacity-50">
+                <p className="text-sm font-medium text-charcoal mb-1.5">Virtual commissioning</p>
+                <p className="text-xs text-mid-grey">Available for Notaries Public and Barristers & Solicitors only.</p>
               </div>
             )}
           </div>
 
-          {/* Virtual service — only for Notary/Solicitor */}
-          {showVirtualOption && (
-            <div className="rounded-card border border-border p-4">
-              <label htmlFor="virtualAvailable" className="block text-sm font-medium text-charcoal mb-1.5">
-                Do you offer virtual / remote commissioning?
-              </label>
-              <select id="virtualAvailable" name="virtualAvailable" className={selectCls}>
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-                <option value="Planning to">Planning to offer</option>
-              </select>
-              <p className="text-mid-grey text-xs mt-1.5">Virtual commissioning is available for Notaries Public and Barristers & Solicitors in Alberta.</p>
-            </div>
-          )}
-
-          {/* Location */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="postalCode" className="block text-sm font-medium text-charcoal mb-1.5">
-                Your postal code <span className="text-red-500">*</span>
-                <span className="text-mid-grey font-normal ml-1">(to match nearby clients)</span>
-              </label>
-              <input id="postalCode" name="postalCode" type="text" placeholder="T2X 0A1" className={inputCls} />
-            </div>
-            <div>
-              <label htmlFor="serviceRadius" className="block text-sm font-medium text-charcoal mb-1.5">Service radius <span className="text-red-500">*</span></label>
-              <select id="serviceRadius" name="serviceRadius" className={selectCls}>
-                <option value="">Select</option>
-                <option value="5 km">5 km</option>
-                <option value="10 km">10 km</option>
-                <option value="25 km">25 km</option>
-                <option value="City-wide">City-wide</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-card p-3 text-xs text-blue-800">
-            <strong>Note:</strong> Availability (days & time slots) will be configured in your partner portal after approval. You can set flexible schedules with multiple time blocks per day.
-          </div>
+          <TagInput
+            name="areasServed"
+            label="Areas you serve"
+            value={areas}
+            onChange={setAreas}
+            suggestions={NEIGHBOURHOOD_SUGGESTIONS}
+            placeholder="Add neighbourhood or area..."
+          />
+          <input type="hidden" name="areasServedJson" value={JSON.stringify(areas)} />
         </div>
       </section>
 
-      {/* Section F — Consents */}
+      {/* Section F — GST/HST */}
       <section>
-        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">F. Consents</h2>
+        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">GST/HST Registration</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="gstNumber" className="block text-sm font-medium text-charcoal mb-1.5">GST/HST number <span className="text-mid-grey font-normal">(if registered)</span></label>
+            <input id="gstNumber" name="gstNumber" type="text" placeholder="e.g. 123456789RT0001" className={inputCls} />
+          </div>
+          <div className="flex items-end pb-1">
+            <label className="flex items-center gap-2 text-sm text-charcoal">
+              <input type="checkbox" name="gstRegistered" value="true" className="rounded border-border text-gold focus:ring-gold" />
+              I am GST/HST registered
+            </label>
+          </div>
+        </div>
+        <p className="text-mid-grey text-xs mt-2">If registered, 5% GST will be added to your payouts.</p>
+      </section>
+
+      {/* Section G — How did you hear */}
+      <section>
+        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">Additional</h2>
+        <div>
+          <label htmlFor="referralSource" className="block text-sm font-medium text-charcoal mb-1.5">How did you hear about us?</label>
+          <select id="referralSource" name="referralSource" className={selectCls}>
+            <option value="">Select</option>
+            <option value="Google Search">Google Search</option>
+            <option value="Social Media">Social Media</option>
+            <option value="Referral">Referral from someone</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </section>
+
+      {/* Section H — Consents */}
+      <section>
         <div className="space-y-3">
           <label className="flex items-start gap-3 text-sm text-charcoal">
             <input type="checkbox" name="confirmAccurate" value="true" required className="mt-0.5 rounded border-border text-gold focus:ring-gold flex-shrink-0" />
-            <span>I confirm all information provided in this application is accurate and truthful.</span>
+            <span>I confirm all information provided is accurate and truthful.</span>
           </label>
           <label className="flex items-start gap-3 text-sm text-charcoal">
             <input type="checkbox" name="agreeTerms" value="true" required className="mt-0.5 rounded border-border text-gold focus:ring-gold flex-shrink-0" />
@@ -291,6 +325,10 @@ export default function JoinForm() {
       </section>
 
       <SubmitButton />
+
+      <p className="text-center text-xs text-mid-grey">
+        Rates and availability are configured in your partner portal after approval.
+      </p>
     </form>
   );
 }

@@ -2,31 +2,27 @@
 
 import { z } from 'zod';
 import { sendEmail } from '@/lib/email';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 
 const joinSchema = z.object({
   fullName: z.string().min(2, 'Full name is required'),
   email: z.string().email('Valid email is required'),
   phone: z.string().min(7, 'Phone number is required'),
   address: z.string().min(5, 'Full address is required'),
-  city: z.string().min(2, 'City is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string().min(8, 'Please confirm your password'),
   credentialTypes: z.string().min(1, 'Please select at least one credential'),
   yearCredentialed: z.string().min(4, 'Year credentialed is required'),
   credentialsActive: z.string().min(1, 'Please indicate if credentials are active'),
   insurance: z.string().min(1, 'Please indicate insurance status'),
   servicesOffered: z.string().min(1, 'Please select at least one service'),
-  languages: z.string().min(2, 'Languages are required'),
-  postalCode: z.string().min(5, 'Postal code is required'),
-  serviceRadius: z.string().min(1, 'Service radius is required'),
-  // Delivery modes
-  mobileAvailable: z.string().min(1, 'Please indicate mobile availability'),
-  mobileTravelFee: z.string().optional(),
+  languagesJson: z.string().min(2, 'At least one language is required'),
+  mobileAvailable: z.string().optional(),
   virtualAvailable: z.string().optional(),
-  // Pricing
-  firstPageRate: z.string().min(1, 'First page rate is required'),
-  additionalPageRate: z.string().min(1, 'Additional page rate is required'),
-  draftingRate: z.string().optional(),
-  // Consents
+  areasServedJson: z.string().optional(),
+  gstNumber: z.string().optional(),
+  gstRegistered: z.string().optional(),
+  referralSource: z.string().optional(),
   confirmAccurate: z.literal('true', { errorMap: () => ({ message: 'You must confirm information is accurate' }) }),
   agreeTerms: z.literal('true', { errorMap: () => ({ message: 'You must agree to the partner terms' }) }),
 });
@@ -54,71 +50,154 @@ export async function submitJoinForm(
 
   const d = parsed.data;
 
+  // Validate passwords match
+  if (d.password !== d.confirmPassword) {
+    return {
+      success: false,
+      message: 'Passwords do not match.',
+      errors: { confirmPassword: ['Passwords do not match'] },
+    };
+  }
+
+  // Parse JSON fields
+  const languages: string[] = JSON.parse(d.languagesJson || '["English"]');
+  const areasServed: string[] = JSON.parse(d.areasServedJson || '[]');
+  const gstRegistered = d.gstRegistered === 'true';
+
   try {
-    await supabase.from('co_partner_applications').insert({
+    // 1. Check email isn't already in use
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    if (existingUsers?.users?.some((u) => u.email === d.email)) {
+      return {
+        success: false,
+        message: 'An account with this email already exists. Please use a different email or log in to the partner portal.',
+        errors: { email: ['Email already in use'] },
+      };
+    }
+
+    // 2. Create Supabase Auth user
+    const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+      email: d.email,
+      password: d.password,
+      email_confirm: true,
+    });
+
+    if (authErr || !authData.user) {
+      return {
+        success: false,
+        message: authErr?.message || 'Failed to create account. Please try again.',
+      };
+    }
+
+    const userId = authData.user.id;
+
+    // 3. Create profile with vendor role
+    await supabaseAdmin.from('co_profiles').insert({
+      id: userId,
+      email: d.email,
+      full_name: d.fullName,
+      role: 'vendor',
+    });
+
+    // 4. Create commissioner record (inactive — admin must approve)
+    const commissionerId = d.fullName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    await supabaseAdmin.from('co_commissioners').insert({
+      id: commissionerId,
+      name: d.fullName,
+      title: d.credentialTypes.split(',')[0]?.trim() || 'Commissioner of Oaths',
+      email: d.email,
+      phone: d.phone,
+      address: d.address,
+      languages,
+      credentials: d.credentialTypes.split(',').map((c: string) => c.trim()),
+      areas_served: areasServed,
+      nearby_neighbourhoods: areasServed,
+      mobile_available: d.mobileAvailable === 'Yes' || d.mobileAvailable === 'Sometimes',
+      virtual_available: d.virtualAvailable === 'Yes',
+      gst_number: d.gstNumber || null,
+      gst_registered: gstRegistered,
+      user_id: userId,
+      active: false, // Admin must approve
+      sort_order: 99,
+    });
+
+    // 5. Upload credential file if provided
+    const credentialFile = formData.get('credentialFile') as File | null;
+    let credentialFileUrl = '';
+    if (credentialFile && credentialFile.size > 0) {
+      const ext = credentialFile.name.split('.').pop() || 'pdf';
+      const path = `credentials/${commissionerId}/certificate_${Date.now()}.${ext}`;
+      const buffer = Buffer.from(await credentialFile.arrayBuffer());
+
+      await supabaseAdmin.storage
+        .from('appointment-documents')
+        .upload(path, buffer, { contentType: credentialFile.type, upsert: false });
+
+      const { data: urlData } = await supabaseAdmin.storage
+        .from('appointment-documents')
+        .createSignedUrl(path, 365 * 24 * 60 * 60); // 1 year
+
+      credentialFileUrl = urlData?.signedUrl || path;
+    }
+
+    // 6. Save application record
+    await supabaseAdmin.from('co_partner_applications').insert({
       full_name: d.fullName,
       email: d.email,
       phone: d.phone,
       address: d.address,
-      city: d.city,
       credential_types: d.credentialTypes,
       year_credentialed: d.yearCredentialed,
       credentials_active: d.credentialsActive,
       insurance: d.insurance,
       services_offered: d.servicesOffered,
-      mobile_available: d.mobileAvailable,
-      mobile_travel_fee: d.mobileTravelFee || null,
+      mobile_available: d.mobileAvailable || 'No',
       virtual_available: d.virtualAvailable || null,
-      languages: d.languages,
-      postal_code: d.postalCode,
-      service_radius: d.serviceRadius,
-      first_page_rate: d.firstPageRate,
-      additional_page_rate: d.additionalPageRate,
-      drafting_rate: d.draftingRate || null,
+      languages: languages.join(', '),
+      areas_served: areasServed.join(', '),
+      gst_number: d.gstNumber || null,
+      gst_registered: gstRegistered,
+      referral_source: d.referralSource || null,
+      credential_file_url: credentialFileUrl || null,
+      commissioner_id: commissionerId,
+      user_id: userId,
+      status: 'pending',
     });
 
+    // 7. Send notification email
     await sendEmail({
       to: 'info@calgaryoaths.com',
       replyTo: d.email,
       subject: `New partner application — ${d.fullName}`,
       html: `
         <h2>New Partner Application</h2>
-        <h3>Personal Information</h3>
         <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Full Name</td><td style="padding:8px;border:1px solid #ddd">${d.fullName}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Name</td><td style="padding:8px;border:1px solid #ddd">${d.fullName}</td></tr>
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #ddd"><a href="mailto:${d.email}">${d.email}</a></td></tr>
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Phone</td><td style="padding:8px;border:1px solid #ddd">${d.phone}</td></tr>
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Address</td><td style="padding:8px;border:1px solid #ddd">${d.address}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">City</td><td style="padding:8px;border:1px solid #ddd">${d.city}</td></tr>
-        </table>
-        <h3>Credentials</h3>
-        <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Credential Types</td><td style="padding:8px;border:1px solid #ddd">${d.credentialTypes}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Year Credentialed</td><td style="padding:8px;border:1px solid #ddd">${d.yearCredentialed}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Currently Active?</td><td style="padding:8px;border:1px solid #ddd">${d.credentialsActive}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Credentials</td><td style="padding:8px;border:1px solid #ddd">${d.credentialTypes} (${d.yearCredentialed})</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Active?</td><td style="padding:8px;border:1px solid #ddd">${d.credentialsActive}</td></tr>
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Insurance</td><td style="padding:8px;border:1px solid #ddd">${d.insurance}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Services</td><td style="padding:8px;border:1px solid #ddd">${d.servicesOffered}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Languages</td><td style="padding:8px;border:1px solid #ddd">${languages.join(', ')}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Areas</td><td style="padding:8px;border:1px solid #ddd">${areasServed.join(', ') || 'Not specified'}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Mobile</td><td style="padding:8px;border:1px solid #ddd">${d.mobileAvailable || 'No'}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Virtual</td><td style="padding:8px;border:1px solid #ddd">${d.virtualAvailable || 'No'}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">GST</td><td style="padding:8px;border:1px solid #ddd">${gstRegistered ? `Yes — ${d.gstNumber}` : 'No'}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Referral</td><td style="padding:8px;border:1px solid #ddd">${d.referralSource || 'Not specified'}</td></tr>
+          ${credentialFileUrl ? `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Credential</td><td style="padding:8px;border:1px solid #ddd"><a href="${credentialFileUrl}">View uploaded certificate</a></td></tr>` : ''}
         </table>
-        <h3>Services & Pricing</h3>
-        <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Services Offered</td><td style="padding:8px;border:1px solid #ddd">${d.servicesOffered}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">First Page Rate</td><td style="padding:8px;border:1px solid #ddd">$${d.firstPageRate}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Additional Page Rate</td><td style="padding:8px;border:1px solid #ddd">$${d.additionalPageRate}</td></tr>
-          ${d.draftingRate ? `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Drafting Rate</td><td style="padding:8px;border:1px solid #ddd">$${d.draftingRate}</td></tr>` : ''}
-        </table>
-        <h3>Delivery & Location</h3>
-        <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Mobile Available</td><td style="padding:8px;border:1px solid #ddd">${d.mobileAvailable}</td></tr>
-          ${d.mobileTravelFee ? `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Mobile Travel Fee</td><td style="padding:8px;border:1px solid #ddd">$${d.mobileTravelFee}</td></tr>` : ''}
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Virtual Available</td><td style="padding:8px;border:1px solid #ddd">${d.virtualAvailable || 'Not specified'}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Languages</td><td style="padding:8px;border:1px solid #ddd">${d.languages}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Postal Code</td><td style="padding:8px;border:1px solid #ddd">${d.postalCode}</td></tr>
-          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Service Radius</td><td style="padding:8px;border:1px solid #ddd">${d.serviceRadius}</td></tr>
-        </table>
-        <p style="color:#888;font-size:12px;">Availability will be configured in the partner portal after approval.</p>
+        <p><strong>Commissioner ID:</strong> ${commissionerId}</p>
+        <p><strong>Account created:</strong> Yes (inactive — set active=true in admin to approve)</p>
+        <p style="color:#888;font-size:12px;">To approve: go to Admin → Vendors → ${d.fullName} → check "Active" and save.</p>
       `,
-    });
+    }).catch((err) => console.error('Join notification email error:', err));
 
-    return { success: true, message: "Thanks for applying! We'll review your application and be in touch within 2 business days." };
+    return {
+      success: true,
+      message: "Thanks for applying! We've created your partner account. We'll review your application and activate your profile within 2 business days.",
+    };
   } catch (err) {
     console.error('Join form error:', err);
     return {
