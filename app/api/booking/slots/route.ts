@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 const SLOT_MINUTES = 30;
 const DAYS_AHEAD = 14;
+const DEFAULT_BUFFER_HOURS = 4;
 
 function calgaryOffset(): number {
   const now = new Date();
@@ -53,18 +54,32 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const commissionerId = searchParams.get('commissionerId');
   const startDate = searchParams.get('startDate');
+  const locationId = searchParams.get('locationId');
 
   if (!commissionerId || !startDate) {
     return NextResponse.json({ error: 'Missing commissionerId or startDate' }, { status: 400 });
   }
 
-  // Fetch availability rules from DB
-  const { data: rules } = await supabase
+  // Get buffer hours from settings
+  const { data: bufferSetting } = await supabase
+    .from('co_settings')
+    .select('value')
+    .eq('key', 'min_booking_buffer_hours')
+    .single();
+  const bufferHours = parseInt(bufferSetting?.value || String(DEFAULT_BUFFER_HOURS), 10);
+
+  // Fetch availability rules — filter by location if provided
+  let rulesQuery = supabase
     .from('co_availability_rules')
     .select('day_of_week, start_time, end_time')
     .eq('commissioner_id', commissionerId)
     .eq('active', true);
 
+  if (locationId) {
+    rulesQuery = rulesQuery.eq('location_id', locationId);
+  }
+
+  const { data: rules } = await rulesQuery;
   const availRules = (rules ?? []) as AvailabilityRule[];
 
   if (availRules.length === 0) {
@@ -83,11 +98,11 @@ export async function GET(req: NextRequest) {
     allSlots.push(...generateSlotsForDay(dateStr, availRules, SLOT_MINUTES));
   }
 
-  // Filter out past slots (1 hour buffer)
-  const cutoff = new Date(Date.now() + 60 * 60 * 1000);
+  // Filter out past slots (buffer hours from now)
+  const cutoff = new Date(Date.now() + bufferHours * 60 * 60 * 1000);
   let available = allSlots.filter((s) => new Date(s) > cutoff);
 
-  // Filter out booked slots from DB
+  // Filter out booked slots from DB (across ALL locations for this commissioner)
   const windowEnd = new Date(base);
   windowEnd.setDate(windowEnd.getDate() + DAYS_AHEAD);
 

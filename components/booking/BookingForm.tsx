@@ -117,6 +117,8 @@ function ServiceSearch({ services, selected, onSelect }: {
 }
 
 
+type CommLocation = { id: string; name: string; address: string };
+
 type DbCommissioner = {
   id: string;
   name: string;
@@ -126,6 +128,8 @@ type DbCommissioner = {
   languages?: string[];
   areas_served?: string[];
   soonestSlot?: string | null;
+  soonestLocationId?: string | null;
+  locations?: CommLocation[];
   first_page_cents?: number | null;
   additional_page_cents?: number | null;
   drafting_fee_cents?: number | null;
@@ -190,6 +194,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   const [slotError, setSlotError] = useState<string | null>(null);
   // Commissioner selection (step 2)
   const [selectedCommissioner, setSelectedCommissioner] = useState<DbCommissioner | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [commFilter, setCommFilter] = useState<'all' | 'soonest' | 'price'>('soonest');
   // Pricing config
   const [pricing, setPricing] = useState<PricingConfig>({ convenienceFeeCents: 499, tax: { total_rate: 0.05, gst_rate: 0.05, pst_rate: 0, hst_rate: 0 } });
@@ -279,6 +284,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           customerAddress: data.customerAddress || '',
           travelFeeCents: isMobile ? travelFee : 0,
           travelDistanceKm: travelFeeData?.distanceKm ?? null,
+          locationId: selectedLocationId || null,
           ...(rebookToken ? { rebookToken } : {}),
         }),
       });
@@ -472,7 +478,11 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-charcoal text-sm">{c.name}</p>
-                        <p className="text-xs text-mid-grey mt-0.5">{c.location}{c.address ? ` · ${c.address}` : ''}</p>
+                        <p className="text-xs text-mid-grey mt-0.5">
+                          {(c.locations ?? []).length > 1
+                            ? `${(c.locations ?? []).length} locations: ${(c.locations ?? []).map((l) => l.name).join(', ')}`
+                            : c.location}{c.address && (c.locations ?? []).length <= 1 ? ` · ${c.address}` : ''}
+                        </p>
                         {c.languages && c.languages.length > 0 && (
                           <p className="text-[11px] text-mid-grey mt-1">{c.languages.join(', ')}</p>
                         )}
@@ -513,7 +523,13 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           </div>
 
           <button type="button" disabled={!selectedCommissioner}
-            onClick={() => { setValue('commissionerId', selectedCommissioner!.id); setStep(3); }}
+            onClick={() => {
+              setValue('commissionerId', selectedCommissioner!.id);
+              const locs = selectedCommissioner!.locations ?? [];
+              if (locs.length === 1) setSelectedLocationId(locs[0].id);
+              else if (locs.length === 0) setSelectedLocationId('');
+              setStep(3);
+            }}
             className="btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed">
             Continue <ChevronRight size={16} />
           </button>
@@ -556,6 +572,31 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             </div>
 
             <input type="hidden" {...register('commissionerId')} />
+
+            {/* Location selection — if commissioner has multiple locations */}
+            {selectedCommissioner && (selectedCommissioner.locations ?? []).length > 1 && (
+              <div>
+                <label className="block text-sm font-medium text-charcoal mb-2">Location *</label>
+                <div className="space-y-2">
+                  {(selectedCommissioner.locations ?? []).map((loc) => (
+                    <label key={loc.id} className={`flex items-center gap-3 p-3 rounded-card border-2 cursor-pointer transition-all ${selectedLocationId === loc.id ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'}`}>
+                      <input
+                        type="radio"
+                        name="locationId"
+                        value={loc.id}
+                        checked={selectedLocationId === loc.id}
+                        onChange={() => setSelectedLocationId(loc.id)}
+                        className="sr-only"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-charcoal">{loc.name}</p>
+                        {loc.address && <p className="text-xs text-mid-grey">{loc.address}</p>}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Delivery mode — only if commissioner offers mobile */}
             {selectedCommissioner?.mobile_available && (
@@ -739,6 +780,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
           <SlotPicker
             commissionerId={selectedCommissionerIdForSlots}
+            locationId={selectedLocationId || undefined}
             onSelect={(iso) => { setSelectedSlot(iso); setSlotError(null); }}
           />
 

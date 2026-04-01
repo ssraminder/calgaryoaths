@@ -45,22 +45,38 @@ export async function GET(req: NextRequest) {
     (rates ?? []).map((r) => [r.commissioner_id, r])
   );
 
-  // For each commissioner, find the soonest available slot
+  // Get buffer hours from settings
+  const { data: bufferSetting } = await supabase
+    .from('co_settings')
+    .select('value')
+    .eq('key', 'min_booking_buffer_hours')
+    .single();
+  const bufferHours = parseInt(bufferSetting?.value || '4', 10);
+
+  // For each commissioner, find locations + soonest available slot
   const now = new Date();
-  const startDate = now.toISOString().slice(0, 10);
-  const cutoff = new Date(Date.now() + 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() + bufferHours * 60 * 60 * 1000);
 
   const enriched = await Promise.all(
     (commissioners ?? []).map(async (c) => {
-      // Get availability rules
+      // Get locations for this commissioner
+      const { data: locations } = await supabase
+        .from('co_locations')
+        .select('id, name, address')
+        .eq('commissioner_id', c.id)
+        .eq('active', true)
+        .order('sort_order', { ascending: true });
+
+      // Get all availability rules (across all locations)
       const { data: rules } = await supabase
         .from('co_availability_rules')
-        .select('day_of_week, start_time, end_time')
+        .select('day_of_week, start_time, end_time, location_id')
         .eq('commissioner_id', c.id)
         .eq('active', true);
 
       if (!rules || rules.length === 0) {
-        return { ...c, soonestSlot: null };
+        const rate = rateMap.get(c.id);
+        return { ...c, locations: locations ?? [], soonestSlot: null, soonestLocationId: null, first_page_cents: rate?.first_page_cents ?? null, additional_page_cents: rate?.additional_page_cents ?? null, drafting_fee_cents: rate?.drafting_fee_cents ?? null };
       }
 
       // Get booked slots
@@ -78,9 +94,10 @@ export async function GET(req: NextRequest) {
 
       const bookedSet = new Set((booked ?? []).map((b) => b.appointment_datetime));
 
-      // Find first available slot in next 7 days
+      // Find first available slot across all locations
       const offset = calgaryOffset();
       let soonestSlot: string | null = null;
+      let soonestLocationId: string | null = null;
 
       for (let i = 0; i < 7 && !soonestSlot; i++) {
         const d = new Date(now);
@@ -103,6 +120,7 @@ export async function GET(req: NextRequest) {
             const slotDate = new Date(Date.UTC(year, month - 1, day, utcH, min, 0));
             if (slotDate > cutoff && !bookedSet.has(slotDate.toISOString())) {
               soonestSlot = slotDate.toISOString();
+              soonestLocationId = rule.location_id;
               break;
             }
           }
@@ -113,7 +131,9 @@ export async function GET(req: NextRequest) {
       const rate = rateMap.get(c.id);
       return {
         ...c,
+        locations: locations ?? [],
         soonestSlot,
+        soonestLocationId,
         first_page_cents: rate?.first_page_cents ?? null,
         additional_page_cents: rate?.additional_page_cents ?? null,
         drafting_fee_cents: rate?.drafting_fee_cents ?? null,

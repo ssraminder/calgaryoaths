@@ -5,7 +5,7 @@ import { sendEmail } from '@/lib/email';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { serviceSlug, commissionerId, name, email, phone, notes, numDocuments, rebookToken, deliveryMode, customerAddress, travelFeeCents, travelDistanceKm } = body;
+    const { serviceSlug, commissionerId, name, email, phone, notes, numDocuments, rebookToken, deliveryMode, customerAddress, travelFeeCents, travelDistanceKm, locationId } = body;
 
     const { data: service, error: serviceError } = await supabase
       .from('co_services')
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
         customer_address: customerAddress || null,
         travel_fee_cents: travelFeeCents || 0,
         travel_distance_km: travelDistanceKm || null,
+        location_id: locationId || null,
         status: service.requires_review ? 'pending_review' : 'pending_scheduling',
       })
       .select('id')

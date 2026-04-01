@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 type Props = {
   commissionerId: string;
+  locationId?: string;
   onSelect: (isoDatetime: string) => void;
 };
 
@@ -28,7 +29,7 @@ function startOfCalgarDay(isoDate: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export default function SlotPicker({ commissionerId, onSelect }: Props) {
+export default function SlotPicker({ commissionerId, locationId, onSelect }: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -54,7 +55,9 @@ export default function SlotPicker({ commissionerId, onSelect }: Props) {
   const fetchSlots = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/booking/slots?commissionerId=${commissionerId}&startDate=${startDateStr}`);
+      const params = new URLSearchParams({ commissionerId, startDate: startDateStr });
+      if (locationId) params.set('locationId', locationId);
+      const res = await fetch(`/api/booking/slots?${params}`);
       const json = await res.json();
       setSlots(json.slots ?? []);
     } finally {

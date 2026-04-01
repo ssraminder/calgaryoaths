@@ -7,17 +7,30 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const commissionerId = req.nextUrl.searchParams.get('commissionerId');
+  const locationId = req.nextUrl.searchParams.get('locationId');
   if (!commissionerId) return NextResponse.json({ error: 'Missing commissionerId' }, { status: 400 });
 
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('co_availability_rules')
-    .select('*')
+    .select('*, location:co_locations(id, name)')
     .eq('commissioner_id', commissionerId)
     .order('day_of_week', { ascending: true })
     .order('start_time', { ascending: true });
 
+  if (locationId) query = query.eq('location_id', locationId);
+
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+
+  // Also return locations for the dropdown
+  const { data: locations } = await supabaseAdmin
+    .from('co_locations')
+    .select('id, name, address')
+    .eq('commissioner_id', commissionerId)
+    .eq('active', true)
+    .order('sort_order', { ascending: true });
+
+  return NextResponse.json({ rules: data ?? [], locations: locations ?? [] });
 }
 
 export async function POST(req: NextRequest) {
@@ -26,19 +39,24 @@ export async function POST(req: NextRequest) {
   if (user.role === 'viewer') return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
 
   const body = await req.json();
-  const { commissioner_id, day_of_week, start_time, end_time } = body;
+  const { commissioner_id, day_of_week, start_time, end_time, location_id } = body;
 
-  if (!commissioner_id || day_of_week === undefined || !start_time || !end_time) {
-    return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  if (!commissioner_id || day_of_week === undefined || !start_time || !end_time || !location_id) {
+    return NextResponse.json({ error: 'Missing required fields (including location_id)' }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin
     .from('co_availability_rules')
-    .insert({ commissioner_id, day_of_week, start_time, end_time })
+    .insert({ commissioner_id, day_of_week, start_time, end_time, location_id })
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.message.includes('overlap')) {
+      return NextResponse.json({ error: 'Time overlap: commissioner already has availability at another location during this time.' }, { status: 409 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json(data, { status: 201 });
 }
 
