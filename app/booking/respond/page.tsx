@@ -1,10 +1,19 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle, XCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function BookingRespondPage() {
+  return (
+    <Suspense>
+      <BookingRespondContent />
+    </Suspense>
+  );
+}
+
+function BookingRespondContent() {
   const searchParams = useSearchParams();
   const result = searchParams.get('result');
 

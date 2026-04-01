@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import StatusBadge from '@/components/admin/StatusBadge';
 
@@ -19,6 +19,14 @@ type Booking = {
 const STATUSES = ['paid', 'confirmed', 'pending_scheduling', 'cancelled', 'completed'];
 
 export default function VendorBookingsPage() {
+  return (
+    <Suspense>
+      <VendorBookingsContent />
+    </Suspense>
+  );
+}
+
+function VendorBookingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);

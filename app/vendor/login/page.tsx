@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 
@@ -10,6 +10,14 @@ const supabase = createBrowserClient(
 );
 
 export default function VendorLoginPage() {
+  return (
+    <Suspense>
+      <VendorLoginForm />
+    </Suspense>
+  );
+}
+
+function VendorLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
