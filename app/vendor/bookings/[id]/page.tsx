@@ -16,6 +16,8 @@ type Booking = {
   proposed_datetime: string | null;
   status: string;
   vendor_payout_cents: number | null;
+  vendor_gst_cents: number | null;
+  vendor_total_payout_cents: number | null;
   notes: string | null;
   num_documents: number;
   delivery_mode: string | null;
@@ -149,7 +151,11 @@ export default function VendorBookingDetailPage() {
               {booking.facility_name && <div className="flex justify-between"><dt className="text-gray-500">Facility</dt><dd>{booking.facility_name}</dd></div>}
             </>
           )}
-          <div className="flex justify-between"><dt className="text-gray-500">Your Payout</dt><dd className="font-medium text-green-700">{booking.vendor_payout_cents != null ? `$${(booking.vendor_payout_cents / 100).toFixed(2)}` : '—'}</dd></div>
+          <div className="flex justify-between"><dt className="text-gray-500">Service Payout</dt><dd>{booking.vendor_payout_cents != null ? `$${(booking.vendor_payout_cents / 100).toFixed(2)}` : '—'}</dd></div>
+          {(booking.vendor_gst_cents ?? 0) > 0 && (
+            <div className="flex justify-between"><dt className="text-gray-500">GST (5%)</dt><dd>${((booking.vendor_gst_cents ?? 0) / 100).toFixed(2)}</dd></div>
+          )}
+          <div className="flex justify-between"><dt className="text-gray-500 font-medium">Your Payout</dt><dd className="font-medium text-green-700">{booking.vendor_total_payout_cents != null ? `$${(booking.vendor_total_payout_cents / 100).toFixed(2)}` : booking.vendor_payout_cents != null ? `$${(booking.vendor_payout_cents / 100).toFixed(2)}` : '—'}</dd></div>
           <div className="flex justify-between"><dt className="text-gray-500">Booked</dt><dd>{fmtDate(booking.created_at)}</dd></div>
         </dl>
         {booking.notes && (

@@ -59,6 +59,8 @@ type Commissioner = {
   booking_fee_cents: number | null;
   commission_rate: number | null;
   is_partner: boolean;
+  gst_number: string | null;
+  gst_registered: boolean;
   mobile_available: boolean;
   virtual_available: boolean;
   user_id: string | null;
@@ -192,6 +194,8 @@ export default function EditVendorPage() {
       booking_fee_cents: Number(fd.get('booking_fee_dollars') || 40) * 100,
       commission_rate: Number(fd.get('commission_rate') || 20),
       is_partner: fd.get('is_partner') === 'on',
+      gst_number: fd.get('gst_number') || null,
+      gst_registered: fd.get('gst_registered') === 'on',
       mobile_available: fd.get('mobile_available') === 'on',
       virtual_available: fd.get('virtual_available') === 'on',
       active: fd.get('active') === 'on',
@@ -328,6 +332,23 @@ export default function EditVendorPage() {
           </div>
           <p className="text-xs text-gray-400">
             Commission is only charged on partner vendors. Platform keeps {commissioner.commission_rate ?? 20}% of the booking fee.
+          </p>
+        </div>
+
+        {/* GST/HST Registration */}
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+          <h3 className="text-sm font-medium text-gray-900">GST/HST Registration</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <Field name="gst_number" label="GST/HST Number" defaultValue={commissioner.gst_number ?? ''} />
+            <div className="flex items-end gap-2 pb-1">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="gst_registered" defaultChecked={commissioner.gst_registered} className="rounded border-gray-300" />
+                GST registered
+              </label>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">
+            If GST registered, 5% GST will be added to vendor payouts. The GST number appears on payout records.
           </p>
         </div>
 
