@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { sendEmail } from '@/lib/email';
+import { supabase } from '@/lib/supabase';
 
 const joinSchema = z.object({
   fullName: z.string().min(2, 'Full name is required'),
@@ -46,6 +47,24 @@ export async function submitJoinForm(
   const d = parsed.data;
 
   try {
+    // Insert into partner applications table for admin tracking
+    await supabase.from('co_partner_applications').insert({
+      full_name: d.fullName,
+      email: d.email,
+      phone: d.phone,
+      city: d.city,
+      credential_types: d.credentialTypes,
+      year_credentialed: d.yearCredentialed,
+      credentials_active: d.credentialsActive,
+      insurance: d.insurance,
+      services_offered: d.servicesOffered,
+      mobile_available: d.mobileAvailable,
+      languages: d.languages,
+      postal_code: d.postalCode,
+      service_radius: d.serviceRadius,
+      availability: d.availability,
+    });
+
     await sendEmail({
       to: 'info@calgaryoaths.com',
       replyTo: d.email,
