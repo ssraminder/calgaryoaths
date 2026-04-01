@@ -2,6 +2,7 @@
 
 import BookButton from '@/components/shared/BookButton';
 import { Phone } from 'lucide-react';
+import { trackPhoneClick } from '@/lib/analytics';
 
 type HeroProps = {
   locationCount?: number;
@@ -46,7 +47,7 @@ export default function Hero({ locationCount = 2, commissionerCount = 2, startin
         </p>
 
         {/* CTAs */}
-        <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 justify-center">
           <BookButton
             label="Book Your Appointment"
             variant="primary"
@@ -54,6 +55,7 @@ export default function Hero({ locationCount = 2, commissionerCount = 2, startin
           />
           <a
             href="tel:5876000746"
+            onClick={() => trackPhoneClick('hero')}
             className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-btn border-2 border-white/60 text-white font-medium text-base uppercase tracking-wide hover:bg-white/10 transition-colors duration-200"
           >
             <Phone size={18} />
