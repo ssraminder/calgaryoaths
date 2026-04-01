@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
 import Stripe from 'stripe';
+import crypto from 'crypto';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-03-25.dahlia',
@@ -82,22 +83,17 @@ export async function GET(req: NextRequest) {
   }
 
   if (action === 'rebook') {
-    // Refund the current booking and redirect to booking flow with service pre-selected
-    let refundId: string | null = null;
-    if (booking.stripe_payment_intent_id) {
-      try {
-        const refund = await stripe.refunds.create({ payment_intent: booking.stripe_payment_intent_id });
-        refundId = refund.id;
-      } catch (e) { console.error('Rebook refund error:', e); }
-    }
+    // Don't refund — keep the payment and generate a rebook token
+    const rebookToken = crypto.randomBytes(32).toString('hex');
 
+    // Mark original booking as transferred-out
     await supabaseAdmin
       .from('co_bookings')
       .update({
         status: 'cancelled',
         cancelled_at: new Date().toISOString(),
-        cancelled_reason: 'Customer chose to rebook with a different vendor',
-        confirmation_token: null,
+        cancelled_reason: 'Customer chose to rebook with a different vendor (payment transferred)',
+        confirmation_token: rebookToken, // reuse field as rebook token
         updated_at: new Date().toISOString(),
       })
       .eq('id', booking.id);
@@ -106,11 +102,13 @@ export async function GET(req: NextRequest) {
       await sendEmail({
         to: 'info@calgaryoaths.com',
         subject: `Customer rebooking with different vendor — ${booking.name}`,
-        html: `<p>${booking.name} (${booking.email}) declined the proposed time for ${booking.service_name} and is rebooking with a different vendor. ${refundId ? `Refund ID: ${refundId}` : 'Manual refund may be needed.'}</p>`,
+        html: `<p>${booking.name} (${booking.email}) is rebooking ${booking.service_name} with a different vendor. Payment from original booking (${booking.id}) will be transferred — no refund issued.</p>`,
       });
     } catch (e) { console.error('Rebook notification error:', e); }
 
-    return NextResponse.redirect(`${siteUrl}/booking/respond?result=rebook&service=${booking.service_slug}`);
+    return NextResponse.redirect(
+      `${siteUrl}/booking/respond?result=rebook&service=${booking.service_slug}&rebook=${rebookToken}`
+    );
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

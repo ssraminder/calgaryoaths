@@ -5,7 +5,7 @@ import { sendEmail } from '@/lib/email';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { serviceSlug, commissionerId, name, email, phone, notes, numDocuments } = body;
+    const { serviceSlug, commissionerId, name, email, phone, notes, numDocuments, rebookToken } = body;
 
     const { data: service, error: serviceError } = await supabase
       .from('co_services')
@@ -62,6 +62,41 @@ export async function POST(req: NextRequest) {
       }).catch((err) => console.error('Manual review email error:', err));
 
       return NextResponse.json({ bookingId: booking.id, requiresReview: true });
+    }
+
+    // If rebooking from a previous cancelled booking, transfer the payment
+    if (rebookToken) {
+      const { data: originalBooking } = await supabase
+        .from('co_bookings')
+        .select('id, amount_paid, stripe_payment_intent_id, stripe_session_id')
+        .eq('confirmation_token', rebookToken)
+        .eq('status', 'cancelled')
+        .single();
+
+      if (originalBooking) {
+        // Transfer payment to new booking
+        await supabase
+          .from('co_bookings')
+          .update({
+            amount_paid: originalBooking.amount_paid,
+            stripe_payment_intent_id: originalBooking.stripe_payment_intent_id,
+            stripe_session_id: originalBooking.stripe_session_id,
+            status: 'paid',
+            transferred_from_booking_id: originalBooking.id,
+          })
+          .eq('id', booking.id);
+
+        // Link original booking to new one
+        await supabase
+          .from('co_bookings')
+          .update({
+            transferred_to_booking_id: booking.id,
+            confirmation_token: null,
+          })
+          .eq('id', originalBooking.id);
+
+        return NextResponse.json({ bookingId: booking.id, requiresReview: false, paymentTransferred: true });
+      }
     }
 
     return NextResponse.json({ bookingId: booking.id, requiresReview: false });

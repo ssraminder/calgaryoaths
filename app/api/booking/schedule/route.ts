@@ -37,6 +37,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This slot was just taken. Please choose another time.' }, { status: 409 });
     }
 
+    // If payment was already transferred from a rebooked booking, skip Stripe
+    if (booking.status === 'paid' && booking.transferred_from_booking_id) {
+      await supabase
+        .from('co_bookings')
+        .update({
+          appointment_datetime: appointmentDatetime,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', bookingId);
+
+      return NextResponse.json({ paymentTransferred: true });
+    }
+
     // Fetch commissioner for fee + commission rate
     const { data: commissioner } = await supabase
       .from('co_commissioners')

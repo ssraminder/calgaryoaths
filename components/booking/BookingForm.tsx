@@ -120,7 +120,7 @@ type DbCommissioner = { id: string; name: string; location: string; booking_fee_
 /* ── Main form ──────────────────────────────────────────────────────────── */
 type Step = 1 | 2 | 3;
 
-export default function BookingForm({ onClose }: { onClose: () => void }) {
+export default function BookingForm({ onClose, rebookToken }: { onClose: () => void; rebookToken?: string }) {
   const [step, setStep] = useState<Step>(1);
   const [services, setServices] = useState<BookingService[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
@@ -185,6 +185,7 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
           email: data.email,
           phone: data.phone,
           notes: data.notes || '',
+          ...(rebookToken ? { rebookToken } : {}),
         }),
       });
 
@@ -196,6 +197,10 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
 
       if (json.requiresReview) {
         setPendingReview(true);
+      } else if (json.paymentTransferred) {
+        // Payment carried over from previous booking — skip Stripe, go to slot pick
+        setSelectedCommissionerIdForSlots(data.commissionerId);
+        setStep(3);
       } else {
         setSelectedCommissionerIdForSlots(data.commissionerId);
         setStep(3);
@@ -226,7 +231,11 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
         return;
       }
 
-      if (json.checkoutUrl) {
+      if (json.paymentTransferred) {
+        // Payment was already made — go straight to success
+        setRedirecting(true);
+        window.location.href = `${window.location.origin}/booking/success?appointment=confirmed`;
+      } else if (json.checkoutUrl) {
         const fee = BOOKING_FEES[selectedCommissionerIdForSlots] ?? 0;
         trackSlotConfirmed(fee);
         trackConversion(fee);

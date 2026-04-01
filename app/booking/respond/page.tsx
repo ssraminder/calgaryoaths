@@ -17,6 +17,7 @@ function BookingRespondContent() {
   const searchParams = useSearchParams();
   const result = searchParams.get('result');
   const service = searchParams.get('service');
+  const rebookToken = searchParams.get('rebook');
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
@@ -55,7 +56,7 @@ function BookingRespondContent() {
               Your previous booking has been refunded. You can now book with a different commissioner — click below to start a new booking.
             </p>
             <Link
-              href={`/?open_booking=1${service ? `&service=${service}` : ''}`}
+              href={`/?open_booking=1${service ? `&service=${service}` : ''}${rebookToken ? `&rebook=${rebookToken}` : ''}`}
               className="mt-4 inline-block rounded-md bg-gold px-6 py-2.5 text-sm font-medium text-white hover:bg-gold/90"
             >
               Book Now
