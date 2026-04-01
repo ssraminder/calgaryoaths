@@ -9,9 +9,9 @@ const features = [
   },
   {
     icon: FileEdit,
-    title: 'Document Drafting Included',
+    title: 'Document Drafting Available',
     description:
-      'No need to prepare your own document. We draft affidavits, statutory declarations, travel consent letters, and invitation letters from scratch — included in the price.',
+      'Need a document drafted? We prepare affidavits, statutory declarations, travel consent letters, and invitation letters from scratch — starting at $100, billed at $100/hour.',
   },
   {
     icon: Languages,
