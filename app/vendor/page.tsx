@@ -23,7 +23,7 @@ export default function VendorDashboard() {
   useEffect(() => {
     fetch('/api/vendor/bookings')
       .then((r) => r.json())
-      .then((d) => { setBookings(d ?? []); setLoading(false); })
+      .then((d) => { setBookings(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 

@@ -116,14 +116,14 @@ export default function VendorsPage() {
       setLoading(true);
       fetch('/api/admin/vendors')
         .then((r) => r.json())
-        .then((d) => { setCommissioners(d); setLoading(false); })
+        .then((d) => { setCommissioners(Array.isArray(d) ? d : []); setLoading(false); })
         .catch(() => setLoading(false));
     } else {
       setLoading(true);
       const params = appStatusFilter ? `?status=${appStatusFilter}` : '';
       fetch(`/api/admin/applications${params}`)
         .then((r) => r.json())
-        .then((d) => { setApplications(d); setLoading(false); })
+        .then((d) => { setApplications(Array.isArray(d) ? d : []); setLoading(false); })
         .catch(() => setLoading(false));
     }
   }, [tab, appStatusFilter]);
@@ -141,7 +141,8 @@ export default function VendorsPage() {
     // Refresh
     const params = appStatusFilter ? `?status=${appStatusFilter}` : '';
     const res = await fetch(`/api/admin/applications${params}`);
-    setApplications(await res.json());
+    const refreshed = await res.json();
+    setApplications(Array.isArray(refreshed) ? refreshed : []);
   }
 
   async function approveAndCreateVendor() {

@@ -56,9 +56,10 @@ export default async function RootLayout({
     <html
       lang="en"
       className={`${playfair.variable} ${inter.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       {gtmId && <GTMHead gtmId={gtmId} />}
-      <body className="min-h-full flex flex-col bg-bg text-charcoal font-body">
+      <body className="min-h-full flex flex-col bg-bg text-charcoal font-body" suppressHydrationWarning>
         {gtmId && <GTMNoScript gtmId={gtmId} />}
         <BookingModalProvider>
           <Navbar />
