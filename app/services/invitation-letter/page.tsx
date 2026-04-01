@@ -16,7 +16,7 @@ export default function InvitationLetterPage() {
   return (
     <ServicePageLayout
       service={service}
-      intro="An invitation letter is a commissioned document from a Canadian resident inviting a foreign national to visit Canada. A commissioned letter carries more weight in visa applications and is often specifically requested by consulates. We draft the letter to IRCC formatting requirements, print it, and commission it with our official seal."
+      intro="An invitation letter is a commissioned document from a Canadian resident inviting a foreign national to visit Canada. A commissioned letter carries more weight in visa applications and is often specifically requested by consulates. We commission the letter with our official seal. Drafting to IRCC formatting requirements is available at an extra charge."
     />
   );
 }

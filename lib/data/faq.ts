@@ -101,8 +101,8 @@ export const faqGroups: FaqGroup[] = [
         answer: 'Yes. Each commissioner sets their own rates. When you book online, you can compare prices across available commissioners for your selected service. The exact rate is shown before you confirm.',
       },
       {
-        question: 'Is drafting included in the price?',
-        answer: 'Some commissioners include drafting in their service rate; others charge a separate drafting fee. The full breakdown is shown during the booking process before you pay.',
+        question: 'Is drafting included in the commissioning price?',
+        answer: 'Drafting is available at an extra charge. The commissioning price covers witnessing your signature and applying the official seal. If you need a document drafted from scratch, a drafting fee applies. The full breakdown is shown during booking.',
       },
     ],
   },

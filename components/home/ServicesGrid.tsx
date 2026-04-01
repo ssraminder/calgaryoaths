@@ -58,7 +58,7 @@ export default async function ServicesGrid() {
         <div className="text-center mb-12">
           <h2 className="section-heading text-3xl md:text-4xl">Documents we commission for you</h2>
           <p className="text-mid-grey mt-3 max-w-xl mx-auto">
-            We draft, print, and commission — bring your ID and we handle the rest.
+            Professional commissioning services — bring your ID and we handle the rest. Drafting available at extra charge.
           </p>
         </div>
 
