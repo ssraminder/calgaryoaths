@@ -64,9 +64,6 @@ export default function EditLocationPage() {
       google_maps_embed: fd.get('google_maps_embed'),
       map_url: fd.get('map_url'),
       calendly_url: fd.get('calendly_url'),
-      hours_weekdays: fd.get('hours_weekdays'),
-      hours_saturday: fd.get('hours_saturday'),
-      hours_sunday: fd.get('hours_sunday'),
       geo_lat: fd.get('geo_lat') ? Number(fd.get('geo_lat')) : null,
       geo_lng: fd.get('geo_lng') ? Number(fd.get('geo_lng')) : null,
       active: fd.get('active') === 'on',
@@ -140,12 +137,6 @@ export default function EditLocationPage() {
         </div>
         <Field name="parking_notes" label="Parking Notes" defaultValue={location.parking_notes} textarea />
         <Field name="nearby_neighbourhoods" label="Nearby Neighbourhoods (comma-separated)" defaultValue={location.nearby_neighbourhoods?.join(', ')} />
-
-        <div className="grid grid-cols-3 gap-4">
-          <Field name="hours_weekdays" label="Weekday Hours" defaultValue={location.hours_weekdays} />
-          <Field name="hours_saturday" label="Saturday Hours" defaultValue={location.hours_saturday} />
-          <Field name="hours_sunday" label="Sunday Hours" defaultValue={location.hours_sunday} />
-        </div>
 
         <Field name="google_maps_embed" label="Google Maps Embed URL" defaultValue={location.google_maps_embed} />
         <Field name="map_url" label="Google Maps Link" defaultValue={location.map_url} />

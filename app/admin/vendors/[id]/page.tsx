@@ -4,6 +4,37 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
+import TagInput from '@/components/shared/TagInput';
+
+const LANGUAGE_SUGGESTIONS = [
+  'English', 'Punjabi', 'Hindi', 'Gujarati', 'Urdu', 'Arabic', 'French',
+  'Spanish', 'Mandarin', 'Cantonese', 'Tagalog', 'Korean', 'Vietnamese',
+  'Farsi', 'Turkish', 'Somali', 'Amharic', 'Tigrinya', 'Swahili',
+];
+
+const CREDENTIAL_SUGGESTIONS = [
+  'Commissioner of Oaths (Alberta)',
+  'Notary Public (Alberta)',
+  'Commissioner of Oaths (British Columbia)',
+  'Commissioner of Oaths (Ontario)',
+  'Lawyer (Alberta)',
+  'Paralegal',
+];
+
+const NEIGHBOURHOOD_SUGGESTIONS = [
+  'Beltline', '17th Ave SW', 'Mission', 'Cliff Bungalow', 'Victoria Park',
+  'Downtown Core', 'Downtown Calgary', 'South Calgary', 'Sunalta', 'Bankview',
+  'Redstone', 'Cornerstone', 'Cityscape', 'Country Hills', 'Saddle Ridge',
+  'Falconridge', 'Taradale', 'NE Calgary', 'Martindale', 'Pineridge',
+  'Rundle', 'Temple', 'Castleridge', 'Bridgeland', 'Kensington',
+  'Marda Loop', 'Inglewood', 'Ramsay', 'Airdrie', 'Cochrane', 'Chestermere',
+  'Panorama Hills', 'Evanston', 'Nolan Hill', 'Sage Hill', 'Coventry Hills',
+  'Harvest Hills', 'Tuscany', 'Royal Oak', 'Arbour Lake', 'Varsity',
+  'Brentwood', 'Dalhousie', 'Edgemont', 'Hawkwood', 'Ranchlands',
+  'Cranston', 'Auburn Bay', 'Mahogany', 'McKenzie Towne', 'New Brighton',
+  'Seton', 'Copperfield', 'Chaparral', 'Lake Bonavista', 'Shawnessy',
+  'Somerset', 'Evergreen', 'Midnapore', 'Sundance', 'Deer Ridge',
+];
 
 type Commissioner = {
   id: string;
@@ -52,6 +83,7 @@ type VendorRate = {
   drafting_fee_cents: number;
   is_saved: boolean;
   is_default: boolean;
+  offered: boolean;
 };
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -67,6 +99,11 @@ export default function EditVendorPage() {
   const [allServices, setAllServices] = useState<{ slug: string; name: string }[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
+  // Tag fields
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [credentials, setCredentials] = useState<string[]>([]);
+  const [neighbourhoods, setNeighbourhoods] = useState<string[]>([]);
+
   // Vendor rates
   const [vendorRates, setVendorRates] = useState<VendorRate[]>([]);
   const [savingRates, setSavingRates] = useState(false);
@@ -76,6 +113,13 @@ export default function EditVendorPage() {
   // Availability rules
   const [rules, setRules] = useState<AvailabilityRule[]>([]);
   const [newRule, setNewRule] = useState({ day_of_week: 1, start_time: '09:00', end_time: '12:00' });
+
+  // Blocked dates
+  type BlockedDate = { id: string; blocked_date: string; reason: string };
+  const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
+  const [newBlockDate, setNewBlockDate] = useState('');
+  const [newBlockEndDate, setNewBlockEndDate] = useState('');
+  const [newBlockReason, setNewBlockReason] = useState('');
 
   function fetchVendorRates() {
     fetch(`/api/admin/vendor-rates?commissionerId=${id}`)
@@ -98,9 +142,18 @@ export default function EditVendorPage() {
         setSelectedServices(
           (vendor.co_commissioner_services || []).map((s: { service_slug: string }) => s.service_slug)
         );
+        setLanguages(vendor.languages ?? []);
+        setCredentials(vendor.credentials ?? []);
+        // Merge areas_served + nearby_neighbourhoods into one field, deduped
+        const merged = Array.from(new Set([
+          ...(vendor.nearby_neighbourhoods ?? []),
+          ...(vendor.areas_served ?? []),
+        ]));
+        setNeighbourhoods(merged);
       }
       setAllServices(Array.isArray(servicesRes?.services) ? servicesRes.services : Array.isArray(servicesRes) ? servicesRes : []);
       setRules(Array.isArray(availRes?.rules) ? availRes.rules : Array.isArray(availRes) ? availRes : []);
+      if (Array.isArray(availRes?.blockedDates)) setBlockedDates(availRes.blockedDates);
       if (Array.isArray(ratesRes?.rates)) setVendorRates(ratesRes.rates);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -122,21 +175,17 @@ export default function EditVendorPage() {
       phone: fd.get('phone'),
       email: fd.get('email'),
       calendly_url: fd.get('calendly_url'),
-      languages: splitTags(fd.get('languages') as string),
-      credentials: splitTags(fd.get('credentials') as string),
-      hours_weekdays: fd.get('hours_weekdays'),
-      hours_saturday: fd.get('hours_saturday'),
-      hours_sunday: fd.get('hours_sunday'),
+      languages,
+      credentials,
       google_maps_embed: fd.get('google_maps_embed'),
       map_url: fd.get('map_url'),
-      areas_served: splitTags(fd.get('areas_served') as string),
-      nearby_neighbourhoods: splitTags(fd.get('nearby_neighbourhoods') as string),
+      areas_served: neighbourhoods,
+      nearby_neighbourhoods: neighbourhoods,
       booking_fee_cents: Number(fd.get('booking_fee_dollars') || 40) * 100,
       commission_rate: Number(fd.get('commission_rate') || 20),
       is_partner: fd.get('is_partner') === 'on',
       active: fd.get('active') === 'on',
       sort_order: Number(fd.get('sort_order') || 0),
-      services: selectedServices,
     };
 
     const res = await fetch(`/api/admin/vendors/${id}`, {
@@ -216,44 +265,34 @@ export default function EditVendorPage() {
         <Field name="bio" label="Bio" textarea defaultValue={commissioner.bio} />
 
         <div className="grid grid-cols-2 gap-4">
-          <Field name="languages" label="Languages (comma-separated)" defaultValue={commissioner.languages?.join(', ')} />
-          <Field name="credentials" label="Credentials (comma-separated)" defaultValue={commissioner.credentials?.join(', ')} />
-          <Field name="areas_served" label="Areas Served (comma-separated)" defaultValue={commissioner.areas_served?.join(', ')} />
-          <Field name="nearby_neighbourhoods" label="Nearby Neighbourhoods (comma-separated)" defaultValue={commissioner.nearby_neighbourhoods?.join(', ')} />
+          <TagInput
+            name="languages"
+            label="Languages"
+            value={languages}
+            onChange={setLanguages}
+            suggestions={LANGUAGE_SUGGESTIONS}
+            placeholder="Add language…"
+          />
+          <TagInput
+            name="credentials"
+            label="Credentials"
+            value={credentials}
+            onChange={setCredentials}
+            suggestions={CREDENTIAL_SUGGESTIONS}
+            placeholder="Add credential…"
+          />
         </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <Field name="hours_weekdays" label="Weekday Hours" defaultValue={commissioner.hours_weekdays} />
-          <Field name="hours_saturday" label="Saturday Hours" defaultValue={commissioner.hours_saturday} />
-          <Field name="hours_sunday" label="Sunday Hours" defaultValue={commissioner.hours_sunday} />
-        </div>
+        <TagInput
+          name="neighbourhoods"
+          label="Areas Served & Nearby Neighbourhoods"
+          value={neighbourhoods}
+          onChange={setNeighbourhoods}
+          suggestions={NEIGHBOURHOOD_SUGGESTIONS}
+          placeholder="Add neighbourhood or area…"
+        />
 
         <Field name="google_maps_embed" label="Google Maps Embed URL" defaultValue={commissioner.google_maps_embed} />
         <Field name="map_url" label="Google Maps Link" defaultValue={commissioner.map_url} />
-
-        {/* Services checkboxes */}
-        {allServices.length > 0 && (
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Services Offered</label>
-            <div className="flex flex-wrap gap-3">
-              {allServices.map((s) => (
-                <label key={s.slug} className="flex items-center gap-1.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedServices.includes(s.slug)}
-                    onChange={(e) => {
-                      setSelectedServices((prev) =>
-                        e.target.checked ? [...prev, s.slug] : prev.filter((x) => x !== s.slug)
-                      );
-                    }}
-                    className="rounded border-gray-300"
-                  />
-                  {s.name}
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Commission & Fee section */}
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
@@ -309,68 +348,97 @@ export default function EditVendorPage() {
         </div>
 
         {vendorRates.length === 0 ? (
-          <p className="text-sm text-gray-400">
-            No services assigned yet. Check services above and save to see pricing options.
-          </p>
+          <p className="text-sm text-gray-400">Loading services…</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
+                  <th className="pb-2 pr-3 w-16">Offer</th>
                   <th className="pb-2 pr-4">Service</th>
-                  <th className="pb-2 pr-4 w-28">Company Rate</th>
-                  <th className="pb-2 pr-4 w-32">Vendor Rate ($)</th>
-                  <th className="pb-2 pr-4 w-32">Add&apos;l Page ($)</th>
-                  <th className="pb-2 w-24">Status</th>
+                  <th className="pb-2 pr-4 w-24">Company</th>
+                  <th className="pb-2 pr-4 w-28">Rate ($)</th>
+                  <th className="pb-2 pr-4 w-28">Add&apos;l ($)</th>
+                  <th className="pb-2 w-20">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {vendorRates.map((rate, i) => (
-                  <tr key={rate.service_slug} className={`border-b border-gray-100 ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
-                    <td className="py-2 pr-4 font-medium text-gray-900">{rate.service_name}</td>
-                    <td className="py-2 pr-4 text-gray-500">
+                  <tr key={rate.service_slug} className={`border-b border-gray-100 ${!rate.offered ? 'opacity-40' : ''} ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
+                    <td className="py-2 pr-3">
+                      <input
+                        type="checkbox"
+                        checked={rate.offered}
+                        onChange={(e) => {
+                          setVendorRates((prev) =>
+                            prev.map((r) =>
+                              r.service_slug === rate.service_slug
+                                ? { ...r, offered: e.target.checked }
+                                : r
+                            )
+                          );
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                    </td>
+                    <td className={`py-2 pr-4 font-medium ${rate.offered ? 'text-gray-900' : 'text-gray-400 line-through'}`}>
+                      {rate.service_name}
+                    </td>
+                    <td className="py-2 pr-4 text-gray-500 text-xs">
                       {rate.service_price != null ? `$${(rate.service_price / 100).toFixed(0)}` : rate.service_price_label}
                     </td>
                     <td className="py-2 pr-4">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={rate.first_page_cents != null ? (rate.first_page_cents / 100).toFixed(2) : ''}
-                        onChange={(e) => {
-                          const cents = Math.round(parseFloat(e.target.value || '0') * 100);
-                          setVendorRates((prev) =>
-                            prev.map((r) =>
-                              r.service_slug === rate.service_slug
-                                ? { ...r, first_page_cents: cents, is_default: false }
-                                : r
-                            )
-                          );
-                        }}
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
-                      />
+                      {rate.offered ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={rate.first_page_cents != null ? (rate.first_page_cents / 100).toFixed(2) : ''}
+                          onChange={(e) => {
+                            const cents = Math.round(parseFloat(e.target.value || '0') * 100);
+                            setVendorRates((prev) =>
+                              prev.map((r) =>
+                                r.service_slug === rate.service_slug
+                                  ? { ...r, first_page_cents: cents, is_default: false }
+                                  : r
+                              )
+                            );
+                          }}
+                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+                        />
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="py-2 pr-4">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={(rate.additional_page_cents / 100).toFixed(2)}
-                        onChange={(e) => {
-                          const cents = Math.round(parseFloat(e.target.value || '0') * 100);
-                          setVendorRates((prev) =>
-                            prev.map((r) =>
-                              r.service_slug === rate.service_slug
-                                ? { ...r, additional_page_cents: cents }
-                                : r
-                            )
-                          );
-                        }}
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
-                      />
+                      {rate.offered ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={(rate.additional_page_cents / 100).toFixed(2)}
+                          onChange={(e) => {
+                            const cents = Math.round(parseFloat(e.target.value || '0') * 100);
+                            setVendorRates((prev) =>
+                              prev.map((r) =>
+                                r.service_slug === rate.service_slug
+                                  ? { ...r, additional_page_cents: cents }
+                                  : r
+                              )
+                            );
+                          }}
+                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+                        />
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="py-2">
-                      {rate.is_saved ? (
+                      {!rate.offered ? (
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                          Not offered
+                        </span>
+                      ) : rate.is_saved ? (
                         <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
                           Saved
                         </span>
@@ -402,14 +470,13 @@ export default function EditVendorPage() {
                 setRatesSaved(false);
                 const payload = {
                   commissionerId: id,
-                  rates: vendorRates
-                    .filter((r) => r.first_page_cents != null)
-                    .map((r) => ({
-                      service_slug: r.service_slug,
-                      first_page_cents: r.first_page_cents!,
-                      additional_page_cents: r.additional_page_cents,
-                      drafting_fee_cents: r.drafting_fee_cents,
-                    })),
+                  rates: vendorRates.map((r) => ({
+                    service_slug: r.service_slug,
+                    first_page_cents: r.first_page_cents,
+                    additional_page_cents: r.additional_page_cents,
+                    drafting_fee_cents: r.drafting_fee_cents,
+                    offered: r.offered,
+                  })),
                 };
                 const res = await fetch('/api/admin/vendor-rates', {
                   method: 'POST',
@@ -428,9 +495,9 @@ export default function EditVendorPage() {
               }}
               className="rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50"
             >
-              {savingRates ? 'Saving Rates...' : 'Save All Rates'}
+              {savingRates ? 'Saving...' : 'Save Services & Rates'}
             </button>
-            {ratesSaved && <span className="text-sm text-green-600">Rates saved successfully!</span>}
+            {ratesSaved && <span className="text-sm text-green-600">Saved!</span>}
             {ratesError && <span className="text-sm text-red-600">{ratesError}</span>}
           </div>
         )}
@@ -515,6 +582,99 @@ export default function EditVendorPage() {
           </button>
         </div>
       </div>
+
+      {/* Blocked Dates */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
+        <h2 className="text-lg font-medium text-gray-900">Blocked Dates</h2>
+        <p className="text-sm text-gray-500">
+          Block specific dates when this vendor is unavailable (holidays, time off, etc.).
+          Customers cannot book on blocked dates.
+        </p>
+
+        {blockedDates.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {blockedDates.map((bd) => (
+              <span key={bd.id} className="inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-medium text-red-700">
+                {new Date(bd.blocked_date + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {bd.reason && <span className="text-red-400">({bd.reason})</span>}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetch(`/api/admin/availability?id=${bd.id}&type=blocked_date`, { method: 'DELETE' });
+                    setBlockedDates((prev) => prev.filter((d) => d.id !== bd.id));
+                  }}
+                  className="text-red-300 hover:text-red-600"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">No dates blocked.</p>
+        )}
+
+        <div className="flex items-end gap-3 border-t border-gray-200 pt-4 flex-wrap">
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">Start Date</label>
+            <input
+              type="date"
+              value={newBlockDate}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => { setNewBlockDate(e.target.value); if (!newBlockEndDate) setNewBlockEndDate(e.target.value); }}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">End Date (optional)</label>
+            <input
+              type="date"
+              value={newBlockEndDate}
+              min={newBlockDate || new Date().toISOString().split('T')[0]}
+              onChange={(e) => setNewBlockEndDate(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="mb-1 block text-xs text-gray-500">Reason (optional)</label>
+            <input
+              type="text"
+              value={newBlockReason}
+              onChange={(e) => setNewBlockReason(e.target.value)}
+              placeholder="e.g. Vacation, Holiday"
+              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!newBlockDate) return;
+              // Build array of dates from start to end
+              const dates: string[] = [];
+              const start = new Date(newBlockDate + 'T12:00:00');
+              const end = newBlockEndDate ? new Date(newBlockEndDate + 'T12:00:00') : start;
+              for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                dates.push(d.toISOString().split('T')[0]);
+              }
+              const res = await fetch('/api/admin/availability', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'blocked_date', commissioner_id: id, dates, reason: newBlockReason }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                setBlockedDates((prev) => [...prev, ...data].sort((a, b) => a.blocked_date.localeCompare(b.blocked_date)));
+                setNewBlockDate('');
+                setNewBlockEndDate('');
+                setNewBlockReason('');
+              }
+            }}
+            className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <Plus className="h-4 w-4" /> Block
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -533,10 +693,6 @@ function Field({ name, label, type = 'text', defaultValue, required, textarea }:
       )}
     </div>
   );
-}
-
-function splitTags(val: string): string[] {
-  return val ? val.split(',').map((s) => s.trim()).filter(Boolean) : [];
 }
 
 function VendorAccountSection({ commissionerId, commissionerName, email, hasAccount }: {

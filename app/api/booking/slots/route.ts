@@ -86,7 +86,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ slots: [] });
   }
 
-  // Generate candidate slots from availability rules
+  // Blocked dates
+  const { data: blockedDatesData } = await supabase
+    .from('co_blocked_dates')
+    .select('blocked_date')
+    .eq('commissioner_id', commissionerId)
+    .gte('blocked_date', startDate);
+  const blockedDates = new Set((blockedDatesData ?? []).map((b) => b.blocked_date));
+
+  // Generate candidate slots from availability rules (skip blocked dates)
   const [sy, sm, sd] = startDate.split('-').map(Number);
   const base = new Date(sy, sm - 1, sd);
   const allSlots: string[] = [];
@@ -95,6 +103,7 @@ export async function GET(req: NextRequest) {
     const d = new Date(base);
     d.setDate(base.getDate() + i);
     const dateStr = d.toISOString().slice(0, 10);
+    if (blockedDates.has(dateStr)) continue;
     allSlots.push(...generateSlotsForDay(dateStr, availRules, SLOT_MINUTES));
   }
 

@@ -21,9 +21,6 @@ type LocationCommissioner = {
   location_slug: string;
   address: string;
   calendly_url: string;
-  hours_weekdays: string;
-  hours_saturday: string;
-  hours_sunday: string;
   google_maps_embed: string;
   map_url: string;
 };
@@ -31,7 +28,7 @@ type LocationCommissioner = {
 async function getCommissioners() {
   const { data, error } = await supabase
     .from('co_commissioners')
-    .select('id, name, title, location, location_slug, address, calendly_url, hours_weekdays, hours_saturday, hours_sunday, google_maps_embed, map_url')
+    .select('id, name, title, location, location_slug, address, calendly_url, google_maps_embed, map_url')
     .eq('active', true)
     .order('sort_order', { ascending: true });
 
@@ -45,9 +42,6 @@ async function getCommissioners() {
       location_slug: c.locationSlug,
       address: c.address,
       calendly_url: c.calendlyUrl,
-      hours_weekdays: c.hours.weekdays,
-      hours_saturday: c.hours.saturday,
-      hours_sunday: c.hours.sunday,
       google_maps_embed: c.googleMapsEmbed,
       map_url: c.mapUrl,
     }));
@@ -109,10 +103,7 @@ export default async function LocationsPage() {
                     </div>
                     <div className="flex items-start gap-2">
                       <Clock size={15} className="text-gold mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p>Mon–Fri: {c.hours_weekdays}</p>
-                        <p>Sat: {c.hours_saturday} · Sun: {c.hours_sunday}</p>
-                      </div>
+                      <p>By appointment only</p>
                     </div>
                   </div>
                 </div>

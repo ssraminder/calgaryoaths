@@ -87,12 +87,22 @@ export async function GET(req: NextRequest) {
         .lte('appointment_datetime', windowEnd.toISOString());
       const bookedSet = new Set((booked ?? []).map((b) => b.appointment_datetime));
 
+      // Blocked dates for this commissioner
+      const { data: blockedDatesData } = await supabase
+        .from('co_blocked_dates')
+        .select('blocked_date')
+        .eq('commissioner_id', comm.id)
+        .gte('blocked_date', now.toISOString().split('T')[0]);
+      const blockedDates = new Set((blockedDatesData ?? []).map((b) => b.blocked_date));
+
       // Find soonest slot at this location
       let soonestSlot: string | null = null;
       if (rules?.length) {
         for (let i = 0; i < 7 && !soonestSlot; i++) {
           const d = new Date(now);
           d.setDate(now.getDate() + i);
+          const dateStr = d.toISOString().slice(0, 10);
+          if (blockedDates.has(dateStr)) continue; // Skip blocked dates
           const dayOfWeek = d.getDay();
           const [year, month, day] = d.toISOString().slice(0, 10).split('-').map(Number);
           const dayRules = rules.filter((r) => r.day_of_week === dayOfWeek);

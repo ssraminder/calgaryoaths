@@ -96,13 +96,9 @@ export default function LocationCard({
               <p className="text-mid-grey text-xs mt-0.5">{parking}</p>
             </div>
           </div>
-          <div className="flex items-start gap-2">
-            <Clock size={16} className="text-gold mt-0.5 flex-shrink-0" />
-            <div>
-              <p>Mon–Fri: {hours.weekdays}</p>
-              <p>Saturday: {hours.saturday}</p>
-              <p className="text-mid-grey">Sunday: {hours.sunday}</p>
-            </div>
+          <div className="flex items-center gap-2">
+            <Clock size={16} className="text-gold flex-shrink-0" />
+            <p>By appointment only</p>
           </div>
           <div className="flex items-center gap-2">
             <Globe size={16} className="text-gold flex-shrink-0" />
