@@ -20,6 +20,7 @@ const joinSchema = z.object({
   mobileAvailable: z.string().optional(),
   virtualAvailable: z.string().optional(),
   areasServedJson: z.string().optional(),
+  otherServices: z.string().optional(),
   gstNumber: z.string().optional(),
   gstRegistered: z.string().optional(),
   referralSource: z.string().optional(),
@@ -151,6 +152,7 @@ export async function submitJoinForm(
       credentials_active: d.credentialsActive,
       insurance: d.insurance,
       services_offered: d.servicesOffered,
+      other_services: d.otherServices || null,
       mobile_available: d.mobileAvailable || 'No',
       virtual_available: d.virtualAvailable || null,
       languages: languages.join(', '),
@@ -186,6 +188,7 @@ export async function submitJoinForm(
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Virtual</td><td style="padding:8px;border:1px solid #ddd">${d.virtualAvailable || 'No'}</td></tr>
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">GST</td><td style="padding:8px;border:1px solid #ddd">${gstRegistered ? `Yes — ${d.gstNumber}` : 'No'}</td></tr>
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Referral</td><td style="padding:8px;border:1px solid #ddd">${d.referralSource || 'Not specified'}</td></tr>
+          ${d.otherServices ? `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Other Services</td><td style="padding:8px;border:1px solid #ddd">${d.otherServices}</td></tr>` : ''}
           ${credentialFileUrl ? `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Credential</td><td style="padding:8px;border:1px solid #ddd"><a href="${credentialFileUrl}">View uploaded certificate</a></td></tr>` : ''}
         </table>
         <p><strong>Commissioner ID:</strong> ${commissionerId}</p>
@@ -194,9 +197,33 @@ export async function submitJoinForm(
       `,
     }).catch((err) => console.error('Join notification email error:', err));
 
+    // 8. Send welcome email to the vendor
+    await sendEmail({
+      to: d.email,
+      subject: 'Welcome to Calgary Oaths — Application Received',
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+          <h2 style="color:#1B3A5C">Welcome to Calgary Oaths, ${d.fullName.split(' ')[0]}!</h2>
+          <p>Thank you for applying to join our commissioner network. We've received your application and created your partner portal account.</p>
+          <h3 style="color:#1B3A5C;margin-top:24px">What happens next?</h3>
+          <ol style="line-height:1.8">
+            <li>Our team will review your application and credentials within <strong>2 business days</strong>.</li>
+            <li>Once approved, we'll activate your profile and you'll appear on our website.</li>
+            <li>You can then log in to the <a href="https://calgaryoaths.com/vendor/login" style="color:#C8922A">Partner Portal</a> to set your rates, availability, and start receiving bookings.</li>
+          </ol>
+          <div style="background:#f8f7f4;border:1px solid #e2e0da;border-radius:8px;padding:16px;margin:24px 0">
+            <p style="margin:0;font-size:14px"><strong>Your login email:</strong> ${d.email}</p>
+            <p style="margin:4px 0 0;font-size:14px"><strong>Partner Portal:</strong> <a href="https://calgaryoaths.com/vendor/login" style="color:#C8922A">calgaryoaths.com/vendor/login</a></p>
+          </div>
+          <p>If you have any questions, reply to this email or call us at <a href="tel:5876000746" style="color:#C8922A">(587) 600-0746</a>.</p>
+          <p style="color:#888;font-size:12px;margin-top:24px">Calgary Oaths — Operated by Cethos Solutions Inc.</p>
+        </div>
+      `,
+    }).catch((err) => console.error('Vendor welcome email error:', err));
+
     return {
       success: true,
-      message: "Thanks for applying! We've created your partner account. We'll review your application and activate your profile within 2 business days.",
+      message: "Thanks for applying! We've created your partner account and sent you a confirmation email. We'll review your application and activate your profile within 2 business days.",
     };
   } catch (err) {
     console.error('Join form error:', err);
