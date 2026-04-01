@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { MapPin, Clock, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { commissioners as fallbackCommissioners } from '@/lib/data/commissioners';
+import BookButton from '@/components/shared/BookButton';
 
 type LocationCommissioner = {
   id: string;
@@ -100,14 +101,12 @@ export default async function LocationsSection() {
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-border">
-                <a
-                  href={c.calendly_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-primary flex-1 justify-center text-xs py-2.5"
-                >
-                  Book with {c.name.split(' ')[0]}
-                </a>
+                <BookButton
+                  label={`Book with ${c.name.split(' ')[0]}`}
+                  variant="primary"
+                  size="sm"
+                  className="flex-1 justify-center"
+                />
                 <Link
                   href={`/locations/${c.location_slug}`}
                   className="btn-secondary flex-1 justify-center text-xs py-2.5"
