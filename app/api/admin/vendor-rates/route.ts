@@ -4,13 +4,19 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 
 /**
  * GET /api/admin/vendor-rates?commissionerId=xxx
- *   Returns all vendor rates for a commissioner, merged with service
- *   defaults (co_services.price * 50%) for services without a rate.
+ *   Returns all vendor rates for a commissioner with suggested rates.
+ *   Suggested rate = company rate minus 20%, rounded to nearest $5.
  *
  * POST /api/admin/vendor-rates
- *   Upserts vendor rates for a commissioner.
- *   Body: { commissionerId, rates: [{ service_slug, first_page_cents, additional_page_cents?, drafting_fee_cents? }] }
+ *   Upserts vendor rates + service assignments for a commissioner.
  */
+
+const ADDITIONAL_PAGE_COMPANY_CENTS = 2000; // $20 company rate for additional pages
+
+/** Round cents to the nearest $5 (500 cents) */
+function roundToNearest5(cents: number): number {
+  return Math.round(cents / 500) * 500;
+}
 
 export async function GET(req: NextRequest) {
   const user = await verifyAdmin(req);
@@ -46,15 +52,21 @@ export async function GET(req: NextRequest) {
   // Build merged list: one entry per ALL active services, with offered flag
   const merged = (services ?? []).map((s) => {
     const existing = rateMap.get(s.slug);
-    const defaultRate = s.price != null ? Math.round(s.price * 0.5) : null;
     const offered = offeredSlugs.has(s.slug);
+
+    // Suggested = company rate - 20%, rounded to nearest $5
+    const suggestedFirst = s.price != null ? roundToNearest5(s.price * 0.8) : null;
+    const suggestedAdditional = roundToNearest5(ADDITIONAL_PAGE_COMPANY_CENTS * 0.8);
+
     return {
       service_slug: s.slug,
       service_name: s.name,
       service_price: s.price,
       service_price_label: s.price_label,
-      first_page_cents: existing?.first_page_cents ?? defaultRate,
-      additional_page_cents: existing?.additional_page_cents ?? 1500,
+      suggested_first_page_cents: suggestedFirst,
+      suggested_additional_page_cents: suggestedAdditional,
+      first_page_cents: existing?.first_page_cents ?? suggestedFirst,
+      additional_page_cents: existing?.additional_page_cents ?? suggestedAdditional,
       drafting_fee_cents: existing?.drafting_fee_cents ?? 0,
       is_saved: !!existing,
       is_default: !existing,

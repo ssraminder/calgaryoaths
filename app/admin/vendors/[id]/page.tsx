@@ -78,6 +78,8 @@ type VendorRate = {
   service_name: string;
   service_price: number | null;
   service_price_label: string;
+  suggested_first_page_cents: number | null;
+  suggested_additional_page_cents: number;
   first_page_cents: number | null;
   additional_page_cents: number;
   drafting_fee_cents: number;
@@ -347,7 +349,7 @@ export default function EditVendorPage() {
           <div>
             <h2 className="text-lg font-medium text-gray-900">Service Pricing</h2>
             <p className="text-sm text-gray-500">
-              Set per-service rates for this vendor. Defaults are 50% of the company service price.
+              Set per-service rates. Suggested rate is 20% below the company rate (rounded to nearest $5).
             </p>
           </div>
           <button
@@ -363,111 +365,153 @@ export default function EditVendorPage() {
           <p className="text-sm text-gray-400">Loading services…</p>
         ) : (
           <div className="overflow-x-auto">
+            {/* Copy all suggested button */}
+            <div className="flex justify-end mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setVendorRates((prev) =>
+                    prev.map((r) => ({
+                      ...r,
+                      first_page_cents: r.suggested_first_page_cents ?? r.first_page_cents,
+                      additional_page_cents: r.suggested_additional_page_cents ?? r.additional_page_cents,
+                      is_default: false,
+                    }))
+                  );
+                }}
+                className="text-xs text-gold hover:text-gold-light font-medium"
+              >
+                Copy all suggested rates
+              </button>
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="pb-2 pr-3 w-16">Offer</th>
-                  <th className="pb-2 pr-4">Service</th>
-                  <th className="pb-2 pr-4 w-24">Company</th>
-                  <th className="pb-2 pr-4 w-28">Rate ($)</th>
-                  <th className="pb-2 pr-4 w-28">Add&apos;l ($)</th>
+                  <th className="pb-2 pr-2 w-12"></th>
+                  <th className="pb-2 pr-3">Service</th>
+                  <th className="pb-2 pr-3 w-24">
+                    <div>Suggested</div>
+                    <div className="font-normal normal-case text-[10px] text-gray-400">1st / add&apos;l</div>
+                  </th>
+                  <th className="pb-2 pr-3 w-20"></th>
+                  <th className="pb-2 pr-3 w-24">Rate ($)</th>
+                  <th className="pb-2 pr-3 w-24">Add&apos;l ($)</th>
                   <th className="pb-2 w-20">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {vendorRates.map((rate, i) => (
-                  <tr key={rate.service_slug} className={`border-b border-gray-100 ${!rate.offered ? 'opacity-40' : ''} ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
-                    <td className="py-2 pr-3">
-                      <input
-                        type="checkbox"
-                        checked={rate.offered}
-                        onChange={(e) => {
-                          setVendorRates((prev) =>
-                            prev.map((r) =>
-                              r.service_slug === rate.service_slug
-                                ? { ...r, offered: e.target.checked }
-                                : r
-                            )
-                          );
-                        }}
-                        className="rounded border-gray-300"
-                      />
-                    </td>
-                    <td className={`py-2 pr-4 font-medium ${rate.offered ? 'text-gray-900' : 'text-gray-400 line-through'}`}>
-                      {rate.service_name}
-                    </td>
-                    <td className="py-2 pr-4 text-gray-500 text-xs">
-                      {rate.service_price != null ? `$${(rate.service_price / 100).toFixed(0)}` : rate.service_price_label}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {rate.offered ? (
+                {vendorRates.map((rate, i) => {
+                  const sugFirst = rate.suggested_first_page_cents;
+                  const sugAddl = rate.suggested_additional_page_cents;
+                  const matchesSuggested = rate.first_page_cents === sugFirst && rate.additional_page_cents === sugAddl;
+                  return (
+                    <tr key={rate.service_slug} className={`border-b border-gray-100 ${!rate.offered ? 'opacity-40' : ''} ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
+                      <td className="py-2 pr-2">
                         <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          value={rate.first_page_cents != null ? Math.round(rate.first_page_cents / 100) : ''}
+                          type="checkbox"
+                          checked={rate.offered}
                           onChange={(e) => {
-                            const dollars = parseInt(e.target.value || '0', 10);
-                            const cents = dollars * 100;
                             setVendorRates((prev) =>
                               prev.map((r) =>
                                 r.service_slug === rate.service_slug
-                                  ? { ...r, first_page_cents: cents, is_default: false }
+                                  ? { ...r, offered: e.target.checked }
                                   : r
                               )
                             );
                           }}
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+                          className="rounded border-gray-300"
                         />
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {rate.offered ? (
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          value={Math.round(rate.additional_page_cents / 100)}
-                          onChange={(e) => {
-                            const dollars = parseInt(e.target.value || '0', 10);
-                            const cents = dollars * 100;
-                            setVendorRates((prev) =>
-                              prev.map((r) =>
-                                r.service_slug === rate.service_slug
-                                  ? { ...r, additional_page_cents: cents }
-                                  : r
-                              )
-                            );
-                          }}
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
-                        />
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="py-2">
-                      {!rate.offered ? (
-                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-                          Not offered
-                        </span>
-                      ) : rate.is_saved ? (
-                        <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                          Saved
-                        </span>
-                      ) : rate.is_default ? (
-                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                          Default
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                          Modified
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className={`py-2 pr-3 font-medium ${rate.offered ? 'text-gray-900' : 'text-gray-400 line-through'}`}>
+                        {rate.service_name}
+                      </td>
+                      <td className="py-2 pr-3 text-xs text-gray-500">
+                        {sugFirst != null
+                          ? <>${sugFirst / 100} / ${sugAddl / 100}</>
+                          : rate.service_price_label}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {rate.offered && sugFirst != null && !matchesSuggested && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVendorRates((prev) =>
+                                prev.map((r) =>
+                                  r.service_slug === rate.service_slug
+                                    ? { ...r, first_page_cents: sugFirst, additional_page_cents: sugAddl, is_default: false }
+                                    : r
+                                )
+                              );
+                            }}
+                            className="text-[10px] text-gold hover:text-gold-light font-medium whitespace-nowrap"
+                          >
+                            Use suggested
+                          </button>
+                        )}
+                        {rate.offered && matchesSuggested && (
+                          <span className="text-[10px] text-green-600">= suggested</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {rate.offered ? (
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            value={rate.first_page_cents != null ? Math.round(rate.first_page_cents / 100) : ''}
+                            onChange={(e) => {
+                              const cents = parseInt(e.target.value || '0', 10) * 100;
+                              setVendorRates((prev) =>
+                                prev.map((r) =>
+                                  r.service_slug === rate.service_slug
+                                    ? { ...r, first_page_cents: cents, is_default: false }
+                                    : r
+                                )
+                              );
+                            }}
+                            className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+                          />
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {rate.offered ? (
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            value={Math.round(rate.additional_page_cents / 100)}
+                            onChange={(e) => {
+                              const cents = parseInt(e.target.value || '0', 10) * 100;
+                              setVendorRates((prev) =>
+                                prev.map((r) =>
+                                  r.service_slug === rate.service_slug
+                                    ? { ...r, additional_page_cents: cents }
+                                    : r
+                                )
+                              );
+                            }}
+                            className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+                          />
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-2">
+                        {!rate.offered ? (
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Off</span>
+                        ) : rate.is_saved ? (
+                          <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Saved</span>
+                        ) : rate.is_default ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Default</span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">Modified</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
