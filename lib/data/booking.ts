@@ -7,6 +7,8 @@ export type BookingService = {
   priceLabel: string;
   requiresReview: boolean;
   reviewReason?: string;
+  /** Duration of the appointment slot in minutes */
+  slotDurationMinutes: number;
 };
 
 /** Booking deposit fee (cents) charged upfront via Stripe, keyed by commissioner id */

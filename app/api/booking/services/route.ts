@@ -21,6 +21,7 @@ export async function GET() {
     priceLabel: row.price_label,
     requiresReview: row.requires_review,
     reviewReason: row.review_reason ?? undefined,
+    slotDurationMinutes: row.slot_duration_minutes ?? 30,
   }));
 
   return NextResponse.json({ services });
