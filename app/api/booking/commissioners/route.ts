@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   const { data: commissioners, error: comError } = await supabase
     .from('co_commissioners')
-    .select('id, name, location, booking_fee_cents, languages, mobile_available, mobile_travel_fee_cents')
+    .select('id, name, location, address, booking_fee_cents, languages, areas_served, mobile_available, mobile_travel_fee_cents, virtual_available')
     .in('id', ids)
     .eq('active', true)
     .order('sort_order', { ascending: true });

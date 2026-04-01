@@ -119,17 +119,41 @@ type DbCommissioner = {
   id: string;
   name: string;
   location: string;
+  address?: string;
   booking_fee_cents?: number;
+  languages?: string[];
+  areas_served?: string[];
   soonestSlot?: string | null;
   first_page_cents?: number | null;
   additional_page_cents?: number | null;
   drafting_fee_cents?: number | null;
   mobile_available?: boolean;
   mobile_travel_fee_cents?: number | null;
+  virtual_available?: boolean;
 };
 
+/* ── Sort commissioners ────────────────────────────────────────────────── */
+function sortedCommissioners(list: DbCommissioner[], filter: 'all' | 'soonest' | 'price'): DbCommissioner[] {
+  const sorted = [...list];
+  if (filter === 'soonest') {
+    sorted.sort((a, b) => {
+      if (!a.soonestSlot && !b.soonestSlot) return 0;
+      if (!a.soonestSlot) return 1;
+      if (!b.soonestSlot) return -1;
+      return new Date(a.soonestSlot).getTime() - new Date(b.soonestSlot).getTime();
+    });
+  } else if (filter === 'price') {
+    sorted.sort((a, b) => {
+      const pa = a.first_page_cents ?? a.booking_fee_cents ?? 999999;
+      const pb = b.first_page_cents ?? b.booking_fee_cents ?? 999999;
+      return pa - pb;
+    });
+  }
+  return sorted;
+}
+
 /* ── Main form ──────────────────────────────────────────────────────────── */
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 export default function BookingForm({ onClose, rebookToken }: { onClose: () => void; rebookToken?: string }) {
   const [step, setStep] = useState<Step>(1);
@@ -147,6 +171,9 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   const [pendingReview, setPendingReview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slotError, setSlotError] = useState<string | null>(null);
+  // Commissioner selection (step 2)
+  const [selectedCommissioner, setSelectedCommissioner] = useState<DbCommissioner | null>(null);
+  const [commFilter, setCommFilter] = useState<'all' | 'soonest' | 'price'>('soonest');
 
   // Fetch services on mount
   useEffect(() => {
@@ -168,19 +195,16 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
     }
   }
 
-  const totalSteps = selectedService?.requiresReview ? 2 : 3;
+  const totalSteps = selectedService?.requiresReview ? 2 : 4;
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<DetailsForm>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<DetailsForm>({
     resolver: zodResolver(detailsSchema),
   });
 
-  const selectedCommissionerId = watch('commissionerId');
-  const selectedCommObj = availableCommissioners.find((c) => c.id === selectedCommissionerId);
   // Booking fee = minimum service charge (first document rate)
-  const bookingFee = selectedCommObj?.first_page_cents
+  const bookingFee = selectedCommissioner?.first_page_cents
     ?? selectedService?.price
-    ?? selectedCommObj?.booking_fee_cents
-    ?? BOOKING_FEES[selectedCommissionerId]
+    ?? selectedCommissioner?.booking_fee_cents
     ?? null;
   const bookingFeeLabel = bookingFee ? `$${(bookingFee / 100).toFixed(0)}` : null;
 
@@ -214,12 +238,11 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
       if (json.requiresReview) {
         setPendingReview(true);
       } else if (json.paymentTransferred) {
-        // Payment carried over from previous booking — skip Stripe, go to slot pick
         setSelectedCommissionerIdForSlots(data.commissionerId);
-        setStep(3);
+        setStep(4);
       } else {
         setSelectedCommissionerIdForSlots(data.commissionerId);
-        setStep(3);
+        setStep(4);
       }
     } catch {
       setError('Network error. Please check your connection.');
@@ -350,96 +373,136 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
         </div>
       )}
 
-      {/* ── Step 2: Details ────────────────────────────────────────── */}
+      {/* ── Step 2: Choose commissioner ─────────────────────────────── */}
       {step === 2 && (
         <div className="p-6">
           <StepDots step={2} total={totalSteps} />
-
           <div className="flex items-center gap-2 mb-4">
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="text-mid-grey hover:text-charcoal transition-colors"
-              aria-label="Back"
-            >
+            <button type="button" onClick={() => setStep(1)} className="text-mid-grey hover:text-charcoal transition-colors" aria-label="Back">
               <ChevronLeft size={18} />
             </button>
             <div>
-              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">
-                Your details
-              </h3>
+              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">Choose a commissioner</h3>
               <p className="text-xs text-mid-grey">{selectedService?.name}</p>
+            </div>
+          </div>
+
+          {/* Sort tabs */}
+          <div className="flex gap-1.5 mb-3">
+            {([['soonest', 'Soonest'], ['price', 'Lowest price'], ['all', 'All']] as const).map(([key, label]) => (
+              <button key={key} type="button" onClick={() => setCommFilter(key)}
+                className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${commFilter === key ? 'bg-navy text-white' : 'bg-bg text-mid-grey hover:bg-border'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
+            {commissionersLoading ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-mid-grey text-sm">
+                <Loader2 size={15} className="animate-spin" /> Loading commissioners…
+              </div>
+            ) : (
+              sortedCommissioners(availableCommissioners, commFilter).map((c) => {
+                const price = c.first_page_cents ?? selectedService?.price ?? c.booking_fee_cents;
+                const priceLabel = price ? `$${(price / 100).toFixed(0)}` : 'Quote';
+                const soonest = c.soonestSlot
+                  ? new Date(c.soonestSlot).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', weekday: 'short', month: 'short', day: 'numeric' })
+                  : null;
+                const isSelected = selectedCommissioner?.id === c.id;
+
+                return (
+                  <button key={c.id} type="button" onClick={() => setSelectedCommissioner(c)}
+                    className={`w-full text-left p-4 rounded-card border-2 transition-all duration-150 ${isSelected ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50 hover:bg-bg'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-charcoal text-sm">{c.name}</p>
+                        <p className="text-xs text-mid-grey mt-0.5">{c.location}{c.address ? ` · ${c.address}` : ''}</p>
+                        {c.languages && c.languages.length > 0 && (
+                          <p className="text-[11px] text-mid-grey mt-1">{c.languages.join(', ')}</p>
+                        )}
+                        {c.areas_served && c.areas_served.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {c.areas_served.slice(0, 4).map((a) => (
+                              <span key={a} className="text-[10px] bg-bg text-mid-grey px-1.5 py-0.5 rounded-pill">{a}</span>
+                            ))}
+                            {c.areas_served.length > 4 && <span className="text-[10px] text-mid-grey">+{c.areas_served.length - 4} more</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span className="text-sm font-semibold text-gold">{priceLabel}</span>
+                        {soonest && (
+                          <span className="text-[10px] bg-teal/10 text-teal border border-teal/20 px-1.5 py-0.5 rounded-pill font-medium whitespace-nowrap">
+                            Next: {soonest}
+                          </span>
+                        )}
+                        {!soonest && (
+                          <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-pill font-medium">
+                            Request time
+                          </span>
+                        )}
+                        <div className="flex gap-1 mt-0.5">
+                          {c.mobile_available && <span className="text-[10px] bg-navy/5 text-navy px-1.5 py-0.5 rounded-pill">Mobile</span>}
+                          {c.virtual_available && <span className="text-[10px] bg-navy/5 text-navy px-1.5 py-0.5 rounded-pill">Virtual</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+            {!commissionersLoading && availableCommissioners.length === 0 && (
+              <p className="text-center text-sm text-mid-grey py-6">No commissioners available for this service.</p>
+            )}
+          </div>
+
+          <button type="button" disabled={!selectedCommissioner}
+            onClick={() => { setValue('commissionerId', selectedCommissioner!.id); setStep(3); }}
+            className="btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed">
+            Continue <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Step 3: Details ────────────────────────────────────────── */}
+      {step === 3 && (
+        <div className="p-6">
+          <StepDots step={3} total={totalSteps} />
+
+          <div className="flex items-center gap-2 mb-4">
+            <button type="button" onClick={() => setStep(selectedService?.requiresReview ? 1 : 2)} className="text-mid-grey hover:text-charcoal transition-colors" aria-label="Back">
+              <ChevronLeft size={18} />
+            </button>
+            <div>
+              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">Your details</h3>
+              <p className="text-xs text-mid-grey">{selectedService?.name} · {selectedCommissioner?.name}</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Full name *</label>
-              <input
-                {...register('name')}
-                type="text"
-                placeholder="Jane Smith"
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.name ? 'border-red-400' : 'border-border'}`}
-              />
+              <input {...register('name')} type="text" placeholder="Jane Smith"
+                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.name ? 'border-red-400' : 'border-border'}`} />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
             </div>
-
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Email *</label>
-              <input
-                {...register('email')}
-                type="email"
-                placeholder="jane@example.com"
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.email ? 'border-red-400' : 'border-border'}`}
-              />
+              <input {...register('email')} type="email" placeholder="jane@example.com"
+                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.email ? 'border-red-400' : 'border-border'}`} />
               {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
             </div>
-
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">Phone *</label>
-              <input
-                {...register('phone')}
-                type="tel"
-                placeholder="(403) 555-0123"
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.phone ? 'border-red-400' : 'border-border'}`}
-              />
+              <input {...register('phone')} type="tel" placeholder="(403) 555-0123"
+                className={`w-full border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition ${errors.phone ? 'border-red-400' : 'border-border'}`} />
               {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-charcoal mb-1">Preferred location *</label>
-              <select
-                {...register('commissionerId')}
-                disabled={commissionersLoading}
-                className={`w-full border rounded-btn px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold/40 transition disabled:opacity-60 ${errors.commissionerId ? 'border-red-400' : 'border-border'}`}
-              >
-                <option value="">
-                  {commissionersLoading ? 'Loading locations…' : 'Select a location…'}
-                </option>
-                {availableCommissioners.map((c) => {
-                  const fee = c.booking_fee_cents ? `$${c.booking_fee_cents / 100}` : '';
-                  const soonest = c.soonestSlot
-                    ? new Date(c.soonestSlot).toLocaleDateString('en-CA', {
-                        timeZone: 'America/Edmonton',
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                      })
-                    : '';
-                  const extra = [fee, soonest ? `next: ${soonest}` : ''].filter(Boolean).join(' · ');
-                  return (
-                    <option key={c.id} value={c.id}>
-                      {c.name} — {c.location}{extra ? ` (${extra})` : ''}
-                    </option>
-                  );
-                })}
-              </select>
-              {errors.commissionerId && (
-                <p className="text-red-500 text-xs mt-1">{errors.commissionerId.message}</p>
-              )}
-            </div>
+            <input type="hidden" {...register('commissionerId')} />
 
-            {selectedService && !selectedService.requiresReview && selectedCommObj && bookingFee && (
+            {selectedService && !selectedService.requiresReview && selectedCommissioner && bookingFee && (
               <div className="bg-navy/5 border border-navy/10 rounded-card p-4 space-y-3">
                 {/* Charged now */}
                 <div>
@@ -451,26 +514,26 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 </div>
 
                 {/* Additional charges at appointment */}
-                {(selectedCommObj.additional_page_cents != null || selectedCommObj.drafting_fee_cents != null || selectedCommObj.mobile_travel_fee_cents != null) && (
+                {(selectedCommissioner.additional_page_cents != null || selectedCommissioner.drafting_fee_cents != null || selectedCommissioner.mobile_travel_fee_cents != null) && (
                   <div className="border-t border-navy/10 pt-3">
                     <p className="text-xs font-medium text-mid-grey uppercase tracking-wide mb-2">Charged at appointment (if applicable)</p>
                     <div className="space-y-1.5 text-xs">
-                      {selectedCommObj.additional_page_cents != null && (
+                      {selectedCommissioner.additional_page_cents != null && (
                         <div className="flex justify-between text-charcoal">
                           <span>Each additional document</span>
-                          <span className="font-medium">${(selectedCommObj.additional_page_cents / 100).toFixed(0)}</span>
+                          <span className="font-medium">${(selectedCommissioner.additional_page_cents / 100).toFixed(0)}</span>
                         </div>
                       )}
-                      {selectedCommObj.drafting_fee_cents != null && selectedCommObj.drafting_fee_cents > 0 && (
+                      {selectedCommissioner.drafting_fee_cents != null && selectedCommissioner.drafting_fee_cents > 0 && (
                         <div className="flex justify-between text-charcoal">
                           <span>Document drafting</span>
-                          <span className="font-medium">${(selectedCommObj.drafting_fee_cents / 100).toFixed(0)}</span>
+                          <span className="font-medium">${(selectedCommissioner.drafting_fee_cents / 100).toFixed(0)}</span>
                         </div>
                       )}
-                      {selectedCommObj.mobile_available && selectedCommObj.mobile_travel_fee_cents != null && (
+                      {selectedCommissioner.mobile_available && selectedCommissioner.mobile_travel_fee_cents != null && (
                         <div className="flex justify-between text-charcoal">
                           <span>Mobile service travel fee</span>
-                          <span className="font-medium">${(selectedCommObj.mobile_travel_fee_cents / 100).toFixed(0)}</span>
+                          <span className="font-medium">${(selectedCommissioner.mobile_travel_fee_cents / 100).toFixed(0)}</span>
                         </div>
                       )}
                     </div>
@@ -525,15 +588,15 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
         </div>
       )}
 
-      {/* ── Step 3: Pick a time slot ───────────────────────────────── */}
-      {step === 3 && (
+      {/* ── Step 4: Pick a time slot ───────────────────────────────── */}
+      {step === 4 && (
         <div className="p-6">
-          <StepDots step={3} total={3} />
+          <StepDots step={4} total={4} />
 
           <div className="flex items-center gap-2 mb-4">
             <button
               type="button"
-              onClick={() => { setStep(2); setSelectedSlot(''); setSlotError(null); }}
+              onClick={() => { setStep(3); setSelectedSlot(''); setSlotError(null); }}
               className="text-mid-grey hover:text-charcoal transition-colors"
               aria-label="Back"
             >
