@@ -483,41 +483,53 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
         <div className="p-4 sm:p-6">
           <StepDots step={2} total={totalSteps} />
           <div className="flex items-center gap-2 mb-4">
-            <button type="button" onClick={() => setStep(1)} className="text-mid-grey hover:text-charcoal transition-colors" aria-label="Back">
+            <button type="button" onClick={() => { if (deliveryTab !== 'in_office' && !selectedOption) { setDeliveryTab('in_office'); } else { setStep(1); setDeliveryTab('in_office'); } }} className="text-mid-grey hover:text-charcoal transition-colors" aria-label="Back">
               <ChevronLeft size={18} />
             </button>
             <div>
-              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">Choose a location</h3>
+              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">
+                {deliveryTab === 'in_office' ? 'Choose a location' : deliveryTab === 'mobile' ? 'Choose a commissioner — Mobile' : 'Choose a commissioner — Virtual'}
+              </h3>
               <p className="text-xs text-mid-grey">{selectedService?.name}</p>
             </div>
           </div>
 
-          {/* Delivery mode tabs */}
-          <div className="flex gap-1.5 mb-3">
-            {([
-              ['in_office', 'In-Office'],
-              ['mobile', 'Mobile'],
-              ['virtual', 'Virtual'],
-            ] as const).map(([key, label]) => {
-              // Check if any vendor offers this mode
-              const available = key === 'in_office' || locationOptions.some(
-                (o) => key === 'mobile' ? o.mobile_available : o.virtual_available
-              );
-              if (!available) return null;
-              return (
-                <button key={key} type="button"
-                  onClick={() => { setDeliveryTab(key); setSelectedOption(null); }}
-                  className={`rounded-pill px-3 py-1.5 text-xs font-medium transition-colors ${
-                    deliveryTab === key
-                      ? 'bg-gold text-white'
-                      : 'bg-bg text-mid-grey hover:bg-border'
-                  }`}
+          {/* Delivery mode cards */}
+          {(() => {
+            const inOfficeCount = locationOptions.length;
+            const mobileCount = locationOptions.filter((o) => o.mobile_available).length;
+            const virtualCount = locationOptions.filter((o) => o.virtual_available).length;
+
+            return (
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <button type="button"
+                  onClick={() => { setDeliveryTab('in_office'); setSelectedOption(null); }}
+                  className={`rounded-card border-2 p-3 text-center transition-all ${deliveryTab === 'in_office' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/40'}`}
                 >
-                  {label}
+                  <p className="text-xs font-medium text-charcoal">In-Office</p>
+                  <p className="text-[10px] text-mid-grey mt-0.5">{inOfficeCount} location{inOfficeCount !== 1 ? 's' : ''}</p>
                 </button>
-              );
-            })}
-          </div>
+                {mobileCount > 0 && (
+                  <button type="button"
+                    onClick={() => { setDeliveryTab('mobile'); setSelectedOption(null); }}
+                    className={`rounded-card border-2 p-3 text-center transition-all ${deliveryTab === 'mobile' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/40'}`}
+                  >
+                    <p className="text-xs font-medium text-charcoal">Mobile</p>
+                    <p className="text-[10px] text-mid-grey mt-0.5">{mobileCount} commissioner{mobileCount !== 1 ? 's' : ''}</p>
+                  </button>
+                )}
+                {virtualCount > 0 && (
+                  <button type="button"
+                    onClick={() => { setDeliveryTab('virtual'); setSelectedOption(null); }}
+                    className={`rounded-card border-2 p-3 text-center transition-all ${deliveryTab === 'virtual' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/40'}`}
+                  >
+                    <p className="text-xs font-medium text-charcoal">Virtual</p>
+                    <p className="text-[10px] text-mid-grey mt-0.5">{virtualCount} commissioner{virtualCount !== 1 ? 's' : ''}</p>
+                  </button>
+                )}
+              </div>
+            );
+          })()}
 
           {deliveryTab === 'mobile' && (
             <p className="text-xs text-mid-grey mb-3 bg-gold/5 border border-gold/20 rounded-btn p-2">
