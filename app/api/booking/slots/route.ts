@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getCronofyFreeBusy } from '@/lib/cronofy';
 
 const SLOT_MINUTES = 30;
 const DAYS_AHEAD = 14;
@@ -15,8 +14,8 @@ function calgaryOffset(): number {
 
 type AvailabilityRule = {
   day_of_week: number;
-  start_time: string; // "09:00:00"
-  end_time: string;   // "12:00:00"
+  start_time: string;
+  end_time: string;
 };
 
 function generateSlotsForDay(
@@ -50,17 +49,6 @@ function generateSlotsForDay(
   return slots;
 }
 
-function isSlotBusy(slotIso: string, busyPeriods: { start: string; end: string }[], slotMinutes: number): boolean {
-  const slotStart = new Date(slotIso).getTime();
-  const slotEnd = slotStart + slotMinutes * 60000;
-
-  return busyPeriods.some((busy) => {
-    const busyStart = new Date(busy.start).getTime();
-    const busyEnd = new Date(busy.end).getTime();
-    return slotStart < busyEnd && slotEnd > busyStart;
-  });
-}
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const commissionerId = searchParams.get('commissionerId');
@@ -79,7 +67,6 @@ export async function GET(req: NextRequest) {
 
   const availRules = (rules ?? []) as AvailabilityRule[];
 
-  // If no rules defined, return empty (commissioner hasn't set up availability)
   if (availRules.length === 0) {
     return NextResponse.json({ slots: [] });
   }
@@ -116,19 +103,7 @@ export async function GET(req: NextRequest) {
   const bookedSet = new Set((booked ?? []).map((b) => b.appointment_datetime));
   available = available.filter((s) => !bookedSet.has(s));
 
-  // Filter out Cronofy busy times (if calendar connected)
-  try {
-    const busyPeriods = await getCronofyFreeBusy(
-      commissionerId,
-      base.toISOString(),
-      windowEnd.toISOString()
-    );
-    if (busyPeriods.length > 0) {
-      available = available.filter((s) => !isSlotBusy(s, busyPeriods, SLOT_MINUTES));
-    }
-  } catch {
-    // Calendar sync unavailable — use DB-only availability
-  }
+  // TODO: Calendar integration (Google/Microsoft) will add busy-time filtering here
 
   return NextResponse.json({ slots: available });
 }
