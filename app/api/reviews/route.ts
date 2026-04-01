@@ -108,6 +108,8 @@ export async function GET() {
     placeIds.push(process.env.GOOGLE_PLACE_ID_2);
   }
 
+  console.log(`[Reviews] Fetching reviews from ${placeIds.length} place(s):`, placeIds);
+
   if (placeIds.length === 0) {
     return NextResponse.json({ error: 'Could not find business on Google' }, { status: 404 });
   }
@@ -118,6 +120,9 @@ export async function GET() {
   );
 
   // Merge reviews from all locations
+  for (const { data, locationName } of results) {
+    console.log(`[Reviews] ${locationName}: ${data?.userRatingCount ?? 0} reviews, rating ${data?.rating ?? 'N/A'}, got ${data?.reviews?.length ?? 0} review texts`);
+  }
   const allReviews: ParsedReview[] = [];
   let totalReviewCount = 0;
   let weightedRatingSum = 0;

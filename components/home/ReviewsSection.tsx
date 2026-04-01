@@ -17,14 +17,75 @@ type ReviewsData = {
   reviews: Review[];
 };
 
-async function getReviews(): Promise<ReviewsData | null> {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/reviews`, {
+async function fetchPlaceReviews(placeId: string, apiKey: string) {
+  const res = await fetch(
+    `https://places.googleapis.com/v1/places/${placeId}?languageCode=en`,
+    {
+      headers: {
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'displayName,rating,userRatingCount,reviews,googleMapsUri',
+      },
       next: { revalidate: 3600 },
+    }
+  );
+  if (!res.ok) return null;
+  return res.json();
+}
+
+async function getReviews(): Promise<ReviewsData | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  const placeIds: string[] = [];
+  if (process.env.GOOGLE_PLACE_ID) placeIds.push(process.env.GOOGLE_PLACE_ID);
+  if (process.env.GOOGLE_PLACE_ID_2) placeIds.push(process.env.GOOGLE_PLACE_ID_2);
+  if (placeIds.length === 0) return null;
+
+  try {
+    const results = await Promise.all(placeIds.map((id) => fetchPlaceReviews(id, apiKey)));
+
+    const allReviews: Review[] = [];
+    let totalReviews = 0;
+    let weightedSum = 0;
+    let weightTotal = 0;
+    let mapsUrl: string | null = null;
+
+    for (const data of results) {
+      if (!data) continue;
+      if (!mapsUrl && data.googleMapsUri) mapsUrl = data.googleMapsUri;
+      if (data.userRatingCount) totalReviews += data.userRatingCount;
+      if (data.rating && data.userRatingCount) {
+        weightedSum += data.rating * data.userRatingCount;
+        weightTotal += data.userRatingCount;
+      }
+      const locName = data.displayName?.text || '';
+      for (const r of data.reviews ?? []) {
+        allReviews.push({
+          author: r.authorAttribution?.displayName || '',
+          authorPhoto: r.authorAttribution?.photoUri || null,
+          authorUrl: r.authorAttribution?.uri || null,
+          rating: r.rating,
+          text: r.text?.text || '',
+          relativeTime: r.relativePublishTimeDescription,
+          location: locName,
+        });
+      }
+    }
+
+    // Deduplicate by author, sort newest first
+    const seen = new Set<string>();
+    const deduped = allReviews.filter((r) => {
+      if (seen.has(r.author)) return false;
+      seen.add(r.author);
+      return true;
     });
-    if (!res.ok) return null;
-    return res.json();
+
+    return {
+      rating: weightTotal > 0 ? Math.round((weightedSum / weightTotal) * 10) / 10 : null,
+      totalReviews,
+      googleMapsUrl: mapsUrl,
+      reviews: deduped,
+    };
   } catch {
     return null;
   }
