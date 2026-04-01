@@ -9,6 +9,8 @@ Copy and paste this prompt into Claude Desktop to set up your Google Analytics a
 ```
 I need help setting up Google Analytics 4 (GA4) and Google Tag Manager (GTM) for my website calgaryoaths.com — a Commissioner of Oaths booking service in Calgary.
 
+I have both Google Analytics (analytics.google.com) and Google Tag Manager (tagmanager.google.com) open in tabs within this tab group. Please use them to complete the setup.
+
 ## Current Setup
 
 The website already has:
