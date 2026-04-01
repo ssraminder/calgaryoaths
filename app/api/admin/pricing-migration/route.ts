@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
           // Deactivate the source service
           await supabaseAdmin
             .from('co_services')
-            .update({ active: false, updated_at: new Date().toISOString() })
+            .update({ active: false })
             .eq('slug', MERGE_SOURCE);
           results.push({ action: 'merge_service', success: true });
           break;
@@ -179,7 +179,6 @@ export async function POST(req: NextRequest) {
             .update({
               slug: MERGE_TARGET,
               name: 'Certified True Copy',
-              updated_at: new Date().toISOString(),
             })
             .eq('slug', MERGE_SOURCE);
           // Also update references
@@ -214,7 +213,6 @@ export async function POST(req: NextRequest) {
             .from('co_services')
             .update({
               price: d.new_cents as number,
-              updated_at: new Date().toISOString(),
             })
             .eq('slug', d.slug as string);
           results.push({
