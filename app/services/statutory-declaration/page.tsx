@@ -7,7 +7,7 @@ const service = services.find((s) => s.slug === 'statutory-declaration')!;
 export const metadata: Metadata = {
   title: 'Statutory Declarations Calgary | Same-Day Service | Calgary Oaths',
   description:
-    'Statutory declarations drafted and commissioned in Calgary. Common-law, lost documents, insurance claims & more. Drafting included. From $35. Same-day available.',
+    'Statutory declarations commissioned in Calgary. Common-law, lost documents, insurance claims & more. Drafting available. From $35. Same-day service.',
   alternates: { canonical: 'https://calgaryoaths.com/services/statutory-declaration' },
   openGraph: { title: 'Statutory Declarations Calgary | Calgary Oaths', url: 'https://calgaryoaths.com/services/statutory-declaration' },
 };
@@ -16,7 +16,7 @@ export default function StatutoryDeclarationPage() {
   return (
     <ServicePageLayout
       service={service}
-      intro="A statutory declaration is a written statement of facts you declare to be true before a Commissioner of Oaths. Unlike an affidavit, it doesn't require an oath — making it the right document for administrative and government purposes. We draft the declaration, print it, administer the affirmation, and commission it with our official seal."
+      intro="A statutory declaration is a written statement of facts you declare to be true before a Commissioner of Oaths. Unlike an affidavit, it doesn't require an oath — making it the right document for administrative and government purposes. We administer the affirmation and commission it with our official seal. Drafting is available at an extra charge if you need the document prepared from scratch."
     />
   );
 }

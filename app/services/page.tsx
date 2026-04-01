@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 export const metadata: Metadata = {
   title: 'Commissioner of Oaths Services Calgary | Calgary Oaths',
   description:
-    'Affidavits, statutory declarations, travel consent letters, invitation letters, notarization & more in Calgary. Drafting included. Same-day available.',
+    'Affidavits, statutory declarations, travel consent letters, invitation letters, notarization & more in Calgary. Drafting available. Same-day service.',
   alternates: { canonical: 'https://calgaryoaths.com/services' },
   openGraph: {
     title: 'Commissioner of Oaths Services Calgary | Calgary Oaths',
@@ -71,7 +71,7 @@ const categoryLabels: Record<string, string> = {
 
 const categoryDescriptions: Record<string, string> = {
   commissioning: 'Witnessing signatures, administering oaths, and certifying documents with an official seal.',
-  drafting: 'We draft legal documents from scratch — bring your ID and the details, we handle the rest.',
+  drafting: 'Document drafting available at an extra charge — bring your ID and the details, we handle the rest.',
   notarization: 'Notarization and authentication services for legal, business, and international use.',
 };
 
@@ -101,8 +101,8 @@ export default async function ServicesPage() {
           </nav>
           <h1 className="font-display font-bold text-4xl md:text-5xl text-navy mb-4">Our Document Services</h1>
           <p className="text-mid-grey text-lg max-w-2xl leading-relaxed">
-            We draft, print, and commission legal documents so you don&apos;t have to figure it out alone.
-            Bring your ID — we handle the formatting, wording, and official seal.
+            We commission legal documents so you don&apos;t have to figure it out alone.
+            Bring your ID — we handle the official seal. Drafting available at extra charge.
           </p>
         </div>
 

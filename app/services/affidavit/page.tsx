@@ -64,7 +64,7 @@ export default function AffidavitPage() {
                 </h1>
                 <p className="text-mid-grey text-lg leading-relaxed">
                   An affidavit is a written statement of facts you swear or affirm to be true before a Commissioner of Oaths.
-                  We draft the affidavit, print it, witness your signature, and commission it with our official seal — all in one appointment.
+                  We witness your signature and commission the affidavit with our official seal. Drafting is available at an extra charge if you need the document prepared from scratch.
                 </p>
               </div>
 

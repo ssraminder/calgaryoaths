@@ -83,7 +83,7 @@ export default async function AboutPage() {
               you leave with a properly commissioned document — done in 15–30 minutes.
             </p>
             <p>
-              Drafting is included in our prices. We use plain, clear language that matches what the receiving
+              Drafting is available at an extra charge. We use plain, clear language that matches what the receiving
               organization needs. No legal jargon for its own sake, no unnecessary complications.
               If you have questions, we answer them clearly before you sign anything.
             </p>
