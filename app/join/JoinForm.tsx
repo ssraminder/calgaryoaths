@@ -210,6 +210,11 @@ export default function JoinForm() {
             </div>
             <input type="hidden" name="servicesOffered" value="" />
           </div>
+          <div>
+            <label htmlFor="otherServices" className="block text-sm font-medium text-charcoal mb-1.5">Other services you offer <span className="text-mid-grey font-normal">(not listed above)</span></label>
+            <input id="otherServices" name="otherServices" type="text" placeholder="e.g. Passport application witnessing, Court form assistance" className={inputCls} />
+            <p className="text-mid-grey text-xs mt-1">We&apos;ll review and may add these to our service catalog.</p>
+          </div>
           <TagInput
             name="languages"
             label="Languages spoken"
@@ -281,14 +286,15 @@ export default function JoinForm() {
         <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">GST/HST Registration</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
+            <label htmlFor="gstRegistered" className="block text-sm font-medium text-charcoal mb-1.5">GST/HST registration status</label>
+            <select id="gstRegistered" name="gstRegistered" className={selectCls}>
+              <option value="false">Not registered for GST/HST</option>
+              <option value="true">Registered for GST/HST</option>
+            </select>
+          </div>
+          <div>
             <label htmlFor="gstNumber" className="block text-sm font-medium text-charcoal mb-1.5">GST/HST number <span className="text-mid-grey font-normal">(if registered)</span></label>
             <input id="gstNumber" name="gstNumber" type="text" placeholder="e.g. 123456789RT0001" className={inputCls} />
-          </div>
-          <div className="flex items-end pb-1">
-            <label className="flex items-center gap-2 text-sm text-charcoal">
-              <input type="checkbox" name="gstRegistered" value="true" className="rounded border-border text-gold focus:ring-gold" />
-              I am GST/HST registered
-            </label>
           </div>
         </div>
         <p className="text-mid-grey text-xs mt-2">If registered, 5% GST will be added to your payouts.</p>
