@@ -136,14 +136,34 @@ export default function JoinForm() {
                     type="checkbox"
                     name="credentialTypes"
                     value={opt}
+                    checked={selectedCreds.includes(opt)}
                     onChange={(e) => {
-                      setSelectedCreds((prev) =>
-                        e.target.checked ? [...prev, opt] : prev.filter((c) => c !== opt)
-                      );
+                      let next: string[];
+                      if (e.target.checked) {
+                        next = [...selectedCreds, opt];
+                        // Auto-include lower credentials
+                        if (opt === 'Barrister & Solicitor') {
+                          if (!next.includes('Notary Public')) next.push('Notary Public');
+                          if (!next.includes('Commissioner of Oaths')) next.push('Commissioner of Oaths');
+                        } else if (opt === 'Notary Public') {
+                          if (!next.includes('Commissioner of Oaths')) next.push('Commissioner of Oaths');
+                        }
+                      } else {
+                        next = selectedCreds.filter((c) => c !== opt);
+                        // Auto-remove higher credentials
+                        if (opt === 'Commissioner of Oaths') {
+                          next = next.filter((c) => c !== 'Notary Public' && c !== 'Barrister & Solicitor');
+                        } else if (opt === 'Notary Public') {
+                          next = next.filter((c) => c !== 'Barrister & Solicitor');
+                        }
+                      }
+                      setSelectedCreds(next);
                     }}
                     className="rounded border-border text-gold focus:ring-gold"
                   />
                   {opt}
+                  {opt === 'Notary Public' && <span className="text-xs text-mid-grey">(includes Commissioner of Oaths)</span>}
+                  {opt === 'Barrister & Solicitor' && <span className="text-xs text-mid-grey">(includes all)</span>}
                 </label>
               ))}
             </div>
