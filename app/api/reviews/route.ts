@@ -21,27 +21,67 @@ type PlaceDetailsResponse = {
   userRatingCount?: number;
   reviews?: GoogleReview[];
   googleMapsUri?: string;
+  displayName?: { text: string };
+};
+
+type ParsedReview = {
+  author: string;
+  authorPhoto: string | null;
+  authorUrl: string | null;
+  rating: number;
+  text: string;
+  relativeTime: string;
+  publishTime: string;
+  location: string;
 };
 
 /**
  * GET /api/reviews
- * Fetches Google reviews for the business using Places API (New).
- * Requires: Places API (New) enabled + GOOGLE_MAPS_API_KEY.
+ * Fetches Google reviews from one or more business profiles.
  *
- * Set GOOGLE_PLACE_ID in env (or co_settings) to the business Place ID.
- * If not set, searches for "Calgary Oaths" to find it.
+ * Env vars:
+ *   GOOGLE_PLACE_ID   — primary Place ID (required or auto-discovered)
+ *   GOOGLE_PLACE_ID_2 — second Place ID (optional, for second location)
+ *
+ * Reviews from both locations are merged and sorted by publish time.
  */
+async function fetchPlaceReviews(
+  placeId: string,
+  apiKey: string
+): Promise<{ data: PlaceDetailsResponse | null; locationName: string }> {
+  const res = await fetch(
+    `https://places.googleapis.com/v1/places/${placeId}?languageCode=en`,
+    {
+      headers: {
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'displayName,rating,userRatingCount,reviews,googleMapsUri',
+      },
+      next: { revalidate: 3600 },
+    }
+  );
+
+  if (!res.ok) {
+    console.error(`Places API error for ${placeId}:`, res.status);
+    return { data: null, locationName: '' };
+  }
+
+  const data: PlaceDetailsResponse = await res.json();
+  return { data, locationName: data.displayName?.text || '' };
+}
+
 export async function GET() {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'Google Maps API key not configured' }, { status: 500 });
   }
 
-  // Try env var first, then fall back to search
-  let placeId = process.env.GOOGLE_PLACE_ID;
+  // Collect Place IDs — primary + optional second location
+  const placeIds: string[] = [];
 
-  if (!placeId) {
-    // Search for the business to get Place ID
+  if (process.env.GOOGLE_PLACE_ID) {
+    placeIds.push(process.env.GOOGLE_PLACE_ID);
+  } else {
+    // Auto-discover primary Place ID via search
     const searchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
       headers: {
@@ -57,50 +97,79 @@ export async function GET() {
       }),
     });
     const searchData = await searchRes.json();
-    placeId = searchData.places?.[0]?.id;
-    if (placeId) {
-      console.log(`[Reviews] Found Google Place ID: ${placeId} — set GOOGLE_PLACE_ID env var for faster lookups`);
-    }
-
-    if (!placeId) {
-      return NextResponse.json({ error: 'Could not find business on Google' }, { status: 404 });
+    const found = searchData.places?.[0]?.id;
+    if (found) {
+      console.log(`[Reviews] Found Google Place ID: ${found} — set GOOGLE_PLACE_ID env var`);
+      placeIds.push(found);
     }
   }
 
-  // Fetch place details with reviews
-  const res = await fetch(
-    `https://places.googleapis.com/v1/places/${placeId}?languageCode=en`,
-    {
-      headers: {
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'rating,userRatingCount,reviews,googleMapsUri',
-      },
-      next: { revalidate: 3600 },
-    }
+  if (process.env.GOOGLE_PLACE_ID_2) {
+    placeIds.push(process.env.GOOGLE_PLACE_ID_2);
+  }
+
+  if (placeIds.length === 0) {
+    return NextResponse.json({ error: 'Could not find business on Google' }, { status: 404 });
+  }
+
+  // Fetch reviews from all locations in parallel
+  const results = await Promise.all(
+    placeIds.map((id) => fetchPlaceReviews(id, apiKey))
   );
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('Places API error:', res.status, text);
-    return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 });
+  // Merge reviews from all locations
+  const allReviews: ParsedReview[] = [];
+  let totalReviewCount = 0;
+  let weightedRatingSum = 0;
+  let totalRatingWeight = 0;
+  let primaryMapsUrl: string | null = null;
+
+  for (const { data, locationName } of results) {
+    if (!data) continue;
+
+    if (!primaryMapsUrl && data.googleMapsUri) {
+      primaryMapsUrl = data.googleMapsUri;
+    }
+
+    if (data.userRatingCount) {
+      totalReviewCount += data.userRatingCount;
+    }
+    if (data.rating && data.userRatingCount) {
+      weightedRatingSum += data.rating * data.userRatingCount;
+      totalRatingWeight += data.userRatingCount;
+    }
+
+    for (const r of data.reviews ?? []) {
+      allReviews.push({
+        author: r.authorAttribution.displayName,
+        authorPhoto: r.authorAttribution.photoUri || null,
+        authorUrl: r.authorAttribution.uri || null,
+        rating: r.rating,
+        text: r.text?.text || '',
+        relativeTime: r.relativePublishTimeDescription,
+        publishTime: r.publishTime,
+        location: locationName,
+      });
+    }
   }
 
-  const data: PlaceDetailsResponse = await res.json();
+  // Sort by publish time (newest first), deduplicate by author name
+  allReviews.sort((a, b) => new Date(b.publishTime).getTime() - new Date(a.publishTime).getTime());
+  const seen = new Set<string>();
+  const dedupedReviews = allReviews.filter((r) => {
+    if (seen.has(r.author)) return false;
+    seen.add(r.author);
+    return true;
+  });
 
-  const reviews = (data.reviews ?? []).map((r) => ({
-    author: r.authorAttribution.displayName,
-    authorPhoto: r.authorAttribution.photoUri || null,
-    authorUrl: r.authorAttribution.uri || null,
-    rating: r.rating,
-    text: r.text?.text || '',
-    relativeTime: r.relativePublishTimeDescription,
-    publishTime: r.publishTime,
-  }));
+  const combinedRating = totalRatingWeight > 0
+    ? Math.round((weightedRatingSum / totalRatingWeight) * 10) / 10
+    : null;
 
   return NextResponse.json({
-    rating: data.rating ?? null,
-    totalReviews: data.userRatingCount ?? 0,
-    googleMapsUrl: data.googleMapsUri ?? null,
-    reviews,
+    rating: combinedRating,
+    totalReviews: totalReviewCount,
+    googleMapsUrl: primaryMapsUrl,
+    reviews: dedupedReviews,
   });
 }
