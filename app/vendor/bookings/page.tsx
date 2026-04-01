@@ -12,7 +12,7 @@ type Booking = {
   appointment_datetime: string | null;
   proposed_datetime: string | null;
   status: string;
-  amount_paid: number | null;
+  vendor_payout_cents: number | null;
   created_at: string;
 };
 
@@ -65,7 +65,7 @@ function VendorBookingsContent() {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Service</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Requested Time</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Paid</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Payout</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -77,7 +77,7 @@ function VendorBookingsContent() {
                     {b.appointment_datetime ? new Date(b.appointment_datetime).toLocaleString('en-CA', { timeZone: 'America/Edmonton', dateStyle: 'medium', timeStyle: 'short' }) : '—'}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm"><StatusBadge status={b.status} /></td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{b.amount_paid != null ? `$${(b.amount_paid / 100).toFixed(2)}` : '—'}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{b.vendor_payout_cents != null ? `$${(b.vendor_payout_cents / 100).toFixed(2)}` : '—'}</td>
                 </tr>
               ))}
               {bookings.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">No bookings found</td></tr>}

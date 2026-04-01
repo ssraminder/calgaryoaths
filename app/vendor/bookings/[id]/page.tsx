@@ -14,7 +14,7 @@ type Booking = {
   appointment_datetime: string | null;
   proposed_datetime: string | null;
   status: string;
-  amount_paid: number | null;
+  vendor_payout_cents: number | null;
   notes: string | null;
   num_documents: number;
   created_at: string;
@@ -96,7 +96,7 @@ export default function VendorBookingDetailPage() {
             <div className="flex justify-between"><dt className="text-gray-500">Proposed Time</dt><dd className="font-medium text-orange-600">{fmtDate(booking.proposed_datetime)}</dd></div>
           )}
           <div className="flex justify-between"><dt className="text-gray-500">Documents</dt><dd>{booking.num_documents}</dd></div>
-          <div className="flex justify-between"><dt className="text-gray-500">Amount Paid</dt><dd>{booking.amount_paid != null ? `$${(booking.amount_paid / 100).toFixed(2)}` : '—'}</dd></div>
+          <div className="flex justify-between"><dt className="text-gray-500">Your Payout</dt><dd className="font-medium text-green-700">{booking.vendor_payout_cents != null ? `$${(booking.vendor_payout_cents / 100).toFixed(2)}` : '—'}</dd></div>
           <div className="flex justify-between"><dt className="text-gray-500">Booked</dt><dd>{fmtDate(booking.created_at)}</dd></div>
         </dl>
         {booking.notes && (

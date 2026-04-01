@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('co_bookings')
-    .select('id, name, email, phone, service_name, appointment_datetime, proposed_datetime, status, amount_paid, notes, num_documents, created_at')
+    .select('id, name, email, phone, service_name, appointment_datetime, proposed_datetime, status, vendor_payout_cents, notes, num_documents, created_at')
     .eq('commissioner_id', vendor.commissionerId)
     .order('created_at', { ascending: false });
 
