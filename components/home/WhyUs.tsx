@@ -11,7 +11,7 @@ const features = [
     icon: FileEdit,
     title: 'Document Drafting Available',
     description:
-      'Need a document drafted? We prepare affidavits, statutory declarations, travel consent letters, and invitation letters from scratch — starting at $100, billed at $100/hour.',
+      'Need a document drafted? We prepare affidavits, statutory declarations, travel consent letters, and invitation letters from scratch — billed at $120/hour.',
   },
   {
     icon: Languages,
@@ -23,7 +23,7 @@ const features = [
     icon: Smartphone,
     title: 'Flexible Hours & Mobile Service',
     description:
-      'Open until 9 PM on weekdays and Saturdays. If you can\'t come to us, we come to you — home, office, hospital, or care facility across all Calgary neighbourhoods.',
+      'By appointment — book online or call us. If you can\'t come to us, we come to you — home, office, hospital, or care facility across all Calgary neighbourhoods.',
   },
 ];
 

@@ -1,0 +1,105 @@
+# ── CONFIRMED OLD WORDPRESS PAGES ────────────────────────────────
+
+# Trailing slash cleanup for pages that exist with same slug on new site
+/services/                                          /services                                   301
+/locations/                                         /locations                                  301
+/contact/                                           /contact                                    301
+/terms-and-conditions/                              /terms-and-conditions                       301
+/privacy-policy/                                    /privacy-policy                             301
+
+# Old WP: Commissioner for Oaths Services → Services index
+/commissioner-for-oaths-services                    /services                                   301
+/commissioner-for-oaths-services/                   /services                                   301
+
+# Old WP: Book Appointment → Contact
+/oaths-commissioner-appointment                     /contact                                    301
+/oaths-commissioner-appointment/                    /contact                                    301
+
+# Old WP: Service Locations → Locations
+/calgary-oaths-service                              /locations                                  301
+/calgary-oaths-service/                             /locations                                  301
+
+# Old WP: Booking confirmation pages → Contact
+/booking-confirmation                               /contact                                    301
+/booking-confirmation/                              /contact                                    301
+/booking-confirmed                                  /contact                                    301
+/booking-confirmed/                                 /contact                                    301
+
+# Old WP: Downtown landing page → Downtown location detail
+/notary-commissioner-services-in-downtown-calgary   /locations/downtown-calgary                 301
+/notary-commissioner-services-in-downtown-calgary/  /locations/downtown-calgary                 301
+
+# Old WP: Affidavit Calgary → Affidavit service
+/services/affidavit-calgary                         /services/affidavit                         301
+/services/affidavit-calgary/                        /services/affidavit                         301
+
+# ── CONFIRMED BLOG POSTS (all 404 on new site) ───────────────────
+
+/affidavit-of-single-status-what-you-need-to-know                  /services/statutory-declaration         301
+/affidavit-of-single-status-what-you-need-to-know/                 /services/statutory-declaration         301
+
+/name-change-affidavit-why-you-need-it-and-how-to-get-one-in-calgary   /services/name-change-declaration   301
+/name-change-affidavit-why-you-need-it-and-how-to-get-one-in-calgary/  /services/name-change-declaration   301
+
+/invitation-letters-ircc                            /services/invitation-letter                 301
+/invitation-letters-ircc/                           /services/invitation-letter                 301
+
+/one-and-the-same-person-affidavit                  /services/affidavit-commissioning           301
+/one-and-the-same-person-affidavit/                 /services/affidavit-commissioning           301
+
+# ── CONFIRMED CATEGORIES ─────────────────────────────────────────
+/category/uncategorized                             /                                           301
+/category/uncategorized/                            /                                           301
+/category/legal-advice                              /services                                   301
+/category/legal-advice/                             /services                                   301
+/category/affidavits                                /services/affidavit-commissioning           301
+/category/affidavits/                               /services/affidavit-commissioning           301
+/category/invitation-letters                        /services/invitation-letter                 301
+/category/invitation-letters/                       /services/invitation-letter                 301
+
+# ── CONFIRMED TAGS (23) ──────────────────────────────────────────
+/tag/calgary-commissioner-of-oaths                  /services                                   301
+/tag/single-status-declaration                      /services/statutory-declaration             301
+/tag/affidavit-of-single-status                     /services/statutory-declaration             301
+/tag/marriage-abroad-requirements                   /services/statutory-declaration             301
+/tag/notary-public-calgary                          /services                                   301
+/tag/legal-document-notarization                    /services                                   301
+/tag/ircc                                           /services/invitation-letter                 301
+/tag/visitor-invitation-letter                      /services/invitation-letter                 301
+/tag/visa-applications                              /services/invitation-letter                 301
+/tag/affidavit                                      /services/affidavit-commissioning           301
+/tag/statutory-declaration                          /services/statutory-declaration             301
+/tag/canadian-immigration                           /services/invitation-letter                 301
+/tag/legal-documentation                            /services                                   301
+/tag/invitation-letter-format                       /services/invitation-letter                 301
+/tag/host-invitation                                /services/invitation-letter                 301
+/tag/travel-visa-support-for-a-few-seconds-visitor-invitation-letter  /services/invitation-letter  301
+/tag/name-change-affidavit                          /services/name-change-declaration           301
+/tag/name-change                                    /services/name-change-declaration           301
+/tag/calgary                                        /                                           301
+/tag/legal-document                                 /services                                   301
+/tag/notary-services                                /services                                   301
+/tag/legal-process                                  /services                                   301
+/tag/document-preparation                           /services                                   301
+/tag/*                                              /                                           301
+
+# ── CONFIRMED AUTHOR ─────────────────────────────────────────────
+/author/ramindersshahgmail-com                      /about                                      301
+/author/ramindersshahgmail-com/                     /about                                      301
+/author/*                                           /about                                      301
+
+# ── WORDPRESS SYSTEM URLS ────────────────────────────────────────
+/wp-admin                                           /                                           301
+/wp-login.php                                       /                                           301
+/xmlrpc.php                                         /                                           301
+/feed                                               /                                           301
+/feed/                                              /                                           301
+/wp-sitemap.xml                                     /sitemap.xml                                301
+/wp-sitemap-posts-page-1.xml                        /sitemap.xml                                301
+/wp-sitemap-posts-post-1.xml                        /sitemap.xml                                301
+/wp-sitemap-taxonomies-category-1.xml               /sitemap.xml                                301
+/wp-sitemap-taxonomies-post_tag-1.xml               /sitemap.xml                                301
+/wp-sitemap-users-1.xml                             /sitemap.xml                                301
+/wp-content/*                                       /                                           301
+/wp-includes/*                                      /                                           301
+/wp-json/*                                          /                                           301
