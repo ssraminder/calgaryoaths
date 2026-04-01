@@ -4,6 +4,37 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
+import TagInput from '@/components/shared/TagInput';
+
+const LANGUAGE_SUGGESTIONS = [
+  'English', 'Punjabi', 'Hindi', 'Gujarati', 'Urdu', 'Arabic', 'French',
+  'Spanish', 'Mandarin', 'Cantonese', 'Tagalog', 'Korean', 'Vietnamese',
+  'Farsi', 'Turkish', 'Somali', 'Amharic', 'Tigrinya', 'Swahili',
+];
+
+const CREDENTIAL_SUGGESTIONS = [
+  'Commissioner of Oaths (Alberta)',
+  'Notary Public (Alberta)',
+  'Commissioner of Oaths (British Columbia)',
+  'Commissioner of Oaths (Ontario)',
+  'Lawyer (Alberta)',
+  'Paralegal',
+];
+
+const NEIGHBOURHOOD_SUGGESTIONS = [
+  'Beltline', '17th Ave SW', 'Mission', 'Cliff Bungalow', 'Victoria Park',
+  'Downtown Core', 'Downtown Calgary', 'South Calgary', 'Sunalta', 'Bankview',
+  'Redstone', 'Cornerstone', 'Cityscape', 'Country Hills', 'Saddle Ridge',
+  'Falconridge', 'Taradale', 'NE Calgary', 'Martindale', 'Pineridge',
+  'Rundle', 'Temple', 'Castleridge', 'Bridgeland', 'Kensington',
+  'Marda Loop', 'Inglewood', 'Ramsay', 'Airdrie', 'Cochrane', 'Chestermere',
+  'Panorama Hills', 'Evanston', 'Nolan Hill', 'Sage Hill', 'Coventry Hills',
+  'Harvest Hills', 'Tuscany', 'Royal Oak', 'Arbour Lake', 'Varsity',
+  'Brentwood', 'Dalhousie', 'Edgemont', 'Hawkwood', 'Ranchlands',
+  'Cranston', 'Auburn Bay', 'Mahogany', 'McKenzie Towne', 'New Brighton',
+  'Seton', 'Copperfield', 'Chaparral', 'Lake Bonavista', 'Shawnessy',
+  'Somerset', 'Evergreen', 'Midnapore', 'Sundance', 'Deer Ridge',
+];
 
 type Commissioner = {
   id: string;
@@ -67,6 +98,11 @@ export default function EditVendorPage() {
   const [allServices, setAllServices] = useState<{ slug: string; name: string }[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
+  // Tag fields
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [credentials, setCredentials] = useState<string[]>([]);
+  const [neighbourhoods, setNeighbourhoods] = useState<string[]>([]);
+
   // Vendor rates
   const [vendorRates, setVendorRates] = useState<VendorRate[]>([]);
   const [savingRates, setSavingRates] = useState(false);
@@ -98,6 +134,14 @@ export default function EditVendorPage() {
         setSelectedServices(
           (vendor.co_commissioner_services || []).map((s: { service_slug: string }) => s.service_slug)
         );
+        setLanguages(vendor.languages ?? []);
+        setCredentials(vendor.credentials ?? []);
+        // Merge areas_served + nearby_neighbourhoods into one field, deduped
+        const merged = Array.from(new Set([
+          ...(vendor.nearby_neighbourhoods ?? []),
+          ...(vendor.areas_served ?? []),
+        ]));
+        setNeighbourhoods(merged);
       }
       setAllServices(Array.isArray(servicesRes?.services) ? servicesRes.services : Array.isArray(servicesRes) ? servicesRes : []);
       setRules(Array.isArray(availRes?.rules) ? availRes.rules : Array.isArray(availRes) ? availRes : []);
@@ -122,15 +166,15 @@ export default function EditVendorPage() {
       phone: fd.get('phone'),
       email: fd.get('email'),
       calendly_url: fd.get('calendly_url'),
-      languages: splitTags(fd.get('languages') as string),
-      credentials: splitTags(fd.get('credentials') as string),
+      languages,
+      credentials,
       hours_weekdays: fd.get('hours_weekdays'),
       hours_saturday: fd.get('hours_saturday'),
       hours_sunday: fd.get('hours_sunday'),
       google_maps_embed: fd.get('google_maps_embed'),
       map_url: fd.get('map_url'),
-      areas_served: splitTags(fd.get('areas_served') as string),
-      nearby_neighbourhoods: splitTags(fd.get('nearby_neighbourhoods') as string),
+      areas_served: neighbourhoods,
+      nearby_neighbourhoods: neighbourhoods,
       booking_fee_cents: Number(fd.get('booking_fee_dollars') || 40) * 100,
       commission_rate: Number(fd.get('commission_rate') || 20),
       is_partner: fd.get('is_partner') === 'on',
@@ -216,11 +260,31 @@ export default function EditVendorPage() {
         <Field name="bio" label="Bio" textarea defaultValue={commissioner.bio} />
 
         <div className="grid grid-cols-2 gap-4">
-          <Field name="languages" label="Languages (comma-separated)" defaultValue={commissioner.languages?.join(', ')} />
-          <Field name="credentials" label="Credentials (comma-separated)" defaultValue={commissioner.credentials?.join(', ')} />
-          <Field name="areas_served" label="Areas Served (comma-separated)" defaultValue={commissioner.areas_served?.join(', ')} />
-          <Field name="nearby_neighbourhoods" label="Nearby Neighbourhoods (comma-separated)" defaultValue={commissioner.nearby_neighbourhoods?.join(', ')} />
+          <TagInput
+            name="languages"
+            label="Languages"
+            value={languages}
+            onChange={setLanguages}
+            suggestions={LANGUAGE_SUGGESTIONS}
+            placeholder="Add language…"
+          />
+          <TagInput
+            name="credentials"
+            label="Credentials"
+            value={credentials}
+            onChange={setCredentials}
+            suggestions={CREDENTIAL_SUGGESTIONS}
+            placeholder="Add credential…"
+          />
         </div>
+        <TagInput
+          name="neighbourhoods"
+          label="Areas Served & Nearby Neighbourhoods"
+          value={neighbourhoods}
+          onChange={setNeighbourhoods}
+          suggestions={NEIGHBOURHOOD_SUGGESTIONS}
+          placeholder="Add neighbourhood or area…"
+        />
 
         <div className="grid grid-cols-3 gap-4">
           <Field name="hours_weekdays" label="Weekday Hours" defaultValue={commissioner.hours_weekdays} />
@@ -533,10 +597,6 @@ function Field({ name, label, type = 'text', defaultValue, required, textarea }:
       )}
     </div>
   );
-}
-
-function splitTags(val: string): string[] {
-  return val ? val.split(',').map((s) => s.trim()).filter(Boolean) : [];
 }
 
 function VendorAccountSection({ commissionerId, commissionerName, email, hasAccount }: {
