@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle, Clock } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, ClipboardCheck } from 'lucide-react';
 import StatusBadge from '@/components/admin/StatusBadge';
+import DocumentUpload from '@/components/vendor/DocumentUpload';
 
 type Booking = {
   id: string;
@@ -17,7 +18,18 @@ type Booking = {
   vendor_payout_cents: number | null;
   notes: string | null;
   num_documents: number;
+  delivery_mode: string | null;
+  customer_address: string | null;
+  facility_name: string | null;
   created_at: string;
+};
+
+type Doc = {
+  id: string;
+  type: 'customer_id' | 'commissioned_document';
+  file_url: string;
+  file_name: string;
+  uploaded_at: string;
 };
 
 export default function VendorBookingDetailPage() {
@@ -33,6 +45,12 @@ export default function VendorBookingDetailPage() {
   const [proposeTime, setProposeTime] = useState('');
   const [proposeReason, setProposeReason] = useState('');
 
+  // Documents & completion
+  const [documents, setDocuments] = useState<Doc[]>([]);
+  const [completionNotes, setCompletionNotes] = useState('');
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState('');
+
   useEffect(() => {
     fetch(`/api/vendor/bookings`)
       .then((r) => r.json())
@@ -40,6 +58,13 @@ export default function VendorBookingDetailPage() {
         const b = (data ?? []).find((x: Booking) => x.id === id);
         setBooking(b || null);
         setLoading(false);
+        // Fetch documents if booking is in completable state
+        if (b && ['confirmed', 'paid', 'completed'].includes(b.status)) {
+          fetch(`/api/vendor/bookings/${id}/documents`)
+            .then((r) => r.json())
+            .then((d) => setDocuments(d.documents ?? []))
+            .catch(() => {});
+        }
       })
       .catch(() => setLoading(false));
   }, [id]);
@@ -64,6 +89,27 @@ export default function VendorBookingDetailPage() {
     setShowPropose(false);
     setActing(false);
   }
+
+  async function handleComplete() {
+    setCompleting(true);
+    setCompleteError('');
+    const res = await fetch(`/api/vendor/bookings/${id}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: completionNotes }),
+    });
+    if (res.ok) {
+      setBooking((prev) => prev ? { ...prev, status: 'completed' } : null);
+    } else {
+      const data = await res.json();
+      setCompleteError(data.error || 'Failed to complete');
+    }
+    setCompleting(false);
+  }
+
+  const hasCustomerId = documents.some((d) => d.type === 'customer_id');
+  const hasCommDoc = documents.some((d) => d.type === 'commissioned_document');
+  const canComplete = hasCustomerId && hasCommDoc;
 
   if (loading) {
     return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-navy border-t-transparent" /></div>;
@@ -96,6 +142,13 @@ export default function VendorBookingDetailPage() {
             <div className="flex justify-between"><dt className="text-gray-500">Proposed Time</dt><dd className="font-medium text-orange-600">{fmtDate(booking.proposed_datetime)}</dd></div>
           )}
           <div className="flex justify-between"><dt className="text-gray-500">Documents</dt><dd>{booking.num_documents}</dd></div>
+          {booking.delivery_mode === 'mobile' && (
+            <>
+              <div className="flex justify-between"><dt className="text-gray-500">Delivery</dt><dd className="font-medium text-navy">Mobile Service</dd></div>
+              {booking.customer_address && <div className="flex justify-between"><dt className="text-gray-500">Address</dt><dd className="text-right max-w-[200px]">{booking.customer_address}</dd></div>}
+              {booking.facility_name && <div className="flex justify-between"><dt className="text-gray-500">Facility</dt><dd>{booking.facility_name}</dd></div>}
+            </>
+          )}
           <div className="flex justify-between"><dt className="text-gray-500">Your Payout</dt><dd className="font-medium text-green-700">{booking.vendor_payout_cents != null ? `$${(booking.vendor_payout_cents / 100).toFixed(2)}` : '—'}</dd></div>
           <div className="flex justify-between"><dt className="text-gray-500">Booked</dt><dd>{fmtDate(booking.created_at)}</dd></div>
         </dl>
@@ -120,6 +173,68 @@ export default function VendorBookingDetailPage() {
             <Clock className="h-4 w-4" />
             Propose Different Time
           </button>
+        </div>
+      )}
+
+      {/* Complete Appointment — for confirmed bookings */}
+      {['confirmed', 'paid'].includes(booking.status) && (
+        <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
+          <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+            <ClipboardCheck size={18} className="text-navy" />
+            Complete Appointment
+          </h2>
+          <p className="text-sm text-gray-500">
+            Upload the customer&apos;s ID and photos of the commissioned documents, then mark as complete to become eligible for payout.
+          </p>
+
+          <DocumentUpload
+            bookingId={booking.id}
+            documents={documents}
+            onDocumentsChange={setDocuments}
+          />
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Notes (optional)</label>
+            <textarea
+              rows={2}
+              value={completionNotes}
+              onChange={(e) => setCompletionNotes(e.target.value)}
+              placeholder="Any notes about the appointment..."
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          {completeError && <p className="text-sm text-red-600">{completeError}</p>}
+
+          <button
+            type="button"
+            onClick={handleComplete}
+            disabled={!canComplete || completing}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-navy px-4 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <CheckCircle size={16} />
+            {completing ? 'Completing...' : 'Mark as Complete'}
+          </button>
+          {!canComplete && (
+            <p className="text-xs text-amber-600 text-center">
+              Upload at least one customer ID and one commissioned document to enable completion.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Completed — show uploads read-only */}
+      {booking.status === 'completed' && documents.length > 0 && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-5 space-y-3">
+          <h2 className="text-sm font-medium text-green-800 flex items-center gap-2">
+            <CheckCircle size={16} /> Appointment Completed
+          </h2>
+          <DocumentUpload
+            bookingId={booking.id}
+            documents={documents}
+            onDocumentsChange={setDocuments}
+            disabled
+          />
         </div>
       )}
 

@@ -59,6 +59,8 @@ type Commissioner = {
   booking_fee_cents: number | null;
   commission_rate: number | null;
   is_partner: boolean;
+  mobile_available: boolean;
+  virtual_available: boolean;
   user_id: string | null;
   active: boolean;
   sort_order: number;
@@ -190,6 +192,8 @@ export default function EditVendorPage() {
       booking_fee_cents: Number(fd.get('booking_fee_dollars') || 40) * 100,
       commission_rate: Number(fd.get('commission_rate') || 20),
       is_partner: fd.get('is_partner') === 'on',
+      mobile_available: fd.get('mobile_available') === 'on',
+      virtual_available: fd.get('virtual_available') === 'on',
       active: fd.get('active') === 'on',
       sort_order: Number(fd.get('sort_order') || 0),
     };
@@ -327,12 +331,24 @@ export default function EditVendorPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <Field name="sort_order" label="Sort Order" type="number" defaultValue={String(commissioner.sort_order)} />
-          <div className="flex items-end gap-2 pb-1">
+          <div className="flex items-end pb-1">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="active" defaultChecked={commissioner.active} className="rounded border-gray-300" />
               Active
+            </label>
+          </div>
+          <div className="flex items-end pb-1">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="mobile_available" defaultChecked={commissioner.mobile_available} className="rounded border-gray-300" />
+              Mobile
+            </label>
+          </div>
+          <div className="flex items-end pb-1">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="virtual_available" defaultChecked={commissioner.virtual_available} className="rounded border-gray-300" />
+              Virtual
             </label>
           </div>
         </div>

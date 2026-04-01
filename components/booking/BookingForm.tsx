@@ -14,7 +14,7 @@ const detailsSchema = z.object({
   name: z.string().min(2, 'Full name required'),
   email: z.string().email('Valid email required'),
   phone: z.string().min(10, 'Phone number required'),
-  deliveryMode: z.enum(['in_office', 'mobile']).default('in_office'),
+  deliveryMode: z.enum(['in_office', 'mobile', 'virtual']).default('in_office'),
   customerAddress: z.string().optional(),
   commissionerId: z.string().min(1, 'Please choose a location'),
   notes: z.string().max(500).optional(),
@@ -251,6 +251,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   const [selectedOption, setSelectedOption] = useState<LocationOption | null>(null);
   const [commFilter, setCommFilter] = useState<'all' | 'soonest' | 'price'>('soonest');
   const [areaFilter, setAreaFilter] = useState<string>('');
+  const [deliveryTab, setDeliveryTab] = useState<'in_office' | 'mobile' | 'virtual'>('in_office');
   // Pricing config
   const [pricing, setPricing] = useState<PricingConfig>({ convenienceFeeCents: 499, tax: { total_rate: 0.05, gst_rate: 0.05, pst_rate: 0, hst_rate: 0 } });
 
@@ -285,8 +286,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   });
 
   // Delivery mode + dynamic travel fee
-  const deliveryMode = watch('deliveryMode') || 'in_office';
-  const isMobile = deliveryMode === 'mobile';
+  const isMobile = deliveryTab === 'mobile';
   const [travelFeeData, setTravelFeeData] = useState<{ travelFeeCents: number; distanceKm: number | null; distanceText?: string; durationText?: string } | null>(null);
   const [travelFeeLoading, setTravelFeeLoading] = useState(false);
   const [customerAddr, setCustomerAddr] = useState('');
@@ -337,6 +337,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           notes: data.notes || '',
           deliveryMode: data.deliveryMode || 'in_office',
           customerAddress: data.customerAddress || '',
+          facilityName: isMobile ? (document.querySelector<HTMLInputElement>('[name="facilityName"]')?.value || '') : '',
+          customerUnit: isMobile ? (document.querySelector<HTMLInputElement>('[name="customerUnit"]')?.value || '') : '',
           travelFeeCents: isMobile ? travelFee : 0,
           travelDistanceKm: travelFeeData?.distanceKm ?? null,
           locationId: selectedOption?.locationId || null,
@@ -490,6 +492,44 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             </div>
           </div>
 
+          {/* Delivery mode tabs */}
+          <div className="flex gap-1.5 mb-3">
+            {([
+              ['in_office', 'In-Office'],
+              ['mobile', 'Mobile'],
+              ['virtual', 'Virtual'],
+            ] as const).map(([key, label]) => {
+              // Check if any vendor offers this mode
+              const available = key === 'in_office' || locationOptions.some(
+                (o) => key === 'mobile' ? o.mobile_available : o.virtual_available
+              );
+              if (!available) return null;
+              return (
+                <button key={key} type="button"
+                  onClick={() => { setDeliveryTab(key); setSelectedOption(null); }}
+                  className={`rounded-pill px-3 py-1.5 text-xs font-medium transition-colors ${
+                    deliveryTab === key
+                      ? 'bg-gold text-white'
+                      : 'bg-bg text-mid-grey hover:bg-border'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {deliveryTab === 'mobile' && (
+            <p className="text-xs text-mid-grey mb-3 bg-gold/5 border border-gold/20 rounded-btn p-2">
+              We come to your home, office, hospital, or care facility. A distance-based travel fee will be added at checkout.
+            </p>
+          )}
+          {deliveryTab === 'virtual' && (
+            <p className="text-xs text-mid-grey mb-3 bg-navy/5 border border-navy/10 rounded-btn p-2">
+              Video call appointment. You&apos;ll receive a meeting link after booking.
+            </p>
+          )}
+
           {/* Sort tabs + area search */}
           <div className="flex items-center gap-1.5 mb-3 flex-wrap">
             {([['soonest', 'Soonest'], ['price', 'Lowest price'], ['all', 'All']] as const).map(([key, label]) => (
@@ -500,10 +540,12 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             ))}
           </div>
 
-          <AreaSearch
-            options={locationOptions}
-            onFilter={setAreaFilter}
-          />
+          {deliveryTab === 'in_office' && (
+            <AreaSearch
+              options={locationOptions}
+              onFilter={setAreaFilter}
+            />
+          )}
 
           <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
             {optionsLoading ? (
@@ -511,15 +553,25 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 <Loader2 size={15} className="animate-spin" /> Loading locations…
               </div>
             ) : (
-              sortedOptions(areaFilter ? locationOptions.filter((opt) => {
-                const q = areaFilter.toLowerCase();
-                // Match area name, postal code prefix, or location name/address
-                return (
-                  opt.locationName.toLowerCase().includes(q) ||
-                  opt.locationAddress?.toLowerCase().includes(q) ||
-                  (opt.areas_served ?? []).some((a) => a.toLowerCase().includes(q))
-                );
-              }) : locationOptions, commFilter).map((opt) => {
+              sortedOptions((() => {
+                // 1. Filter by delivery mode
+                let filtered = locationOptions;
+                if (deliveryTab === 'mobile') {
+                  filtered = filtered.filter((o) => o.mobile_available);
+                } else if (deliveryTab === 'virtual') {
+                  filtered = filtered.filter((o) => o.virtual_available);
+                }
+                // 2. Filter by area search (in-office only)
+                if (areaFilter && deliveryTab === 'in_office') {
+                  const q = areaFilter.toLowerCase();
+                  filtered = filtered.filter((opt) =>
+                    opt.locationName.toLowerCase().includes(q) ||
+                    opt.locationAddress?.toLowerCase().includes(q) ||
+                    (opt.areas_served ?? []).some((a) => a.toLowerCase().includes(q))
+                  );
+                }
+                return filtered;
+              })(), commFilter).map((opt) => {
                 const basePrice = opt.first_page_cents ?? selectedService?.price ?? opt.booking_fee_cents;
                 const price = basePrice ? customerPrice(basePrice, opt) : null;
                 const priceLabel = price ? `$${(price / 100).toFixed(0)}` : 'Quote';
@@ -573,17 +625,28 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             {!optionsLoading && locationOptions.length === 0 && (
               <p className="text-center text-sm text-mid-grey py-6">No locations available for this service.</p>
             )}
-            {!optionsLoading && locationOptions.length > 0 && areaFilter && sortedOptions(locationOptions.filter((opt) => {
+            {!optionsLoading && locationOptions.length > 0 && (() => {
+              let filtered = locationOptions;
+              if (deliveryTab === 'mobile') filtered = filtered.filter((o) => o.mobile_available);
+              else if (deliveryTab === 'virtual') filtered = filtered.filter((o) => o.virtual_available);
+              if (areaFilter && deliveryTab === 'in_office') {
                 const q = areaFilter.toLowerCase();
-                return opt.locationName.toLowerCase().includes(q) || opt.locationAddress?.toLowerCase().includes(q) || (opt.areas_served ?? []).some((a) => a.toLowerCase().includes(q));
-              }), commFilter).length === 0 && (
-              <p className="text-center text-sm text-mid-grey py-6">No locations match &ldquo;{areaFilter}&rdquo;. Try a different area or postal code.</p>
+                filtered = filtered.filter((o) => o.locationName.toLowerCase().includes(q) || o.locationAddress?.toLowerCase().includes(q) || (o.areas_served ?? []).some((a) => a.toLowerCase().includes(q)));
+              }
+              return filtered.length === 0;
+            })() && (
+              <p className="text-center text-sm text-mid-grey py-6">
+                {deliveryTab === 'mobile' ? 'No commissioners offer mobile service for this service.' :
+                 deliveryTab === 'virtual' ? 'No commissioners offer virtual service for this service.' :
+                 areaFilter ? `No locations match "${areaFilter}".` : 'No locations available.'}
+              </p>
             )}
           </div>
 
           <button type="button" disabled={!selectedOption}
             onClick={() => {
               setValue('commissionerId', selectedOption!.commissionerId);
+              setValue('deliveryMode', deliveryTab);
               setStep(3);
             }}
             className="btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -628,43 +691,57 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             </div>
 
             <input type="hidden" {...register('commissionerId')} />
+            <input type="hidden" {...register('deliveryMode')} />
 
-            {/* Delivery mode — only if commissioner offers mobile */}
-            {selectedOption?.mobile_available && (
+            {/* Address + facility for mobile bookings */}
+            {deliveryTab === 'mobile' && (
               <div className="space-y-3">
-                <label className="block text-sm font-medium text-charcoal mb-2">Appointment type *</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className={`flex items-center justify-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all ${deliveryMode === 'in_office' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'}`}>
-                    <input type="radio" {...register('deliveryMode')} value="in_office" className="sr-only" />
-                    <span className="text-sm font-medium text-charcoal">In-Office</span>
-                  </label>
-                  <label className={`flex items-center justify-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all ${deliveryMode === 'mobile' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'}`}>
-                    <input type="radio" {...register('deliveryMode')} value="mobile" className="sr-only" />
-                    <span className="text-sm font-medium text-charcoal">Mobile</span>
-                  </label>
+                <div className="bg-gold/5 border border-gold/20 rounded-card p-3">
+                  <p className="text-xs font-medium text-charcoal">Mobile Service</p>
+                  <p className="text-xs text-mid-grey mt-0.5">Commissioner will travel to your location. Enter your address below.</p>
                 </div>
-
-                {/* Address input for mobile */}
-                {isMobile && (
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-charcoal">Your address *</label>
-                    <div className="flex gap-2">
-                      <input
-                        {...register('customerAddress')}
-                        type="text"
-                        placeholder="123 Main St, Calgary, AB"
-                        value={customerAddr}
-                        onChange={(e) => { setCustomerAddr(e.target.value); setValue('customerAddress', e.target.value); }}
-                        className="flex-1 border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
-                      />
-                      <button
-                        type="button"
-                        disabled={!customerAddr || travelFeeLoading}
-                        onClick={() => calcTravelFee(customerAddr)}
-                        className="rounded-btn bg-navy px-4 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 flex-shrink-0"
-                      >
-                        {travelFeeLoading ? 'Calculating...' : 'Calculate'}
-                      </button>
+                {(
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-charcoal mb-1">Your address *</label>
+                      <div className="flex gap-2">
+                        <input
+                          {...register('customerAddress')}
+                          type="text"
+                          placeholder="123 Main St, Calgary, AB"
+                          value={customerAddr}
+                          onChange={(e) => { setCustomerAddr(e.target.value); setValue('customerAddress', e.target.value); }}
+                          className="flex-1 border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
+                        />
+                        <button
+                          type="button"
+                          disabled={!customerAddr || travelFeeLoading}
+                          onClick={() => calcTravelFee(customerAddr)}
+                          className="rounded-btn bg-navy px-4 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 flex-shrink-0"
+                        >
+                          {travelFeeLoading ? 'Calculating...' : 'Calculate'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-charcoal mb-1">Facility name</label>
+                        <input
+                          type="text"
+                          name="facilityName"
+                          placeholder="e.g. Foothills Hospital"
+                          className="w-full border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-charcoal mb-1">Unit / Room #</label>
+                        <input
+                          type="text"
+                          name="customerUnit"
+                          placeholder="e.g. Suite 200, Room 4B"
+                          className="w-full border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
+                        />
+                      </div>
                     </div>
 
                     {travelFeeData && (
@@ -683,6 +760,13 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {deliveryTab === 'virtual' && (
+              <div className="bg-navy/5 border border-navy/10 rounded-card p-3">
+                <p className="text-xs font-medium text-charcoal">Virtual Appointment</p>
+                <p className="text-xs text-mid-grey mt-0.5">You&apos;ll receive a video call link by email after booking.</p>
               </div>
             )}
 
