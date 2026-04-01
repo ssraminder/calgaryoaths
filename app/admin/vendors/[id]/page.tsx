@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 
 type Commissioner = {
   id: string;
@@ -164,7 +165,22 @@ export default function EditVendorPage() {
           <Field name="phone" label="Phone" defaultValue={commissioner.phone} />
           <Field name="location" label="Location Label" defaultValue={commissioner.location} />
           <Field name="location_slug" label="Location Slug" defaultValue={commissioner.location_slug} />
-          <Field name="address" label="Address" defaultValue={commissioner.address} />
+          <AddressAutocomplete
+            name="address"
+            label="Address"
+            defaultValue={commissioner.address}
+            onAddressResolved={(data) => {
+              const form = document.querySelector('form');
+              if (form) {
+                const setVal = (n: string, v: string) => {
+                  const el = form.querySelector<HTMLInputElement>(`[name="${n}"]`);
+                  if (el) { el.value = v; el.dispatchEvent(new Event('change')); }
+                };
+                setVal('google_maps_embed', data.googleMapsEmbed);
+                setVal('map_url', data.mapUrl);
+              }
+            }}
+          />
           <Field name="calendly_url" label="Calendly URL" defaultValue={commissioner.calendly_url} />
         </div>
 

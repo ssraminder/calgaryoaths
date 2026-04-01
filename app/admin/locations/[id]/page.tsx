@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
+import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 
 type Location = {
   id: string;
@@ -32,6 +33,9 @@ export default function EditLocationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const geoRef = useRef<{ lat: number | null; lng: number | null; embed: string; mapUrl: string }>({
+    lat: null, lng: null, embed: '', mapUrl: '',
+  });
 
   useEffect(() => {
     Promise.all([
@@ -110,7 +114,26 @@ export default function EditLocationPage() {
           </div>
         </div>
 
-        <Field name="address" label="Address" defaultValue={location.address} />
+        <AddressAutocomplete
+          name="address"
+          label="Address"
+          defaultValue={location.address}
+          onAddressResolved={(data) => {
+            geoRef.current = { lat: data.lat, lng: data.lng, embed: data.googleMapsEmbed, mapUrl: data.mapUrl };
+            // Auto-fill the hidden/visible fields
+            const form = document.querySelector('form');
+            if (form) {
+              const setVal = (n: string, v: string) => {
+                const el = form.querySelector<HTMLInputElement>(`[name="${n}"]`);
+                if (el) { el.value = v; el.dispatchEvent(new Event('change')); }
+              };
+              setVal('geo_lat', String(data.lat));
+              setVal('geo_lng', String(data.lng));
+              setVal('google_maps_embed', data.googleMapsEmbed);
+              setVal('map_url', data.mapUrl);
+            }
+          }}
+        />
         <div className="grid grid-cols-2 gap-4">
           <Field name="phone" label="Phone" defaultValue={location.phone} />
           <Field name="calendly_url" label="Calendly URL" defaultValue={location.calendly_url} />
@@ -132,6 +155,7 @@ export default function EditLocationPage() {
           <Field name="geo_lng" label="Longitude" type="number" defaultValue={location.geo_lng != null ? String(location.geo_lng) : ''} />
           <Field name="sort_order" label="Sort Order" type="number" defaultValue={String(location.sort_order)} />
         </div>
+        <p className="text-xs text-gray-400">Lat/lng, embed URL, and map link auto-fill when you select an address above.</p>
 
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="active" defaultChecked={location.active} className="rounded border-gray-300" />
