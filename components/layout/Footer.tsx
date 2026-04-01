@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
+import BookButton from '@/components/shared/BookButton';
 import { commissioners as fallbackCommissioners } from '@/lib/data/commissioners';
 
 const quickLinks = [
@@ -113,14 +114,11 @@ export default async function Footer() {
                 <div key={c.id} className="bg-white/5 rounded-card p-4 border border-white/10">
                   <p className="font-body font-medium text-white text-sm">{c.name}</p>
                   <p className="text-white/60 text-xs mt-0.5 mb-3">{c.location} · {c.address.split(',')[0]}</p>
-                  <a
-                    href={c.calendly_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center text-xs font-medium text-gold hover:text-gold-light transition-colors uppercase tracking-wide"
-                  >
-                    Book with {c.name.split(' ')[0]} →
-                  </a>
+                  <BookButton
+                    label={`Book with ${c.name.split(' ')[0]} →`}
+                    variant="ghost"
+                    size="sm"
+                  />
                 </div>
               ))}
             </div>

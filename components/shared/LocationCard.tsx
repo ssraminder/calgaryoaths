@@ -1,5 +1,6 @@
 import { MapPin, Clock, ExternalLink, Globe } from 'lucide-react';
 import SchemaSEO from '@/components/shared/SchemaSEO';
+import BookButton from '@/components/shared/BookButton';
 
 interface LocationCardProps {
   name: string;
@@ -118,14 +119,11 @@ export default function LocationCard({
           </div>
         </div>
 
-        <a
-          href={calendlyUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-primary w-full justify-center"
-        >
-          Book with {commissionerName.split(' ')[0]} →
-        </a>
+        <BookButton
+          label={`Book with ${commissionerName.split(' ')[0]} →`}
+          variant="primary"
+          className="w-full justify-center"
+        />
       </div>
     </>
   );

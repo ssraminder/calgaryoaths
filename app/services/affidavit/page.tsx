@@ -139,17 +139,7 @@ export default function AffidavitPage() {
               {/* Book CTAs */}
               <div className="card space-y-3">
                 <p className="font-display font-semibold text-charcoal">Book your appointment</p>
-                {commissioners.map((c) => (
-                  <a
-                    key={c.id}
-                    href={c.calendlyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-primary w-full justify-center text-xs py-2.5"
-                  >
-                    Book with {c.name.split(' ')[0]} — {c.location.split(' ')[0]}
-                  </a>
-                ))}
+                <BookButton label="Book Appointment" variant="primary" size="md" className="w-full justify-center" />
                 <p className="text-xs text-mid-grey text-center">
                   Or call <a href="tel:5876000746" className="text-gold font-medium">(587) 600-0746</a>
                 </p>

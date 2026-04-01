@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { MapPin, Clock, Globe, Award } from 'lucide-react';
 import { Commissioner } from '@/lib/data/commissioners';
+import BookButton from '@/components/shared/BookButton';
 
 interface CommissionerCardProps {
   commissioner: Commissioner;
@@ -29,14 +30,12 @@ export default function CommissionerCard({ commissioner: c, size = 'full' }: Com
             </span>
           ))}
         </div>
-        <a
-          href={c.calendlyUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-primary text-xs justify-center w-full"
-        >
-          Book with {c.name.split(' ')[0]} →
-        </a>
+        <BookButton
+          label={`Book with ${c.name.split(' ')[0]} →`}
+          variant="primary"
+          size="sm"
+          className="w-full justify-center"
+        />
       </div>
     );
   }
@@ -108,14 +107,12 @@ export default function CommissionerCard({ commissioner: c, size = 'full' }: Com
 
       {/* CTA */}
       <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-border">
-        <a
-          href={c.calendlyUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-primary flex-1 justify-center"
-        >
-          Book with {c.name.split(' ')[0]} →
-        </a>
+        <BookButton
+          label={`Book with ${c.name.split(' ')[0]} →`}
+          variant="primary"
+          size="md"
+          className="flex-1 justify-center"
+        />
         <Link
           href={`/locations/${c.locationSlug}`}
           className="btn-secondary flex-1 justify-center"

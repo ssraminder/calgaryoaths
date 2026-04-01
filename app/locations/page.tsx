@@ -109,9 +109,11 @@ export default async function LocationsPage() {
                 </div>
 
                 <div className="flex flex-col gap-3 justify-end">
-                  <a href={c.calendly_url} target="_blank" rel="noopener noreferrer" className="btn-primary justify-center">
-                    Book with {c.name.split(' ')[0]}
-                  </a>
+                  <BookButton
+                    label={`Book with ${c.name.split(' ')[0]}`}
+                    variant="primary"
+                    className="justify-center"
+                  />
                   <Link href={`/locations/${c.location_slug}`} className="btn-secondary justify-center">
                     View location details
                   </Link>
