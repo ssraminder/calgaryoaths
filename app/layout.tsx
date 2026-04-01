@@ -7,6 +7,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import BookingModal from '@/components/layout/BookingModal';
 import WhatsAppButton from '@/components/layout/WhatsAppButton';
+import AuthRedirect from '@/components/shared/AuthRedirect';
 import { GTMHead, GTMNoScript } from '@/components/shared/GoogleTagManager';
 import { getAnalyticsSettings } from '@/lib/data/db';
 
@@ -67,6 +68,7 @@ export default async function RootLayout({
           <Footer />
           <BookingModal />
           <WhatsAppButton />
+          <AuthRedirect />
         </BookingModalProvider>
         {ga4Id && <GoogleAnalytics gaId={ga4Id} />}
       </body>
