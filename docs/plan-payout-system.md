@@ -1,188 +1,137 @@
-# Payout System Implementation Plan
+# Calgary Oaths — Development Progress & Plan
 
-## Status
+## Session Summary (April 2026)
 
-- **Phase 1: DONE** — Appointment completion workflow (DB tables, upload APIs, vendor UI)
-- **Phase 2: DEFERRED** — Admin payout dashboard (build when external vendors onboard)
-- **Phase 3: DEFERRED** — Vendor payout history page (build when external vendors onboard)
+### Completed Features
 
-> Phases 2 & 3 are not needed while all commissioners are internal (Raminder & Amrita).
-> Build these when external/partner vendors join the platform and need automated payout tracking.
+#### Pricing System
+- [x] Dynamic pricing from `co_vendor_rates` — public pages show lowest vendor rate as "From $X"
+- [x] Per-vendor service pricing with suggested rates (company rate - 20%, rounded to $5)
+- [x] Minimum vendor rate enforcement (`co_services.min_vendor_rate_cents` = 75% of suggested)
+- [x] Service pricing table in admin vendor edit with offer toggle, suggested rates, copy-to-vendor action
+- [x] Price removed from booking Step 1 — customers see vendor-specific prices in Step 2
+- [x] Drafting copy updated sitewide: "commissioning · drafting available at extra charge"
 
-## Overview
+#### Vendor Management
+- [x] Tag-based inputs for languages (19 presets), credentials (6 presets), neighbourhoods (60+ presets)
+- [x] Merged "Areas Served" and "Nearby Neighbourhoods" into single field
+- [x] Services + pricing merged into one table (removed separate checkboxes)
+- [x] GST/HST registration (number + registered flag) with 5% GST added to vendor payouts
+- [x] Mobile and Virtual service toggles per vendor
+- [x] Availability rules: bulk day selection (Weekdays/Weekends/All), location auto-resolve
+- [x] Blocked dates: date range picker, red pill display, booking slots respect blocked dates
+- [x] Vendor payout display: shows service payout + GST breakdown (not total charged to customer)
+- [x] Hours removed from public pages — "By appointment only" everywhere
 
-Appointment lifecycle: vendor confirms appointment → completes service → uploads customer ID + commissioned documents → marks as complete → payout becomes eligible → admin processes weekly manual payout (e-Transfer or bank transfer).
+#### Booking Flow
+- [x] Delivery mode selection in Step 2 (In-Office / Mobile / Virtual) with vendor filtering
+- [x] Delivery mode cards show vendor/location counts per mode
+- [x] Smart back button (delivery mode → Step 1 navigation)
+- [x] Area/neighbourhood/postal code search filter for in-office locations
+- [x] Mobile booking: facility name + unit/room fields, distance-based travel fee
+- [x] Virtual booking: info banner, video call notice in Step 3
 
----
+#### Appointment Completion (Payout Phase 1)
+- [x] `co_appointment_documents` table — customer ID + commissioned document uploads
+- [x] `co_payout_batches` table — weekly payout batch tracking
+- [x] Supabase Storage bucket: `appointment-documents` (private, 10MB, jpg/png/pdf/heic)
+- [x] Vendor upload APIs: POST upload, DELETE, GET documents
+- [x] Vendor complete API: validates both upload types exist before marking complete
+- [x] DocumentUpload component: drag-to-upload zones, thumbnail list, delete buttons
+- [x] "Mark as Complete" button on vendor booking detail (disabled until uploads present)
+- [x] Read-only upload view after completion
 
-## Phase 1: Appointment Completion Workflow
+#### Join / Vendor Registration (`/join`)
+- [x] Auto-creates Supabase auth account + vendor profile (inactive, admin approves)
+- [x] Credential certificate upload (scan/photo stored in Supabase Storage)
+- [x] Credential hierarchy auto-selection (Notary → includes Commissioner)
+- [x] TagInput for languages and areas served
+- [x] GST/HST dropdown (registered/not registered) + number field
+- [x] "Other services" text field for services not in catalog
+- [x] "How did you hear about us?" referral source dropdown
+- [x] Welcome email to vendor + notification email to admin
+- [x] Pricing/hours removed (configured in partner portal after approval)
 
-### 1.1 New DB table: `co_appointment_documents`
+#### Data & Addresses
+- [x] Downtown: 421 7th Ave SW, #3000, Calgary, AB T2P 4K9
+- [x] NE Calgary: 220 Red Sky Terrace NE, Calgary, AB T3N 1M9
+- [x] Updated in: Supabase (co_commissioners + co_locations), hardcoded fallbacks, location detail pages, homepage JSON-LD, meta descriptions, Google Maps URLs
+- [x] Supabase-driven: locations page, footer, about page, home LocationsSection (with fallback)
+- [x] Service prices updated to market benchmarks (Statutory $45, Power of Attorney $80, etc.)
+- [x] Merged "True Copy Attestation" into "Certified True Copy"
 
-Stores uploaded customer IDs and commissioned document photos.
+#### Google Integrations
+- [x] Google Places autocomplete for admin address fields (vendor + location edit)
+- [x] Geocode API: auto-fills lat/lng + Google Maps embed/link URLs
+- [x] Google Reviews via Places API (New) — live reviews on homepage, 1hr cache
+- [x] Distance Matrix API for mobile travel fee calculation (already existed)
 
-```sql
-CREATE TABLE co_appointment_documents (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id uuid NOT NULL REFERENCES co_bookings(id) ON DELETE CASCADE,
-  commissioner_id text NOT NULL REFERENCES co_commissioners(id),
-  type text NOT NULL CHECK (type IN ('customer_id', 'commissioned_document')),
-  file_url text NOT NULL,
-  file_name text,
-  uploaded_at timestamptz DEFAULT now()
-);
-```
+#### SEO & Redirects
+- [x] `public/_redirects` with 80+ WordPress migration rules (pages, blog posts, categories, tags, authors, wp-system URLs)
+- [x] Removed duplicate redirects from `netlify.toml`
+- [x] Trust bar converted to CSS marquee animation (no scrollbar)
 
-### 1.2 New columns on `co_bookings`
-
-```sql
-ALTER TABLE co_bookings ADD COLUMN completed_at timestamptz;
-ALTER TABLE co_bookings ADD COLUMN completion_notes text;
-ALTER TABLE co_bookings ADD COLUMN payout_status text DEFAULT 'pending'
-  CHECK (payout_status IN ('pending', 'eligible', 'paid'));
-ALTER TABLE co_bookings ADD COLUMN payout_reference text;   -- e-Transfer ref or note
-ALTER TABLE co_bookings ADD COLUMN payout_paid_at timestamptz;
-ALTER TABLE co_bookings ADD COLUMN payout_batch_id uuid;    -- links to co_payout_batches
-```
-
-### 1.3 New DB table: `co_payout_batches`
-
-Groups weekly payouts per vendor.
-
-```sql
-CREATE TABLE co_payout_batches (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  commissioner_id text NOT NULL REFERENCES co_commissioners(id),
-  period_start date NOT NULL,
-  period_end date NOT NULL,
-  total_cents integer NOT NULL,
-  booking_count integer NOT NULL,
-  status text NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending', 'paid', 'cancelled')),
-  payment_method text,            -- 'e_transfer', 'bank_transfer', etc.
-  payment_reference text,         -- e-Transfer confirmation #
-  paid_at timestamptz,
-  created_at timestamptz DEFAULT now()
-);
-```
-
-### 1.4 Supabase Storage bucket: `appointment-documents`
-
-Private bucket — only authenticated users can upload/read. Files organized as:
-```
-appointment-documents/{booking_id}/{type}_{timestamp}.{ext}
-```
-
-### 1.5 Vendor portal: Complete Appointment flow
-
-On the vendor booking detail page (`/vendor/bookings/[id]`), after status = `confirmed`:
-
-1. **Upload section** appears:
-   - "Upload Customer ID" — file input (photo/scan, max 10MB, jpg/png/pdf)
-   - "Upload Commissioned Document(s)" — file input (multiple)
-   - Uploaded files show as thumbnails with delete option
-
-2. **Mark as Complete** button — only enabled when:
-   - At least 1 customer ID uploaded
-   - At least 1 commissioned document uploaded
-   - Optional: completion notes field
-
-3. On submit:
-   - Status → `completed`
-   - `completed_at` = now
-   - `payout_status` = `eligible`
-
-### 1.6 API endpoints
-
-- `POST /api/vendor/bookings/[id]/upload` — upload doc to Supabase Storage, create row
-- `DELETE /api/vendor/bookings/[id]/upload?docId=xxx` — delete uploaded document
-- `POST /api/vendor/bookings/[id]/complete` — mark complete (validates uploads exist)
-- `GET /api/vendor/bookings/[id]/documents` — list uploaded documents
+#### Email
+- [x] Sender email: `noreply@cethos.com` (via Brevo API)
+- [x] Vendor welcome email on registration
+- [x] Admin notification email on vendor application (with credential file link)
 
 ---
 
-## Phase 2: Admin Payout Dashboard
+### Deferred — Build When External Vendors Join
 
-### 2.1 New page: `/admin/payouts`
+#### Payout Dashboard (Phase 2)
+- [ ] `/admin/payouts` page with summary cards (eligible/processing/paid totals)
+- [ ] Weekly batch generation: group eligible bookings per vendor per Mon–Sun period
+- [ ] Batch detail: expand to see individual bookings
+- [ ] "Mark Batch as Paid" with payment method + reference number
+- [ ] Bulk actions: "Pay All Eligible", "Export CSV"
+- [ ] GST totals per batch (`gst_cents`, `total_with_gst_cents` columns ready)
 
-**Summary cards:**
-- Total eligible (unpaid completed appointments)
-- Total paid this week / this month
+#### Vendor Payout History (Phase 3)
+- [ ] `/vendor/payouts` page with earnings summary (this week / month / all time)
+- [ ] Payout history table: period, bookings, amount, status, reference
+- [ ] Click batch to see individual bookings
 
-**Weekly batch workflow:**
-1. Admin opens payouts page, sees eligible bookings grouped by vendor
-2. Clicks "Generate Weekly Batch" → creates `co_payout_batches` row per vendor
-   - Aggregates all `payout_status = 'eligible'` bookings for that vendor
-   - Period = last Monday–Sunday (or custom range)
-   - Links bookings to batch via `payout_batch_id`
-3. Admin sends e-Transfer/bank transfer manually
-4. Clicks "Mark Batch as Paid" → enters payment reference
-   - Updates batch: `status = 'paid'`, `paid_at = now`, `payment_reference`
-   - Updates all linked bookings: `payout_status = 'paid'`, `payout_paid_at = now`
-
-**Table columns:** Vendor, Period, Bookings, Total Payout, Status, Action
-
-**Per-vendor breakdown:** Click to expand — shows individual bookings in the batch
-
-### 2.2 API endpoints
-
-- `GET /api/admin/payouts` — list batches + eligible summary
-- `POST /api/admin/payouts` — generate batch for a vendor (or all vendors)
-- `PATCH /api/admin/payouts/[batchId]` — mark batch as paid
+#### Stripe Connect (Optional Future)
+- [ ] Express account onboarding per vendor
+- [ ] Auto-transfer on batch payment
+- [ ] `co_commissioners.stripe_account_id` column
 
 ---
 
-## Phase 3: Vendor Payout History
+### DB Tables Created This Session
 
-### 3.1 New page: `/vendor/payouts`
+| Table | Purpose |
+|---|---|
+| `co_appointment_documents` | Customer ID + commissioned document uploads per booking |
+| `co_payout_batches` | Weekly payout batch tracking per vendor |
+| `co_blocked_dates` | Vendor date blocking (holidays, time off) |
 
-- Earnings summary: This week / This month / All time
-- Payout history table: Period, Bookings, Amount, Status, Reference
-- Click batch to see individual bookings
+### Columns Added This Session
 
-### 3.2 API endpoints
-
-- `GET /api/vendor/payouts` — vendor's batch history + earnings summary
-
----
-
-## Implementation Order
-
-1. **DB setup** — Create tables + columns + storage bucket
-2. **Upload APIs** — File upload/delete/list endpoints
-3. **Vendor completion UI** — Upload section + complete button on booking detail
-4. **Admin payout dashboard** — Batch generation, mark-as-paid flow
-5. **Vendor payout history** — Earnings page
-6. **Nav links** — Add Payouts to admin sidebar and vendor nav
-
-### Files to create
-
-```
-app/api/vendor/bookings/[id]/upload/route.ts
-app/api/vendor/bookings/[id]/complete/route.ts
-app/api/vendor/bookings/[id]/documents/route.ts
-app/api/admin/payouts/route.ts
-app/api/admin/payouts/[batchId]/route.ts
-app/api/vendor/payouts/route.ts
-app/admin/payouts/page.tsx
-app/vendor/payouts/page.tsx
-components/vendor/DocumentUpload.tsx
-```
-
-### Files to modify
-
-```
-app/vendor/bookings/[id]/page.tsx   — upload section + complete button
-app/vendor/layout.tsx               — add Payouts nav link
-components/admin/Sidebar.tsx        — add Payouts nav link
-```
-
-### Constraints
-- Customer ID photos: private bucket, RLS, vendor can only access own bookings
-- Documents auto-deleted after 90 days (Supabase lifecycle policy)
-- Max file size: 10MB per upload
-- Accepted formats: jpg, png, pdf, heic
-- Vendor can only complete bookings assigned to them
-- Payout only eligible after BOTH customer ID + document uploaded
-- Weekly pay cycle: Mon–Sun completed appointments, paid following week
-- Platform fee is NOT included in vendor payout — only `vendor_payout_cents`
+| Table | Column | Type |
+|---|---|---|
+| `co_services` | `min_vendor_rate_cents` | integer |
+| `co_commissioners` | `gst_number` | text |
+| `co_commissioners` | `gst_registered` | boolean |
+| `co_bookings` | `completed_at` | timestamptz |
+| `co_bookings` | `completion_notes` | text |
+| `co_bookings` | `payout_status` | text |
+| `co_bookings` | `payout_reference` | text |
+| `co_bookings` | `payout_paid_at` | timestamptz |
+| `co_bookings` | `payout_batch_id` | uuid |
+| `co_bookings` | `vendor_gst_cents` | integer |
+| `co_bookings` | `vendor_total_payout_cents` | integer |
+| `co_bookings` | `facility_name` | text |
+| `co_bookings` | `facility_type` | text |
+| `co_bookings` | `customer_unit` | text |
+| `co_partner_applications` | `areas_served` | text |
+| `co_partner_applications` | `gst_number` | text |
+| `co_partner_applications` | `gst_registered` | boolean |
+| `co_partner_applications` | `referral_source` | text |
+| `co_partner_applications` | `credential_file_url` | text |
+| `co_partner_applications` | `commissioner_id` | text |
+| `co_partner_applications` | `user_id` | uuid |
+| `co_partner_applications` | `status` | text |
+| `co_partner_applications` | `other_services` | text |

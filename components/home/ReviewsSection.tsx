@@ -7,6 +7,7 @@ type Review = {
   rating: number;
   text: string;
   relativeTime: string;
+  location?: string;
 };
 
 type ReviewsData = {
@@ -120,7 +121,7 @@ export default async function ReviewsSection() {
                       </a>
                     ) : review.author}
                   </p>
-                  <p className="text-xs text-mid-grey">{review.relativeTime}</p>
+                  <p className="text-xs text-mid-grey">{review.relativeTime}{review.location ? ` · ${review.location}` : ''}</p>
                 </div>
               </div>
 
