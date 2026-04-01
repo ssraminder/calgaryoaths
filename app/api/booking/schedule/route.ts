@@ -37,14 +37,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This slot was just taken. Please choose another time.' }, { status: 409 });
     }
 
-    // Save appointment datetime
+    // Fetch commissioner for fee + commission rate
+    const { data: commissioner } = await supabase
+      .from('co_commissioners')
+      .select('booking_fee_cents, commission_rate, is_partner')
+      .eq('id', booking.commissioner_id)
+      .single();
+
+    const bookingFee = commissioner?.booking_fee_cents ?? (await getBookingFee(booking.commissioner_id));
+    const commissionRate = commissioner?.is_partner ? (commissioner.commission_rate ?? 20) : 0;
+    const platformFeeCents = Math.round(bookingFee * (commissionRate / 100));
+    const vendorPayoutCents = bookingFee - platformFeeCents;
+
+    // Save appointment datetime + commission info
     await supabase
       .from('co_bookings')
-      .update({ appointment_datetime: appointmentDatetime, status: 'pending_payment' })
+      .update({
+        appointment_datetime: appointmentDatetime,
+        status: 'pending_payment',
+        commission_rate: commissionRate,
+        platform_fee_cents: platformFeeCents,
+        vendor_payout_cents: vendorPayoutCents,
+      })
       .eq('id', bookingId);
-
-    // Create Stripe checkout for deposit
-    const bookingFee = await getBookingFee(booking.commissioner_id);
     const feeLabel = `$${bookingFee / 100}`;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
