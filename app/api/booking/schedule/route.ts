@@ -50,10 +50,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ paymentTransferred: true });
     }
 
-    // Fetch commissioner for commission rate + mode
+    // Fetch commissioner for commission rate + mode + travel fee
     const { data: commissioner } = await supabase
       .from('co_commissioners')
-      .select('booking_fee_cents, commission_rate, is_partner, commission_mode')
+      .select('booking_fee_cents, commission_rate, is_partner, commission_mode, mobile_travel_fee_cents')
       .eq('id', booking.commissioner_id)
       .single();
 
@@ -104,7 +104,10 @@ export async function POST(req: NextRequest) {
       .single();
     const taxRate = taxData?.total_rate ?? 0.05;
 
-    const subtotal = customerServiceFee + convenienceFeeCents;
+    // Travel fee for mobile bookings
+    const travelFeeCents = booking.delivery_mode === 'mobile' ? (commissioner?.mobile_travel_fee_cents ?? 0) : 0;
+
+    const subtotal = customerServiceFee + travelFeeCents + convenienceFeeCents;
     const taxCents = Math.round(subtotal * taxRate);
     const totalChargedCents = subtotal + taxCents;
 
@@ -118,6 +121,7 @@ export async function POST(req: NextRequest) {
         commission_mode: commissionMode,
         platform_fee_cents: platformFeeCents,
         vendor_payout_cents: vendorPayoutCents,
+        travel_fee_cents: travelFeeCents,
         convenience_fee_cents: convenienceFeeCents,
         tax_rate: taxRate,
         tax_cents: taxCents,
@@ -137,38 +141,54 @@ export async function POST(req: NextRequest) {
 
     const taxLabel = `Tax (${(taxRate * 100).toFixed(0)}%)`;
 
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        price_data: {
+          currency: 'cad',
+          unit_amount: customerServiceFee,
+          product_data: {
+            name: `${booking.service_name} — First document`,
+            description: `Appointment: ${apptDate}. Additional documents charged at appointment.`,
+          },
+        },
+        quantity: 1,
+      },
+    ];
+
+    if (travelFeeCents > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'cad',
+          unit_amount: travelFeeCents,
+          product_data: { name: 'Mobile service travel fee' },
+        },
+        quantity: 1,
+      });
+    }
+
+    lineItems.push(
+      {
+        price_data: {
+          currency: 'cad',
+          unit_amount: convenienceFeeCents,
+          product_data: { name: 'Convenience fee' },
+        },
+        quantity: 1,
+      },
+      {
+        price_data: {
+          currency: 'cad',
+          unit_amount: taxCents,
+          product_data: { name: taxLabel },
+        },
+        quantity: 1,
+      },
+    );
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_email: booking.email,
-      line_items: [
-        {
-          price_data: {
-            currency: 'cad',
-            unit_amount: customerServiceFee,
-            product_data: {
-              name: `${booking.service_name} — First document`,
-              description: `Appointment: ${apptDate}. Additional documents charged at appointment.`,
-            },
-          },
-          quantity: 1,
-        },
-        {
-          price_data: {
-            currency: 'cad',
-            unit_amount: convenienceFeeCents,
-            product_data: { name: 'Convenience fee' },
-          },
-          quantity: 1,
-        },
-        {
-          price_data: {
-            currency: 'cad',
-            unit_amount: taxCents,
-            product_data: { name: taxLabel },
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       metadata: { bookingId, serviceSlug: booking.service_slug },
       success_url: `${siteUrl}/booking/success?appointment=confirmed`,
       cancel_url: `${siteUrl}/?booking_cancelled=1`,

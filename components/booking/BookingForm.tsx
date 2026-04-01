@@ -14,6 +14,7 @@ const detailsSchema = z.object({
   name: z.string().min(2, 'Full name required'),
   email: z.string().email('Valid email required'),
   phone: z.string().min(10, 'Phone number required'),
+  deliveryMode: z.enum(['in_office', 'mobile']).default('in_office'),
   commissionerId: z.string().min(1, 'Please choose a location'),
   notes: z.string().max(500).optional(),
 });
@@ -222,6 +223,11 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
     resolver: zodResolver(detailsSchema),
   });
 
+  // Delivery mode
+  const deliveryMode = watch('deliveryMode') || 'in_office';
+  const isMobile = deliveryMode === 'mobile';
+  const travelFee = isMobile && selectedCommissioner?.mobile_travel_fee_cents ? selectedCommissioner.mobile_travel_fee_cents : 0;
+
   // Booking fee = minimum service charge (first document rate), adjusted for commission mode
   const baseServiceFee = selectedCommissioner?.first_page_cents ?? selectedService?.price ?? selectedCommissioner?.booking_fee_cents ?? null;
   const bookingFee = baseServiceFee && selectedCommissioner ? customerPrice(baseServiceFee, selectedCommissioner) : baseServiceFee;
@@ -229,7 +235,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
   // Full breakdown for display
   const convFee = pricing.convenienceFeeCents;
-  const subtotal = (bookingFee ?? 0) + convFee;
+  const subtotal = (bookingFee ?? 0) + travelFee + convFee;
   const taxAmount = Math.round(subtotal * pricing.tax.total_rate);
   const totalCharged = subtotal + taxAmount;
 
@@ -250,6 +256,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           email: data.email,
           phone: data.phone,
           notes: data.notes || '',
+          deliveryMode: data.deliveryMode || 'in_office',
           ...(rebookToken ? { rebookToken } : {}),
         }),
       });
@@ -528,6 +535,26 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
             <input type="hidden" {...register('commissionerId')} />
 
+            {/* Delivery mode — only if commissioner offers mobile */}
+            {selectedCommissioner?.mobile_available && (
+              <div>
+                <label className="block text-sm font-medium text-charcoal mb-2">Appointment type *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className={`flex items-center justify-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all ${deliveryMode === 'in_office' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'}`}>
+                    <input type="radio" {...register('deliveryMode')} value="in_office" className="sr-only" />
+                    <span className="text-sm font-medium text-charcoal">In-Office</span>
+                  </label>
+                  <label className={`flex items-center justify-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all ${deliveryMode === 'mobile' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'}`}>
+                    <input type="radio" {...register('deliveryMode')} value="mobile" className="sr-only" />
+                    <span className="text-sm font-medium text-charcoal">Mobile</span>
+                    {selectedCommissioner.mobile_travel_fee_cents != null && (
+                      <span className="text-xs text-mid-grey">+${(selectedCommissioner.mobile_travel_fee_cents / 100).toFixed(2)}</span>
+                    )}
+                  </label>
+                </div>
+              </div>
+            )}
+
             {selectedService && !selectedService.requiresReview && selectedCommissioner && bookingFee && (
               <div className="bg-navy/5 border border-navy/10 rounded-card p-4 space-y-3">
                 {/* Charged now — full breakdown */}
@@ -538,6 +565,12 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                       <span>Service fee (first document)</span>
                       <span>{bookingFeeLabel}</span>
                     </div>
+                    {isMobile && travelFee > 0 && (
+                      <div className="flex justify-between text-charcoal">
+                        <span>Mobile travel fee</span>
+                        <span>${(travelFee / 100).toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-charcoal">
                       <span>Convenience fee</span>
                       <span>${(convFee / 100).toFixed(2)}</span>
@@ -570,12 +603,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                           <span className="font-medium">${(customerPrice(selectedCommissioner.drafting_fee_cents, selectedCommissioner) / 100).toFixed(2)}</span>
                         </div>
                       )}
-                      {selectedCommissioner.mobile_available && selectedCommissioner.mobile_travel_fee_cents != null && (
-                        <div className="flex justify-between text-charcoal">
-                          <span>Mobile travel fee</span>
-                          <span className="font-medium">${(selectedCommissioner.mobile_travel_fee_cents / 100).toFixed(2)}</span>
-                        </div>
-                      )}
+                      {/* Mobile travel fee is charged upfront, not at appointment */}
                     </div>
                   </div>
                 )}
