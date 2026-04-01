@@ -78,6 +78,7 @@ type VendorRate = {
   service_name: string;
   service_price: number | null;
   service_price_label: string;
+  min_vendor_rate_cents: number | null;
   suggested_first_page_cents: number | null;
   suggested_additional_page_cents: number;
   first_page_cents: number | null;
