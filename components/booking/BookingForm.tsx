@@ -73,7 +73,7 @@ function ServiceCard({ service, selected, onSelect }: {
 }
 
 
-type DbCommissioner = { id: string; name: string; location: string };
+type DbCommissioner = { id: string; name: string; location: string; booking_fee_cents?: number; soonestSlot?: string | null };
 
 /* ── Main form ──────────────────────────────────────────────────────────── */
 type Step = 1 | 2 | 3;
@@ -122,7 +122,8 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
   });
 
   const selectedCommissionerId = watch('commissionerId');
-  const bookingFee = BOOKING_FEES[selectedCommissionerId] ?? null;
+  const selectedCommObj = availableCommissioners.find((c) => c.id === selectedCommissionerId);
+  const bookingFee = selectedCommObj?.booking_fee_cents ?? BOOKING_FEES[selectedCommissionerId] ?? null;
   const bookingFeeLabel = bookingFee ? `$${bookingFee / 100}` : null;
 
   /* ── Step 2 submit: save booking ──────────────────────────────────── */
@@ -341,11 +342,23 @@ export default function BookingForm({ onClose }: { onClose: () => void }) {
                 <option value="">
                   {commissionersLoading ? 'Loading locations…' : 'Select a location…'}
                 </option>
-                {availableCommissioners.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} — {c.location}
-                  </option>
-                ))}
+                {availableCommissioners.map((c) => {
+                  const fee = c.booking_fee_cents ? `$${c.booking_fee_cents / 100}` : '';
+                  const soonest = c.soonestSlot
+                    ? new Date(c.soonestSlot).toLocaleDateString('en-CA', {
+                        timeZone: 'America/Edmonton',
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                      })
+                    : '';
+                  const extra = [fee, soonest ? `next: ${soonest}` : ''].filter(Boolean).join(' · ');
+                  return (
+                    <option key={c.id} value={c.id}>
+                      {c.name} — {c.location}{extra ? ` (${extra})` : ''}
+                    </option>
+                  );
+                })}
               </select>
               {errors.commissionerId && (
                 <p className="text-red-500 text-xs mt-1">{errors.commissionerId.message}</p>
