@@ -49,8 +49,8 @@ export default function ServicesPage() {
 
   useEffect(() => {
     fetch('/api/admin/services')
-      .then((r) => r.json())
-      .then((d) => { setServices(d); setLoading(false); })
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((d) => { setServices(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 

@@ -38,8 +38,8 @@ export default function LocationsPage() {
 
   useEffect(() => {
     fetch('/api/admin/locations')
-      .then((r) => r.json())
-      .then((d) => { setLocations(d); setLoading(false); })
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((d) => { setLocations(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
