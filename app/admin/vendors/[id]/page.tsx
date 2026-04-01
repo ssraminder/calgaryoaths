@@ -112,7 +112,9 @@ export default function EditVendorPage() {
 
   // Availability rules
   const [rules, setRules] = useState<AvailabilityRule[]>([]);
-  const [newRule, setNewRule] = useState({ day_of_week: 1, start_time: '09:00', end_time: '12:00' });
+  const [availLocations, setAvailLocations] = useState<{ id: string; name: string }[]>([]);
+  const [newRule, setNewRule] = useState({ days: [1] as number[], start_time: '09:00', end_time: '17:00', location_id: '' });
+  const [addingRule, setAddingRule] = useState(false);
 
   // Blocked dates
   type BlockedDate = { id: string; blocked_date: string; reason: string };
@@ -153,6 +155,7 @@ export default function EditVendorPage() {
       }
       setAllServices(Array.isArray(servicesRes?.services) ? servicesRes.services : Array.isArray(servicesRes) ? servicesRes : []);
       setRules(Array.isArray(availRes?.rules) ? availRes.rules : Array.isArray(availRes) ? availRes : []);
+      if (Array.isArray(availRes?.locations)) setAvailLocations(availRes.locations);
       if (Array.isArray(availRes?.blockedDates)) setBlockedDates(availRes.blockedDates);
       if (Array.isArray(ratesRes?.rates)) setVendorRates(ratesRes.rates);
       setLoading(false);
@@ -204,15 +207,24 @@ export default function EditVendorPage() {
   }
 
   async function addRule() {
+    if (newRule.days.length === 0) return;
+    setAddingRule(true);
     const res = await fetch('/api/admin/availability', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commissioner_id: id, ...newRule }),
+      body: JSON.stringify({
+        commissioner_id: id,
+        days_of_week: newRule.days,
+        start_time: newRule.start_time,
+        end_time: newRule.end_time,
+        location_id: newRule.location_id || undefined,
+      }),
     });
     if (res.ok) {
-      const rule = await res.json();
-      setRules((prev) => [...prev, rule]);
+      const newRules = await res.json();
+      setRules((prev) => [...prev, ...(Array.isArray(newRules) ? newRules : [newRules])]);
     }
+    setAddingRule(false);
   }
 
   async function deleteRule(ruleId: string) {
@@ -546,42 +558,102 @@ export default function EditVendorPage() {
         </div>
 
         {/* Add new rule */}
-        <div className="flex items-end gap-3 border-t border-gray-200 pt-4">
+        <div className="border-t border-gray-200 pt-4 space-y-3">
+          {/* Day chips */}
           <div>
-            <label className="mb-1 block text-xs text-gray-500">Day</label>
-            <select
-              value={newRule.day_of_week}
-              onChange={(e) => setNewRule({ ...newRule, day_of_week: Number(e.target.value) })}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            <label className="mb-1.5 block text-xs text-gray-500">Days</label>
+            <div className="flex flex-wrap gap-1.5">
+              {/* Quick-select buttons */}
+              {[
+                { label: 'Weekdays', days: [1, 2, 3, 4, 5] },
+                { label: 'Weekends', days: [0, 6] },
+                { label: 'All', days: [0, 1, 2, 3, 4, 5, 6] },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setNewRule({ ...newRule, days: preset.days })}
+                  className={`rounded-pill px-2.5 py-1 text-xs font-medium transition-colors ${
+                    JSON.stringify(newRule.days.sort()) === JSON.stringify(preset.days.sort())
+                      ? 'bg-gold text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              <span className="text-gray-300 mx-1">|</span>
+              {DAYS.map((dayName, dayIdx) => {
+                const isSelected = newRule.days.includes(dayIdx);
+                return (
+                  <button
+                    key={dayIdx}
+                    type="button"
+                    onClick={() => {
+                      setNewRule({
+                        ...newRule,
+                        days: isSelected
+                          ? newRule.days.filter((d) => d !== dayIdx)
+                          : [...newRule.days, dayIdx],
+                      });
+                    }}
+                    className={`rounded-pill px-2.5 py-1 text-xs font-medium transition-colors ${
+                      isSelected
+                        ? 'bg-navy text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {dayName.slice(0, 3)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Time + Location + Add */}
+          <div className="flex items-end gap-3 flex-wrap">
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Start</label>
+              <input
+                type="time"
+                value={newRule.start_time}
+                onChange={(e) => setNewRule({ ...newRule, start_time: e.target.value })}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">End</label>
+              <input
+                type="time"
+                value={newRule.end_time}
+                onChange={(e) => setNewRule({ ...newRule, end_time: e.target.value })}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+              />
+            </div>
+            {availLocations.length > 1 && (
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">Location</label>
+                <select
+                  value={newRule.location_id}
+                  onChange={(e) => setNewRule({ ...newRule, location_id: e.target.value })}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                >
+                  <option value="">Auto (first location)</option>
+                  {availLocations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={addRule}
+              disabled={newRule.days.length === 0 || addingRule}
+              className="inline-flex items-center gap-1 rounded-md bg-navy px-3 py-1.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50"
             >
-              {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-            </select>
+              <Plus className="h-4 w-4" /> {addingRule ? 'Adding...' : `Add${newRule.days.length > 1 ? ` (${newRule.days.length} days)` : ''}`}
+            </button>
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Start</label>
-            <input
-              type="time"
-              value={newRule.start_time}
-              onChange={(e) => setNewRule({ ...newRule, start_time: e.target.value })}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">End</label>
-            <input
-              type="time"
-              value={newRule.end_time}
-              onChange={(e) => setNewRule({ ...newRule, end_time: e.target.value })}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={addRule}
-            className="inline-flex items-center gap-1 rounded-md bg-navy px-3 py-1.5 text-sm font-medium text-white hover:bg-navy/90"
-          >
-            <Plus className="h-4 w-4" /> Add
-          </button>
         </div>
       </div>
 
