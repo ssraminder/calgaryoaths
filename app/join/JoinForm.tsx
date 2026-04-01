@@ -76,6 +76,11 @@ export default function JoinForm() {
             <input id="phone" name="phone" type="tel" required className={inputCls} />
             {state.errors?.phone && <p className="text-red-500 text-xs mt-1">{state.errors.phone[0]}</p>}
           </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="address" className="block text-sm font-medium text-charcoal mb-1.5">Full address <span className="text-red-500">*</span></label>
+            <input id="address" name="address" type="text" required placeholder="123 Main St, Calgary, AB T2X 0A1" className={inputCls} />
+            {state.errors?.address && <p className="text-red-500 text-xs mt-1">{state.errors.address[0]}</p>}
+          </div>
           <div>
             <label htmlFor="city" className="block text-sm font-medium text-charcoal mb-1.5">City <span className="text-red-500">*</span></label>
             <input id="city" name="city" type="text" required className={inputCls} />

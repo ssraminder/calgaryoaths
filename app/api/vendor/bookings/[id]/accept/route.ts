@@ -30,10 +30,17 @@ export async function POST(
     .update({ status: 'confirmed', updated_at: new Date().toISOString() })
     .eq('id', id);
 
-  // Email customer
+  // Get commissioner details for email
+  const { data: commDetail } = await supabaseAdmin
+    .from('co_commissioners')
+    .select('address, phone')
+    .eq('id', vendor.commissionerId)
+    .single();
+
   const apptDate = new Date(booking.appointment_datetime).toLocaleString('en-CA', {
     timeZone: 'America/Edmonton', dateStyle: 'full', timeStyle: 'short',
   });
+  const isMobile = booking.delivery_mode === 'mobile';
 
   try {
     await sendEmail({
@@ -45,6 +52,18 @@ export async function POST(
         <p>Your appointment for <strong>${booking.service_name}</strong> has been confirmed.</p>
         <p><strong>Date & Time:</strong> ${apptDate}</p>
         <p><strong>Commissioner:</strong> ${vendor.commissionerName}</p>
+        ${isMobile
+          ? `<p><strong>Location:</strong> Mobile — we will come to: ${booking.customer_address || 'your location'}</p>`
+          : `<p><strong>Location:</strong> ${commDetail?.address || 'See confirmation details'}</p>`
+        }
+        <p><strong>Phone:</strong> ${commDetail?.phone || '(587) 600-0746'}</p>
+        <h3>What to bring:</h3>
+        <ul>
+          <li>Valid government-issued photo ID</li>
+          <li>Your documents (unsigned)</li>
+          <li>Any supporting materials</li>
+        </ul>
+        <p><strong>Important:</strong> Do NOT sign your documents before the appointment.</p>
         <p>If you need to make changes, please contact us at info@calgaryoaths.com.</p>
         <p>Thank you,<br/>Calgary Oaths</p>
       `,

@@ -104,8 +104,8 @@ export async function POST(req: NextRequest) {
       .single();
     const taxRate = taxData?.total_rate ?? 0.05;
 
-    // Travel fee for mobile bookings
-    const travelFeeCents = booking.delivery_mode === 'mobile' ? (commissioner?.mobile_travel_fee_cents ?? 0) : 0;
+    // Travel fee for mobile bookings (pre-calculated and stored on booking)
+    const travelFeeCents = booking.delivery_mode === 'mobile' ? (booking.travel_fee_cents || 0) : 0;
 
     const subtotal = customerServiceFee + travelFeeCents + convenienceFeeCents;
     const taxCents = Math.round(subtotal * taxRate);

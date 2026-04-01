@@ -21,15 +21,42 @@ export async function POST(
 
   await supabaseAdmin.from('co_bookings').update({ status: 'confirmed', updated_at: new Date().toISOString() }).eq('id', id);
 
+  const { data: commDetail } = await supabaseAdmin
+    .from('co_commissioners')
+    .select('name, address, phone')
+    .eq('id', booking.commissioner_id)
+    .single();
+
   const apptDate = booking.appointment_datetime
     ? new Date(booking.appointment_datetime).toLocaleString('en-CA', { timeZone: 'America/Edmonton', dateStyle: 'full', timeStyle: 'short' })
     : '';
+  const isMobile = booking.delivery_mode === 'mobile';
 
   try {
     await sendEmail({
       to: booking.email,
       subject: `Booking confirmed — ${booking.service_name}`,
-      html: `<h2>Your Booking is Confirmed!</h2><p>Hi ${booking.name},</p><p>Your appointment for <strong>${booking.service_name}</strong> on <strong>${apptDate}</strong> has been confirmed.</p><p>Thank you,<br/>Calgary Oaths</p>`,
+      html: `
+        <h2>Your Booking is Confirmed!</h2>
+        <p>Hi ${booking.name},</p>
+        <p>Your appointment for <strong>${booking.service_name}</strong> has been confirmed.</p>
+        <p><strong>Date & Time:</strong> ${apptDate}</p>
+        <p><strong>Commissioner:</strong> ${commDetail?.name || ''}</p>
+        ${isMobile
+          ? `<p><strong>Location:</strong> Mobile — we will come to: ${booking.customer_address || 'your location'}</p>`
+          : `<p><strong>Location:</strong> ${commDetail?.address || ''}</p>`
+        }
+        <p><strong>Phone:</strong> ${commDetail?.phone || '(587) 600-0746'}</p>
+        <h3>What to bring:</h3>
+        <ul>
+          <li>Valid government-issued photo ID</li>
+          <li>Your documents (unsigned)</li>
+          <li>Any supporting materials</li>
+        </ul>
+        <p><strong>Important:</strong> Do NOT sign your documents before the appointment.</p>
+        <p>If you need to make changes, please contact us at info@calgaryoaths.com.</p>
+        <p>Thank you,<br/>Calgary Oaths</p>
+      `,
     });
   } catch (e) { console.error('Accept email error:', e); }
 

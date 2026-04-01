@@ -15,6 +15,7 @@ const detailsSchema = z.object({
   email: z.string().email('Valid email required'),
   phone: z.string().min(10, 'Phone number required'),
   deliveryMode: z.enum(['in_office', 'mobile']).default('in_office'),
+  customerAddress: z.string().optional(),
   commissionerId: z.string().min(1, 'Please choose a location'),
   notes: z.string().max(500).optional(),
 });
@@ -223,10 +224,28 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
     resolver: zodResolver(detailsSchema),
   });
 
-  // Delivery mode
+  // Delivery mode + dynamic travel fee
   const deliveryMode = watch('deliveryMode') || 'in_office';
   const isMobile = deliveryMode === 'mobile';
-  const travelFee = isMobile && selectedCommissioner?.mobile_travel_fee_cents ? selectedCommissioner.mobile_travel_fee_cents : 0;
+  const [travelFeeData, setTravelFeeData] = useState<{ travelFeeCents: number; distanceKm: number | null; distanceText?: string; durationText?: string } | null>(null);
+  const [travelFeeLoading, setTravelFeeLoading] = useState(false);
+  const [customerAddr, setCustomerAddr] = useState('');
+  const travelFee = isMobile ? (travelFeeData?.travelFeeCents ?? selectedCommissioner?.mobile_travel_fee_cents ?? 3000) : 0;
+
+  async function calcTravelFee(address: string) {
+    if (!address || !selectedCommissioner) return;
+    setTravelFeeLoading(true);
+    try {
+      const params = new URLSearchParams({ commissionerId: selectedCommissioner.id, address });
+      const res = await fetch(`/api/booking/travel-fee?${params}`);
+      const data = await res.json();
+      setTravelFeeData(data);
+    } catch {
+      setTravelFeeData(null);
+    } finally {
+      setTravelFeeLoading(false);
+    }
+  }
 
   // Booking fee = minimum service charge (first document rate), adjusted for commission mode
   const baseServiceFee = selectedCommissioner?.first_page_cents ?? selectedService?.price ?? selectedCommissioner?.booking_fee_cents ?? null;
@@ -257,6 +276,9 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           phone: data.phone,
           notes: data.notes || '',
           deliveryMode: data.deliveryMode || 'in_office',
+          customerAddress: data.customerAddress || '',
+          travelFeeCents: isMobile ? travelFee : 0,
+          travelDistanceKm: travelFeeData?.distanceKm ?? null,
           ...(rebookToken ? { rebookToken } : {}),
         }),
       });
@@ -537,7 +559,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
             {/* Delivery mode — only if commissioner offers mobile */}
             {selectedCommissioner?.mobile_available && (
-              <div>
+              <div className="space-y-3">
                 <label className="block text-sm font-medium text-charcoal mb-2">Appointment type *</label>
                 <div className="grid grid-cols-2 gap-2">
                   <label className={`flex items-center justify-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all ${deliveryMode === 'in_office' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'}`}>
@@ -547,11 +569,48 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                   <label className={`flex items-center justify-center gap-2 p-3 rounded-card border-2 cursor-pointer transition-all ${deliveryMode === 'mobile' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'}`}>
                     <input type="radio" {...register('deliveryMode')} value="mobile" className="sr-only" />
                     <span className="text-sm font-medium text-charcoal">Mobile</span>
-                    {selectedCommissioner.mobile_travel_fee_cents != null && (
-                      <span className="text-xs text-mid-grey">+${(selectedCommissioner.mobile_travel_fee_cents / 100).toFixed(2)}</span>
-                    )}
                   </label>
                 </div>
+
+                {/* Address input for mobile */}
+                {isMobile && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-charcoal">Your address *</label>
+                    <div className="flex gap-2">
+                      <input
+                        {...register('customerAddress')}
+                        type="text"
+                        placeholder="123 Main St, Calgary, AB"
+                        value={customerAddr}
+                        onChange={(e) => { setCustomerAddr(e.target.value); setValue('customerAddress', e.target.value); }}
+                        className="flex-1 border border-border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
+                      />
+                      <button
+                        type="button"
+                        disabled={!customerAddr || travelFeeLoading}
+                        onClick={() => calcTravelFee(customerAddr)}
+                        className="rounded-btn bg-navy px-4 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 flex-shrink-0"
+                      >
+                        {travelFeeLoading ? 'Calculating...' : 'Calculate'}
+                      </button>
+                    </div>
+
+                    {travelFeeData && (
+                      <div className="bg-gold/5 border border-gold/20 rounded-btn p-3 text-sm">
+                        <div className="flex justify-between text-charcoal">
+                          <span>
+                            Travel fee
+                            {travelFeeData.distanceKm != null && (
+                              <span className="text-mid-grey font-normal"> ({travelFeeData.distanceText}{travelFeeData.durationText ? ` · ~${travelFeeData.durationText}` : ''})</span>
+                            )}
+                          </span>
+                          <span className="font-semibold text-gold">${(travelFeeData.travelFeeCents / 100).toFixed(2)}</span>
+                        </div>
+                        <p className="text-xs text-mid-grey mt-1">$3/km, minimum $30. Charged upfront with your booking.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

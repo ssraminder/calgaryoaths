@@ -8,6 +8,7 @@ const joinSchema = z.object({
   fullName: z.string().min(2, 'Full name is required'),
   email: z.string().email('Valid email is required'),
   phone: z.string().min(7, 'Phone number is required'),
+  address: z.string().min(5, 'Full address is required'),
   city: z.string().min(2, 'City is required'),
   credentialTypes: z.string().min(1, 'Please select at least one credential'),
   yearCredentialed: z.string().min(4, 'Year credentialed is required'),
@@ -58,6 +59,7 @@ export async function submitJoinForm(
       full_name: d.fullName,
       email: d.email,
       phone: d.phone,
+      address: d.address,
       city: d.city,
       credential_types: d.credentialTypes,
       year_credentialed: d.yearCredentialed,
@@ -86,6 +88,7 @@ export async function submitJoinForm(
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Full Name</td><td style="padding:8px;border:1px solid #ddd">${d.fullName}</td></tr>
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #ddd"><a href="mailto:${d.email}">${d.email}</a></td></tr>
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Phone</td><td style="padding:8px;border:1px solid #ddd">${d.phone}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Address</td><td style="padding:8px;border:1px solid #ddd">${d.address}</td></tr>
           <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">City</td><td style="padding:8px;border:1px solid #ddd">${d.city}</td></tr>
         </table>
         <h3>Credentials</h3>
