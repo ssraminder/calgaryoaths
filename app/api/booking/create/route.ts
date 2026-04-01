@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { bookingServices } from '@/lib/data/booking';
 import { sendEmail } from '@/lib/email';
-import { commissioners } from '@/lib/data/commissioners';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { serviceSlug, commissionerId, name, email, phone, notes, numDocuments } = body;
 
-    const service = bookingServices.find((s) => s.slug === serviceSlug);
-    if (!service) {
+    const { data: service, error: serviceError } = await supabase
+      .from('co_services')
+      .select('slug, name, requires_review, review_reason')
+      .eq('slug', serviceSlug)
+      .eq('active', true)
+      .single();
+
+    if (serviceError || !service) {
       return NextResponse.json({ error: 'Invalid service' }, { status: 400 });
     }
 
@@ -25,8 +29,8 @@ export async function POST(req: NextRequest) {
         phone,
         notes: notes || null,
         num_documents: numDocuments || 1,
-        requires_review: service.requiresReview,
-        status: service.requiresReview ? 'pending_review' : 'pending_scheduling',
+        requires_review: service.requires_review,
+        status: service.requires_review ? 'pending_review' : 'pending_scheduling',
       })
       .select('id')
       .single();
@@ -37,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Manual-review: notify team, return without Calendly/Stripe
-    if (service.requiresReview) {
+    if (service.requires_review) {
       await sendEmail({
         to: 'info@calgaryoaths.com',
         replyTo: email,
@@ -60,13 +64,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ bookingId: booking.id, requiresReview: true });
     }
 
-    // Auto-confirm: return booking id + the right Calendly URL for the chosen commissioner
-    const commissioner = commissioners.find((c) => c.id === commissionerId) ?? commissioners[0];
-    return NextResponse.json({
-      bookingId: booking.id,
-      requiresReview: false,
-      calendlyUrl: commissioner.calendlyUrl,
-    });
+    return NextResponse.json({ bookingId: booking.id, requiresReview: false });
   } catch (err) {
     console.error('Booking create error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
