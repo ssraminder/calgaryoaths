@@ -2,7 +2,7 @@
 
 ## Overview
 
-Complete appointment lifecycle: vendor completes appointment → uploads proof documents → marks as complete → payout becomes eligible → Stripe Connect auto-transfers funds.
+Appointment lifecycle: vendor confirms appointment → completes service → uploads customer ID + commissioned documents → marks as complete → payout becomes eligible → admin processes weekly manual payout (e-Transfer or bank transfer).
 
 ---
 
@@ -18,7 +18,7 @@ CREATE TABLE co_appointment_documents (
   booking_id uuid NOT NULL REFERENCES co_bookings(id) ON DELETE CASCADE,
   commissioner_id text NOT NULL REFERENCES co_commissioners(id),
   type text NOT NULL CHECK (type IN ('customer_id', 'commissioned_document')),
-  file_url text NOT NULL,        -- Supabase Storage URL
+  file_url text NOT NULL,
   file_name text,
   uploaded_at timestamptz DEFAULT now()
 );
@@ -29,21 +29,42 @@ CREATE TABLE co_appointment_documents (
 ```sql
 ALTER TABLE co_bookings ADD COLUMN completed_at timestamptz;
 ALTER TABLE co_bookings ADD COLUMN completion_notes text;
-ALTER TABLE co_bookings ADD COLUMN payout_eligible boolean DEFAULT false;
 ALTER TABLE co_bookings ADD COLUMN payout_status text DEFAULT 'pending'
-  CHECK (payout_status IN ('pending', 'eligible', 'processing', 'paid', 'failed'));
-ALTER TABLE co_bookings ADD COLUMN payout_transfer_id text;  -- Stripe Transfer ID
+  CHECK (payout_status IN ('pending', 'eligible', 'paid'));
+ALTER TABLE co_bookings ADD COLUMN payout_reference text;   -- e-Transfer ref or note
 ALTER TABLE co_bookings ADD COLUMN payout_paid_at timestamptz;
+ALTER TABLE co_bookings ADD COLUMN payout_batch_id uuid;    -- links to co_payout_batches
 ```
 
-### 1.3 Supabase Storage bucket: `appointment-documents`
+### 1.3 New DB table: `co_payout_batches`
+
+Groups weekly payouts per vendor.
+
+```sql
+CREATE TABLE co_payout_batches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  commissioner_id text NOT NULL REFERENCES co_commissioners(id),
+  period_start date NOT NULL,
+  period_end date NOT NULL,
+  total_cents integer NOT NULL,
+  booking_count integer NOT NULL,
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'paid', 'cancelled')),
+  payment_method text,            -- 'e_transfer', 'bank_transfer', etc.
+  payment_reference text,         -- e-Transfer confirmation #
+  paid_at timestamptz,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+### 1.4 Supabase Storage bucket: `appointment-documents`
 
 Private bucket — only authenticated users can upload/read. Files organized as:
 ```
 appointment-documents/{booking_id}/{type}_{timestamp}.{ext}
 ```
 
-### 1.4 Vendor portal: Complete Appointment flow
+### 1.5 Vendor portal: Complete Appointment flow
 
 On the vendor booking detail page (`/vendor/bookings/[id]`), after status = `confirmed`:
 
@@ -60,111 +81,99 @@ On the vendor booking detail page (`/vendor/bookings/[id]`), after status = `con
 3. On submit:
    - Status → `completed`
    - `completed_at` = now
-   - `payout_eligible` = true
    - `payout_status` = `eligible`
 
-### 1.5 API endpoints needed
+### 1.6 API endpoints
 
-- `POST /api/vendor/bookings/[id]/upload` — upload document to Supabase Storage, create `co_appointment_documents` row
+- `POST /api/vendor/bookings/[id]/upload` — upload doc to Supabase Storage, create row
 - `DELETE /api/vendor/bookings/[id]/upload?docId=xxx` — delete uploaded document
-- `POST /api/vendor/bookings/[id]/complete` — mark appointment as complete (validates uploads exist)
-- `GET /api/vendor/bookings/[id]/documents` — list uploaded documents for a booking
+- `POST /api/vendor/bookings/[id]/complete` — mark complete (validates uploads exist)
+- `GET /api/vendor/bookings/[id]/documents` — list uploaded documents
 
 ---
 
-## Phase 2: Stripe Connect Integration
+## Phase 2: Admin Payout Dashboard
 
-### 2.1 New column on `co_commissioners`
+### 2.1 New page: `/admin/payouts`
 
-```sql
-ALTER TABLE co_commissioners ADD COLUMN stripe_account_id text;
-```
+**Summary cards:**
+- Total eligible (unpaid completed appointments)
+- Total paid this week / this month
 
-### 2.2 Vendor Stripe Connect onboarding
+**Weekly batch workflow:**
+1. Admin opens payouts page, sees eligible bookings grouped by vendor
+2. Clicks "Generate Weekly Batch" → creates `co_payout_batches` row per vendor
+   - Aggregates all `payout_status = 'eligible'` bookings for that vendor
+   - Period = last Monday–Sunday (or custom range)
+   - Links bookings to batch via `payout_batch_id`
+3. Admin sends e-Transfer/bank transfer manually
+4. Clicks "Mark Batch as Paid" → enters payment reference
+   - Updates batch: `status = 'paid'`, `paid_at = now`, `payment_reference`
+   - Updates all linked bookings: `payout_status = 'paid'`, `payout_paid_at = now`
 
-- Add "Connect Stripe Account" to admin vendor edit page
-- Use Stripe Connect Express accounts (simplest for vendors)
-- Onboarding flow:
-  1. Admin clicks "Create Stripe Account" for vendor
-  2. System creates Express account via Stripe API
-  3. Generates onboarding link → vendor completes identity verification
-  4. Webhook captures `account.updated` → stores `stripe_account_id`
+**Table columns:** Vendor, Period, Bookings, Total Payout, Status, Action
 
-### 2.3 Automatic payout on appointment completion
+**Per-vendor breakdown:** Click to expand — shows individual bookings in the batch
 
-When a booking is marked `completed` and `payout_eligible = true`:
+### 2.2 API endpoints
 
-1. Check vendor has `stripe_account_id`
-2. Create a Stripe Transfer:
-   ```
-   stripe.transfers.create({
-     amount: vendor_payout_cents,
-     currency: 'cad',
-     destination: stripe_account_id,
-     transfer_group: booking_id,
-     description: `Payout for ${service_name} - ${customer_name}`
-   })
-   ```
-3. Update booking: `payout_status = 'paid'`, `payout_transfer_id = transfer.id`, `payout_paid_at = now`
-
-### 2.4 Fallback for vendors without Stripe Connect
-
-If vendor has no `stripe_account_id`:
-- `payout_status` stays `eligible`
-- Shows in admin payout dashboard for manual processing
-- Admin can mark as paid manually (records e-Transfer reference)
+- `GET /api/admin/payouts` — list batches + eligible summary
+- `POST /api/admin/payouts` — generate batch for a vendor (or all vendors)
+- `PATCH /api/admin/payouts/[batchId]` — mark batch as paid
 
 ---
 
-## Phase 3: Admin Payout Dashboard
+## Phase 3: Vendor Payout History
 
-### 3.1 New page: `/admin/payouts`
+### 3.1 New page: `/vendor/payouts`
 
-- **Summary cards**: Total eligible, Total processing, Total paid (this month)
-- **Filterable table**: All bookings with `payout_status` = eligible/processing/paid
-- **Columns**: Date, Vendor, Service, Customer, Payout Amount, Status, Action
-- **Bulk actions**: "Pay All Eligible" (triggers Stripe Transfers), "Export CSV"
-- **Per-row actions**: "Mark Paid Manually" (for e-Transfer), "View Details"
+- Earnings summary: This week / This month / All time
+- Payout history table: Period, Bookings, Amount, Status, Reference
+- Click batch to see individual bookings
 
-### 3.2 Vendor payout history
+### 3.2 API endpoints
 
-On vendor portal, new `/vendor/payouts` page:
-- List of completed appointments with payout status
-- Total earned this month / all time
-- Stripe Connect status indicator
+- `GET /api/vendor/payouts` — vendor's batch history + earnings summary
 
 ---
 
 ## Implementation Order
 
-1. **Phase 1.3** — Create Supabase Storage bucket
-2. **Phase 1.1 + 1.2** — Create DB table + columns
-3. **Phase 1.5** — Build upload/complete API endpoints
-4. **Phase 1.4** — Build vendor UI (upload + complete flow)
-5. **Phase 2.1 + 2.2** — Stripe Connect onboarding
-6. **Phase 2.3** — Auto-payout on completion
-7. **Phase 3** — Admin dashboard + vendor payout history
+1. **DB setup** — Create tables + columns + storage bucket
+2. **Upload APIs** — File upload/delete/list endpoints
+3. **Vendor completion UI** — Upload section + complete button on booking detail
+4. **Admin payout dashboard** — Batch generation, mark-as-paid flow
+5. **Vendor payout history** — Earnings page
+6. **Nav links** — Add Payouts to admin sidebar and vendor nav
 
-### Files to create/modify
+### Files to create
 
-**New files:**
-- `app/api/vendor/bookings/[id]/upload/route.ts`
-- `app/api/vendor/bookings/[id]/complete/route.ts`
-- `app/api/vendor/bookings/[id]/documents/route.ts`
-- `app/api/admin/payouts/route.ts`
-- `app/admin/payouts/page.tsx`
-- `app/vendor/payouts/page.tsx`
-- `components/vendor/DocumentUpload.tsx`
+```
+app/api/vendor/bookings/[id]/upload/route.ts
+app/api/vendor/bookings/[id]/complete/route.ts
+app/api/vendor/bookings/[id]/documents/route.ts
+app/api/admin/payouts/route.ts
+app/api/admin/payouts/[batchId]/route.ts
+app/api/vendor/payouts/route.ts
+app/admin/payouts/page.tsx
+app/vendor/payouts/page.tsx
+components/vendor/DocumentUpload.tsx
+```
 
-**Modified files:**
-- `app/vendor/bookings/[id]/page.tsx` — add upload section + complete button
-- `app/admin/vendors/[id]/page.tsx` — add Stripe Connect section
-- `app/vendor/layout.tsx` — add Payouts nav link
-- `app/admin/layout.tsx` or sidebar — add Payouts nav link
+### Files to modify
 
-### Critical constraints
-- Customer ID photos must be stored securely (private bucket, RLS)
-- Documents auto-deleted after 90 days (retention policy)
-- Vendor can only upload for their own bookings
-- Payout only triggered after BOTH uploads verified
-- Platform fee is NOT transferred — only `vendor_payout_cents`
+```
+app/vendor/bookings/[id]/page.tsx   — upload section + complete button
+app/vendor/layout.tsx               — add Payouts nav link
+components/admin/Sidebar.tsx        — add Payouts nav link
+```
+
+### Constraints
+- Customer ID photos: private bucket, RLS, vendor can only access own bookings
+- Documents auto-deleted after 90 days (Supabase lifecycle policy)
+- Max file size: 10MB per upload
+- Accepted formats: jpg, png, pdf, heic
+- Vendor can only complete bookings assigned to them
+- Payout only eligible after BOTH customer ID + document uploaded
+- Weekly pay cycle: Mon–Sun completed appointments, paid following week
+- Platform fee is NOT included in vendor payout — only `vendor_payout_cents`
