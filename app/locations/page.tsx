@@ -8,7 +8,7 @@ import BookButton from '@/components/shared/BookButton';
 export const metadata: Metadata = {
   title: 'Commissioner of Oaths Calgary Locations | Downtown & NE | Calgary Oaths',
   description:
-    'Two Commissioner of Oaths locations in Calgary — Downtown (17th Ave SW) and NE Calgary (Redstone). Extended hours, walk-ins welcome. Plus mobile service across Calgary.',
+    'Two Commissioner of Oaths locations in Calgary — Downtown (7th Ave SW) and NE Calgary. By appointment. Plus mobile service across Calgary.',
   alternates: { canonical: 'https://calgaryoaths.com/locations' },
   openGraph: { title: 'Calgary Oaths Locations | Calgary Oaths', url: 'https://calgaryoaths.com/locations' },
 };

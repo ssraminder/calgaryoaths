@@ -10,7 +10,7 @@ const c = commissioners[0]; // Raminder Shah
 export const metadata: Metadata = {
   title: 'Commissioner of Oaths Downtown Calgary | Walk-Ins Welcome | Calgary Oaths',
   description:
-    'Commissioner of Oaths in Downtown Calgary (17th Ave SW). Raminder Shah — Commissioner of Oaths. Same-day service, walk-ins welcome. Open until 9 PM weekdays.',
+    'Commissioner of Oaths in Downtown Calgary (7th Ave SW). Raminder Shah — Commissioner of Oaths. Same-day service, by appointment.',
   alternates: { canonical: 'https://calgaryoaths.com/locations/downtown-calgary' },
   openGraph: { title: 'Downtown Calgary Commissioner of Oaths | Calgary Oaths', url: 'https://calgaryoaths.com/locations/downtown-calgary' },
 };
@@ -34,9 +34,9 @@ export default function DowntownCalgaryPage() {
                 Commissioner of Oaths — Downtown Calgary
               </h1>
               <p className="text-mid-grey text-lg leading-relaxed">
-                Our Downtown Calgary location on 17th Ave SW serves clients from across the Beltline, Mission,
+                Our Downtown Calgary location on 7th Ave SW serves clients from across the Beltline, Mission,
                 Victoria Park, and the Downtown Core. Raminder Shah is a Commissioner of Oaths,
-                available for same-day appointments and walk-ins Monday through Saturday.
+                available for same-day appointments by booking.
               </p>
             </div>
 
@@ -61,13 +61,12 @@ export default function DowntownCalgaryPage() {
                 Serving Downtown and surrounding neighbourhoods
               </h2>
               <p className="text-mid-grey leading-relaxed mb-4">
-                Located at 815 – 17th Ave SW, our downtown office is easily accessible from the Beltline, Mission,
+                Located at 421 7th Ave SW, #3000, our downtown office is easily accessible from the Beltline, Mission,
                 Cliff Bungalow, and Victoria Park. We also serve clients who work in the Downtown Core and need
                 documents commissioned during business hours or after work.
               </p>
               <p className="text-mid-grey leading-relaxed">
-                Metered street parking is available on 17th Ave SW, and paid parking lots are within one block.
-                Transit access is excellent via the nearby CTrain stations.
+                Paid parking is available nearby. Transit access is excellent via the nearby CTrain stations.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {c.nearbyNeighbourhoods.map((n) => (
@@ -86,7 +85,7 @@ export default function DowntownCalgaryPage() {
               commissionerName={c.name}
               commissionerTitle={c.title}
               address={c.address}
-              parking="Metered street parking on 17th Ave SW. Pay parking lots within 1 block."
+              parking="Paid parking available nearby. Accessible via CTrain."
               nearbyNeighbourhoods={c.nearbyNeighbourhoods}
               googleMapsEmbed={c.googleMapsEmbed}
               mapUrl={c.mapUrl}
