@@ -42,6 +42,12 @@ export default function BookingDetailPage() {
   const [adminNotes, setAdminNotes] = useState('');
   const [newStatus, setNewStatus] = useState('');
 
+  // Propose modal
+  const [showProposeModal, setShowProposeModal] = useState(false);
+  const [proposeDate, setProposeDate] = useState('');
+  const [proposeTime, setProposeTime] = useState('');
+  const [proposeReason, setProposeReason] = useState('');
+
   // Cancel modal
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -188,6 +194,28 @@ export default function BookingDetailPage() {
 
         {/* Actions */}
         <div className="space-y-4">
+          {/* Accept / Propose — for paid bookings */}
+          {booking.status === 'paid' && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-5 space-y-3">
+              <h2 className="font-medium text-gray-900">Confirm Booking</h2>
+              <p className="text-sm text-gray-600">This booking is paid. Accept the requested time or propose a different one.</p>
+              <button
+                onClick={async () => { setSaving(true); await fetch(`/api/admin/bookings/${id}/accept`, { method: 'POST' }); const d = await fetch(`/api/admin/bookings/${id}`).then(r => r.json()); setBooking(d); setNewStatus(d.status); setSaving(false); }}
+                disabled={saving}
+                className="w-full rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                Accept — Confirm This Time
+              </button>
+              <button
+                onClick={() => setShowProposeModal(true)}
+                disabled={saving}
+                className="w-full rounded-md border border-orange-300 px-4 py-2 text-sm font-medium text-orange-600 hover:bg-orange-50 disabled:opacity-50"
+              >
+                Propose Different Time
+              </button>
+            </div>
+          )}
+
           {/* Status change */}
           <div className="rounded-lg border border-gray-200 bg-white p-5">
             <h2 className="mb-3 font-medium text-gray-900">Update Status</h2>
@@ -275,6 +303,47 @@ export default function BookingDetailPage() {
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {saving ? 'Cancelling...' : 'Confirm Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Propose time modal */}
+      {showProposeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+            <h3 className="text-lg font-medium text-gray-900">Propose a New Time</h3>
+            <p className="mt-1 text-sm text-gray-500">The customer will be emailed with the option to accept or request a refund.</p>
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Date</label>
+                  <input type="date" value={proposeDate} onChange={(e) => setProposeDate(e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Time</label>
+                  <input type="time" value={proposeTime} onChange={(e) => setProposeTime(e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <textarea rows={2} value={proposeReason} onChange={(e) => setProposeReason(e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="Reason (optional, shown to customer)..." />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setShowProposeModal(false)} className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button
+                disabled={saving || !proposeDate || !proposeTime}
+                onClick={async () => {
+                  setSaving(true);
+                  await fetch(`/api/admin/bookings/${id}/propose`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proposed_datetime: new Date(`${proposeDate}T${proposeTime}:00`).toISOString(), reason: proposeReason }),
+                  });
+                  const d = await fetch(`/api/admin/bookings/${id}`).then(r => r.json());
+                  setBooking(d); setNewStatus(d.status); setShowProposeModal(false); setSaving(false);
+                }}
+                className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+              >
+                {saving ? 'Sending...' : 'Send Proposal'}
               </button>
             </div>
           </div>
