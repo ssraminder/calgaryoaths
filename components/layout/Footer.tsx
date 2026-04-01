@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { commissioners } from '@/lib/data/commissioners';
+import { supabase } from '@/lib/supabase';
+import { commissioners as fallbackCommissioners } from '@/lib/data/commissioners';
 
 const quickLinks = [
   { href: '/services', label: 'Services' },
@@ -12,7 +13,36 @@ const quickLinks = [
   { href: '/join', label: 'Join Our Network' },
 ];
 
-export default function Footer() {
+type FooterCommissioner = {
+  id: string;
+  name: string;
+  location: string;
+  address: string;
+  calendly_url: string;
+};
+
+async function getCommissioners(): Promise<FooterCommissioner[]> {
+  const { data, error } = await supabase
+    .from('co_commissioners')
+    .select('id, name, location, address, calendly_url')
+    .eq('active', true)
+    .order('sort_order', { ascending: true });
+
+  if (error || !data?.length) {
+    return fallbackCommissioners.map((c) => ({
+      id: c.id,
+      name: c.name,
+      location: c.location,
+      address: c.address,
+      calendly_url: c.calendlyUrl,
+    }));
+  }
+  return data as FooterCommissioner[];
+}
+
+export default async function Footer() {
+  const commissioners = await getCommissioners();
+
   return (
     <footer className="bg-navy text-white">
       <div className="max-content py-12 lg:py-16">
@@ -84,7 +114,7 @@ export default function Footer() {
                   <p className="font-body font-medium text-white text-sm">{c.name}</p>
                   <p className="text-white/60 text-xs mt-0.5 mb-3">{c.location} · {c.address.split(',')[0]}</p>
                   <a
-                    href={c.calendlyUrl}
+                    href={c.calendly_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center text-xs font-medium text-gold hover:text-gold-light transition-colors uppercase tracking-wide"
