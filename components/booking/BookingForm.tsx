@@ -85,7 +85,6 @@ function ServiceGrid({ services, selected, onSelect }: {
                   <p className="font-medium text-charcoal text-sm leading-snug flex-1 min-w-0">{s.name}</p>
                   {isSelected && <CheckCircle size={16} className="text-gold flex-shrink-0 mt-0.5" />}
                 </div>
-                <span className="text-sm font-semibold text-gold mt-1 block">{s.priceLabel}</span>
                 {s.requiresReview ? (
                   <span className="inline-block text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-pill font-medium mt-1.5">
                     Manual review

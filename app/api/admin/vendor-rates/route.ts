@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   // Fetch all active services for context
   const { data: services } = await supabaseAdmin
     .from('co_services')
-    .select('slug, name, price, price_label')
+    .select('slug, name, price, price_label, min_vendor_rate_cents')
     .eq('active', true)
     .order('display_order', { ascending: true });
 
@@ -63,6 +63,7 @@ export async function GET(req: NextRequest) {
       service_name: s.name,
       service_price: s.price,
       service_price_label: s.price_label,
+      min_vendor_rate_cents: s.min_vendor_rate_cents ?? null,
       suggested_first_page_cents: suggestedFirst,
       suggested_additional_page_cents: suggestedAdditional,
       first_page_cents: existing?.first_page_cents ?? suggestedFirst,
@@ -100,6 +101,24 @@ export async function POST(req: NextRequest) {
   }
 
   const results: { slug: string; ok: boolean; error?: string }[] = [];
+
+  // Fetch minimum vendor rates for validation
+  const { data: servicesData } = await supabaseAdmin
+    .from('co_services')
+    .select('slug, min_vendor_rate_cents')
+    .eq('active', true);
+  const minRateMap = new Map((servicesData ?? []).map((s) => [s.slug, s.min_vendor_rate_cents]));
+
+  // Validate rates against minimums
+  for (const rate of rates) {
+    if (!rate.offered || rate.first_page_cents == null) continue;
+    const minRate = minRateMap.get(rate.service_slug);
+    if (minRate != null && rate.first_page_cents < minRate) {
+      return NextResponse.json({
+        error: `Rate for "${rate.service_slug}" ($${rate.first_page_cents / 100}) is below the minimum allowed ($${minRate / 100}).`,
+      }, { status: 400 });
+    }
+  }
 
   // Sync service assignments: rebuild co_commissioner_services
   const offeredSlugs = rates.filter((r) => r.offered).map((r) => r.service_slug);
