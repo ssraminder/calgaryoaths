@@ -16,7 +16,7 @@ export async function sendEmail({ to, replyTo, subject, html, fromName, fromEmai
   const body: Record<string, unknown> = {
     sender: {
       name: fromName ?? 'Calgary Oaths',
-      email: fromEmail ?? 'noreply@calgaryoaths.com',
+      email: fromEmail ?? 'noreply@cethos.com',
     },
     to: recipients,
     subject,
