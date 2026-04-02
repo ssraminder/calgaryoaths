@@ -63,7 +63,7 @@ export default function ResourcesPage() {
         {/* CTA */}
         <div className="bg-navy/5 border border-navy/10 rounded-card p-6 text-center">
           <p className="text-charcoal font-medium mb-2">Need help with a specific document?</p>
-          <p className="text-mid-grey text-sm mb-4">Our commissioners can draft it for you — same day, from $30.</p>
+          <p className="text-mid-grey text-sm mb-4">Our commissioners can draft it for you — same day, from $120/hr (commissioning included).</p>
           <a href="/contact" className="btn-primary inline-flex">Get in touch</a>
         </div>
       </div>

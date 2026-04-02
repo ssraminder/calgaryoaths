@@ -15,7 +15,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
  *   insurance-claim-declaration                 → 4000
  *   general-consent-letter                      → 4000
  *   power-of-attorney                           → 8000
- *   document-drafting                           → 12000 (per-hour)
+ *   document-drafting                           → 12000 (per-hour, billed every 30 min after 1 hr)
  */
 
 const TARGET_MINIMUMS: Record<string, number> = {

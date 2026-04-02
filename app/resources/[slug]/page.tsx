@@ -76,7 +76,7 @@ export default function BlogPostPage({ params }: Props) {
           {/* CTA */}
           <div className="bg-navy rounded-card p-6 md:p-8 text-center">
             <h2 className="font-display font-bold text-xl text-white mb-2">Ready to get your documents done?</h2>
-            <p className="text-white/70 text-sm mb-5">Same-day service at both Calgary locations. From $30.</p>
+            <p className="text-white/70 text-sm mb-5">Same-day service at both Calgary locations. Drafting from $120/hr.</p>
             <BookButton label="Book an appointment" variant="primary" />
           </div>
 

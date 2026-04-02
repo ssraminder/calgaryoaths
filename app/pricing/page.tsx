@@ -4,7 +4,7 @@ import PricingTable from '@/components/shared/PricingTable';
 export const metadata: Metadata = {
   title: 'Commissioner of Oaths Pricing Calgary | Transparent Fees | Calgary Oaths',
   description:
-    'Transparent pricing for Commissioner of Oaths services in Calgary. Commissioning from $30, affidavit drafting $40, travel consent letters $40. No hidden fees. Book today.',
+    'Transparent pricing for Commissioner of Oaths services in Calgary. Affidavit drafting from $120/hr (commissioning included). No hidden fees. Book today.',
   alternates: { canonical: 'https://calgaryoaths.com/pricing' },
   openGraph: { title: 'Commissioner Pricing Calgary | Calgary Oaths', url: 'https://calgaryoaths.com/pricing' },
 };

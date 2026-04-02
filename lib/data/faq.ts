@@ -102,7 +102,7 @@ export const faqGroups: FaqGroup[] = [
       },
       {
         question: 'Is drafting included in the commissioning price?',
-        answer: 'Drafting is available at an extra charge. The commissioning price covers witnessing your signature and applying the official seal. If you need a document drafted from scratch, a drafting fee applies. The full breakdown is shown during booking.',
+        answer: 'Drafting is not included in the commissioning price. Commissioning covers witnessing your signature and applying the official seal. If you need a document drafted from scratch, drafting starts at $120/hr (commissioning included) and is billed every 30 minutes after the first hour. The full breakdown is shown during booking.',
       },
     ],
   },
