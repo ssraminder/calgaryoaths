@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
   const offeredSlugs = new Set((links ?? []).map((l) => l.service_slug));
   const rateMap = new Map((rates ?? []).map((r) => [r.service_slug, r]));
 
+  // Offered services with rates
   const merged = (services ?? [])
     .filter((s) => offeredSlugs.has(s.slug))
     .map((s) => {
@@ -51,7 +52,25 @@ export async function GET(req: NextRequest) {
       };
     });
 
-  return NextResponse.json({ rates: merged });
+  // Available services not yet offered by this vendor
+  const available = (services ?? [])
+    .filter((s) => !offeredSlugs.has(s.slug))
+    .map((s) => ({
+      slug: s.slug,
+      name: s.name,
+      price: s.price,
+      price_label: s.price_label,
+    }));
+
+  // Pending service requests
+  const { data: pendingRequests } = await supabaseAdmin
+    .from('co_service_requests')
+    .select('id, service_slug, custom_service_name, status, created_at')
+    .eq('commissioner_id', vendor.commissionerId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  return NextResponse.json({ rates: merged, available, pendingRequests: pendingRequests ?? [] });
 }
 
 export async function POST(req: NextRequest) {
@@ -108,4 +127,102 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ success: true });
+}
+
+export async function DELETE(req: NextRequest) {
+  const vendor = await verifyVendor(req);
+  if (!vendor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const slug = req.nextUrl.searchParams.get('slug');
+  if (!slug) return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
+
+  // Remove from commissioner_services
+  await supabaseAdmin
+    .from('co_commissioner_services')
+    .delete()
+    .eq('commissioner_id', vendor.commissionerId)
+    .eq('service_slug', slug);
+
+  // Remove vendor rate
+  await supabaseAdmin
+    .from('co_vendor_rates')
+    .delete()
+    .eq('commissioner_id', vendor.commissionerId)
+    .eq('service_slug', slug);
+
+  return NextResponse.json({ success: true });
+}
+
+export async function PUT(req: NextRequest) {
+  const vendor = await verifyVendor(req);
+  if (!vendor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const { slug, customServiceName } = await req.json();
+  const { sendEmail } = await import('@/lib/email');
+
+  // Adding an existing service from the catalog — requires approval
+  if (slug) {
+    const { data: service } = await supabaseAdmin
+      .from('co_services')
+      .select('slug, name')
+      .eq('slug', slug)
+      .eq('active', true)
+      .single();
+
+    if (!service) return NextResponse.json({ error: 'Service not found' }, { status: 404 });
+
+    // Check for duplicate pending request
+    const { data: existingReq } = await supabaseAdmin
+      .from('co_service_requests')
+      .select('id')
+      .eq('commissioner_id', vendor.commissionerId)
+      .eq('service_slug', slug)
+      .eq('status', 'pending')
+      .single();
+
+    if (existingReq) {
+      return NextResponse.json({ error: 'Request already pending for this service.' }, { status: 400 });
+    }
+
+    await supabaseAdmin.from('co_service_requests').insert({
+      commissioner_id: vendor.commissionerId,
+      service_slug: slug,
+    });
+
+    await sendEmail({
+      to: 'info@calgaryoaths.com',
+      subject: `Service request — ${vendor.commissionerName} wants to add ${service.name}`,
+      html: `
+        <h2>Service Addition Request</h2>
+        <p><strong>Vendor:</strong> ${vendor.commissionerName} (${vendor.commissionerId})</p>
+        <p><strong>Service:</strong> ${service.name} (${slug})</p>
+        <p>To approve: go to Admin → Vendors → ${vendor.commissionerName} → Service Pricing → check the service and save.</p>
+      `,
+    }).catch((err) => console.error('Service request email error:', err));
+
+    return NextResponse.json({ success: true, message: 'Request submitted for admin approval.' });
+  }
+
+  // Requesting a custom service — also requires approval
+  if (customServiceName) {
+    await supabaseAdmin.from('co_service_requests').insert({
+      commissioner_id: vendor.commissionerId,
+      custom_service_name: customServiceName,
+    });
+
+    await sendEmail({
+      to: 'info@calgaryoaths.com',
+      subject: `Custom service request — ${vendor.commissionerName}`,
+      html: `
+        <h2>Custom Service Request</h2>
+        <p><strong>Vendor:</strong> ${vendor.commissionerName} (${vendor.commissionerId})</p>
+        <p><strong>Requested service:</strong> ${customServiceName}</p>
+        <p>To add: go to Admin → Services → create the service, then assign it to the vendor.</p>
+      `,
+    }).catch((err) => console.error('Custom service email error:', err));
+
+    return NextResponse.json({ success: true, message: 'Request submitted for admin approval.' });
+  }
+
+  return NextResponse.json({ error: 'Missing slug or customServiceName' }, { status: 400 });
 }
