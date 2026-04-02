@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   // Custom times
   const { data: customTimes } = await supabaseAdmin
     .from('co_custom_times')
-    .select('id, custom_date, start_time, end_time, reason')
+    .select('id, custom_date, start_time, end_time, mode, reason')
     .eq('commissioner_id', vendor.commissionerId)
     .gte('custom_date', new Date().toISOString().split('T')[0])
     .order('custom_date', { ascending: true });
@@ -77,10 +77,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(data, { status: 201 });
   }
 
-  // Handle custom time creation
+  // Handle custom time creation (mode: 'add' for extra slots, 'block' to remove time windows)
   if (body.type === 'custom_time') {
-    const { custom_date, start_time, end_time, reason } = body as {
-      type: string; custom_date: string; start_time: string; end_time: string; reason?: string;
+    const { custom_date, start_time, end_time, mode, reason } = body as {
+      type: string; custom_date: string; start_time: string; end_time: string; mode?: string; reason?: string;
     };
     if (!custom_date || !start_time || !end_time) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -92,6 +92,8 @@ export async function POST(req: NextRequest) {
         custom_date,
         start_time,
         end_time,
+        mode: mode === 'block' ? 'block' : 'add',
+        source: 'manual',
         reason: reason || '',
       })
       .select()
