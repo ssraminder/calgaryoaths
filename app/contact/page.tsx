@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Phone, Mail, Calendar } from 'lucide-react';
 import ContactForm from './ContactForm';
 import BookButton from '@/components/shared/BookButton';
+import PhoneLink from '@/components/shared/PhoneLink';
 
 export const metadata: Metadata = {
   title: 'Contact Calgary Oaths | Book a Commissioner in Calgary',
@@ -25,8 +26,8 @@ export default function ContactPage() {
 
         {/* Contact method cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
-          <a
-            href="tel:5876000746"
+          <PhoneLink
+            location="contact"
             className="card text-center hover:shadow-card-hover transition-shadow group"
           >
             <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-3">
@@ -35,7 +36,7 @@ export default function ContactPage() {
             <p className="font-display font-semibold text-charcoal">Call us</p>
             <p className="text-gold font-medium mt-1 group-hover:underline">(587) 600-0746</p>
             <p className="text-xs text-mid-grey mt-1">Mon–Fri 9 AM–9 PM · Sat 10 AM–5 PM</p>
-          </a>
+          </PhoneLink>
 
           <a
             href="mailto:info@calgaryoaths.com"

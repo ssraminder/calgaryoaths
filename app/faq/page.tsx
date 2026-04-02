@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import SchemaSEO from '@/components/shared/SchemaSEO';
 import { allFaqItems } from '@/lib/data/faq';
 import FaqContent from './FaqContent';
+import PhoneLink from '@/components/shared/PhoneLink';
 
 export const metadata: Metadata = {
   title: 'Commissioner of Oaths FAQ Calgary | Calgary Oaths',
@@ -43,7 +44,7 @@ export default function FaqPage() {
           <div className="mt-14 bg-navy rounded-card p-6 md:p-8 text-center">
             <h2 className="font-display font-bold text-2xl text-white mb-3">Still have a question?</h2>
             <p className="text-white/70 mb-5">
-              Call us at <a href="tel:5876000746" className="text-gold font-medium">(587) 600-0746</a> or use the form on our contact page.
+              Call us at <PhoneLink location="faq" className="text-gold font-medium" /> or use the form on our contact page.
             </p>
             <a href="/contact" className="btn-primary inline-flex">Get in touch</a>
           </div>

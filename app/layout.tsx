@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, Inter } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
+import Script from 'next/script';
 import './globals.css';
 import { BookingModalProvider } from '@/lib/context/BookingModalContext';
 import Navbar from '@/components/layout/Navbar';
@@ -52,6 +53,7 @@ export default async function RootLayout({
   const analytics = await getAnalyticsSettings();
   const ga4Id = analytics.ga4Id || process.env.NEXT_PUBLIC_GA4_ID;
   const gtmId = analytics.gtmId || process.env.NEXT_PUBLIC_GTM_ID;
+  const gadsId = analytics.googleAdsId || process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 
   return (
     <html
@@ -71,6 +73,31 @@ export default async function RootLayout({
           <AuthRedirect />
         </BookingModalProvider>
         {ga4Id && <GoogleAnalytics gaId={ga4Id} />}
+        {/* Google Ads global site tag + conversion config — values from DB/env */}
+        {gadsId && (
+          <>
+            <Script
+              id="google-ads-gtag"
+              strategy="afterInteractive"
+              src={`https://www.googletagmanager.com/gtag/js?id=${gadsId}`}
+            />
+            <Script
+              id="google-ads-config"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: [
+                  `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}`,
+                  `gtag('config',${JSON.stringify(gadsId)});`,
+                  `window.__ADS_CONFIG=${JSON.stringify({
+                    id: gadsId,
+                    bookingLabel: analytics.googleAdsBookingLabel || null,
+                    phoneLabel: analytics.googleAdsPhoneLabel || null,
+                  })};`,
+                ].join(''),
+              }}
+            />
+          </>
+        )}
       </body>
     </html>
   );

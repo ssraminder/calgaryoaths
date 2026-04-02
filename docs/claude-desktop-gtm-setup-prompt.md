@@ -161,7 +161,7 @@ These events are automatically pushed by the website code:
 | service_selected   | User picks a service (Step 1→2)   | service_name                  |
 | booking_created    | User submits details (Step 2)     | service_name, commissioner_id |
 | begin_checkout     | User confirms slot (Step 3)       | value (CAD), currency         |
-| purchase           | Redirect to Stripe payment        | value (CAD), currency         |
+| purchase           | Stripe checkout initiated         | value (CAD), currency         |
 | phone_click        | User clicks phone number          | location                      |
 
 ## Conversion Values

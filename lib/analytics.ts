@@ -1,4 +1,14 @@
-/** Google Analytics 4 + GTM event helpers for conversion tracking */
+/** Google Analytics 4 + GTM + Google Ads event helpers for conversion tracking */
+
+type AdsConfig = { id: string; bookingLabel: string | null; phoneLabel: string | null };
+
+/** Read the Google Ads config injected by the root layout script tag. */
+function getAdsConfig(): AdsConfig | null {
+  if (typeof window !== 'undefined' && (window as Record<string, unknown>).__ADS_CONFIG) {
+    return (window as Record<string, unknown>).__ADS_CONFIG as AdsConfig;
+  }
+  return null;
+}
 
 type GtagEvent = {
   event_category?: string;
@@ -85,4 +95,23 @@ export function trackPhoneClick(location: string) {
     event_label: location,
   });
   pushDataLayer({ event: 'phone_click', location });
+
+  // Fire Google Ads phone-call conversion
+  const phoneCfg = getAdsConfig();
+  if (phoneCfg?.phoneLabel && window.gtag) {
+    window.gtag('event', 'conversion', {
+      send_to: `${phoneCfg.id}/${phoneCfg.phoneLabel}`,
+    });
+  }
+}
+
+/** Fire the Google Ads booking-confirmed conversion (call once on confirmation page) */
+export function trackBookingConversion() {
+  const cfg = getAdsConfig();
+  if (cfg?.bookingLabel && typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', 'conversion', {
+      send_to: `${cfg.id}/${cfg.bookingLabel}`,
+    });
+  }
+  pushDataLayer({ event: 'booking_conversion' });
 }

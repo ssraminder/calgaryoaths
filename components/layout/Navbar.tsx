@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Menu, X, Phone } from 'lucide-react';
 import BookButton from '@/components/shared/BookButton';
+import { trackPhoneClick } from '@/lib/analytics';
 
 const navLinks = [
   { href: '/services', label: 'Services' },
@@ -71,6 +72,7 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center gap-4">
             <a
               href="tel:5876000746"
+              onClick={() => trackPhoneClick('navbar_desktop')}
               className="text-sm font-body font-medium text-charcoal hover:text-gold transition-colors flex items-center gap-1.5"
             >
               <Phone size={15} />
@@ -133,6 +135,7 @@ export default function Navbar() {
           ))}
           <a
             href="tel:5876000746"
+            onClick={() => trackPhoneClick('navbar_mobile')}
             className="flex items-center gap-2 py-3 text-base font-body font-medium text-charcoal hover:text-gold transition-colors border-b border-border"
           >
             <Phone size={16} />

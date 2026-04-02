@@ -4,6 +4,7 @@ import { MapPin, Clock, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { commissioners as fallbackCommissioners } from '@/lib/data/commissioners';
 import BookButton from '@/components/shared/BookButton';
+import PhoneLink from '@/components/shared/PhoneLink';
 
 export const metadata: Metadata = {
   title: 'Commissioner of Oaths Calgary Locations | Downtown & NE | Calgary Oaths',
@@ -145,9 +146,9 @@ export default async function LocationsPage() {
               <Link href="/services/mobile-service" className="btn-primary justify-center">
                 Learn about mobile service
               </Link>
-              <a href="tel:5876000746" className="inline-flex items-center justify-center px-6 py-3 rounded-btn border-2 border-white/40 text-white text-sm font-medium hover:bg-white/10 transition-colors uppercase tracking-wide">
+              <PhoneLink location="locations_mobile_cta" className="inline-flex items-center justify-center px-6 py-3 rounded-btn border-2 border-white/40 text-white text-sm font-medium hover:bg-white/10 transition-colors uppercase tracking-wide">
                 Call (587) 600-0746
-              </a>
+              </PhoneLink>
             </div>
           </div>
         </div>
