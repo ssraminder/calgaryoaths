@@ -63,6 +63,7 @@ type Commissioner = {
   gst_registered: boolean;
   mobile_available: boolean;
   virtual_available: boolean;
+  min_booking_buffer_hours: number | null;
   user_id: string | null;
   active: boolean;
   sort_order: number;
@@ -197,6 +198,7 @@ export default function EditVendorPage() {
       gst_registered: fd.get('gst_registered') === 'on',
       mobile_available: fd.get('mobile_available') === 'on',
       virtual_available: fd.get('virtual_available') === 'on',
+      min_booking_buffer_hours: fd.get('min_booking_buffer_hours') ? Number(fd.get('min_booking_buffer_hours')) : null,
       active: fd.get('active') === 'on',
       sort_order: Number(fd.get('sort_order') || 0),
     };
@@ -385,6 +387,23 @@ export default function EditVendorPage() {
               <input type="checkbox" name="virtual_available" defaultChecked={commissioner.virtual_available} className="rounded border-gray-300" />
               Virtual
             </label>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Lead Time</label>
+            <select
+              name="min_booking_buffer_hours"
+              defaultValue={commissioner.min_booking_buffer_hours ?? ''}
+              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+            >
+              <option value="">Default</option>
+              <option value="1">1 hour</option>
+              <option value="2">2 hours</option>
+              <option value="4">4 hours</option>
+              <option value="8">8 hours</option>
+              <option value="12">12 hours</option>
+              <option value="24">24 hours</option>
+              <option value="48">48 hours</option>
+            </select>
           </div>
         </div>
 
