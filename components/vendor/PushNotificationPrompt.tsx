@@ -68,10 +68,16 @@ export default function PushNotificationPrompt() {
         return;
       }
 
+      // Ensure service worker is registered
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      if (registrations.length === 0) {
+        await navigator.serviceWorker.register('/sw.js', { scope: '/vendor' });
+      }
+
       // Wait for service worker with a timeout
       const swReady = await Promise.race([
         navigator.serviceWorker.ready,
-        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Service worker not ready')), 5000)),
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Service worker not ready. Try reopening the app.')), 10000)),
       ]);
       if (!swReady) throw new Error('No service worker');
 
@@ -93,7 +99,8 @@ export default function PushNotificationPrompt() {
       setShow(false);
     } catch (err) {
       console.error('Push subscription failed:', err);
-      alert('Could not enable notifications. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      alert(`Could not enable notifications: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -216,27 +223,39 @@ export function PushToggle() {
         if (permission !== 'granted') return;
 
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        if (!vapidKey) throw new Error('VAPID key not configured');
+        if (!vapidKey) throw new Error('VAPID key not configured. Contact admin.');
+
+        // Ensure service worker is registered
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        if (registrations.length === 0) {
+          await navigator.serviceWorker.register('/sw.js', { scope: '/vendor' });
+        }
 
         const registration = await Promise.race([
           navigator.serviceWorker.ready,
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('SW timeout')), 5000)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Service worker not ready. Try reopening the app.')), 10000)),
         ]) as ServiceWorkerRegistration;
 
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(vapidKey),
         });
-        await fetch('/api/vendor/push', {
+
+        const res = await fetch('/api/vendor/push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subscription: subscription.toJSON() }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `Server error ${res.status}`);
+        }
         setSubscribed(true);
       }
     } catch (err) {
       console.error('Push toggle failed:', err);
-      alert('Could not toggle notifications. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      alert(`Could not toggle notifications: ${msg}`);
     } finally {
       setLoading(false);
     }
