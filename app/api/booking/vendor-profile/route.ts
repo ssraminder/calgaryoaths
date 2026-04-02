@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   // Fetch service details
   const { data: services } = await supabase
     .from('co_services')
-    .select('slug, name, short_description, price, price_label, requires_review, review_reason, slot_duration_minutes')
+    .select('slug, name, short_description, price, price_label, requires_review, review_reason, slot_duration_minutes, booking_notice')
     .eq('active', true)
     .in('slug', slugs)
     .order('display_order', { ascending: true });
@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
       requiresReview: s.requires_review,
       reviewReason: s.review_reason,
       slotDurationMinutes: s.slot_duration_minutes ?? 30,
+      bookingNotice: s.booking_notice || null,
     };
   });
 

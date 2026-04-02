@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
 
     if (bookingId) {
       const vendorToken = crypto.randomBytes(32).toString('hex');
+      const cancelToken = crypto.randomBytes(32).toString('hex');
 
       // Fetch booking + commissioner to check auto-accept
       const { data: preBooking } = await supabaseAdmin.from('co_bookings').select('commissioner_id').eq('id', bookingId).single();
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
           stripe_payment_intent_id: session.payment_intent as string,
           amount_paid: session.amount_total,
           vendor_action_token: autoConfirm ? null : vendorToken,
+          cancel_token: cancelToken,
           updated_at: new Date().toISOString(),
         })
         .eq('id', bookingId);
@@ -66,6 +68,7 @@ export async function POST(req: NextRequest) {
 
       const vendorEmail = commissioner?.email || '';
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const cancelUrl = `${siteUrl}/booking/cancel?token=${cancelToken}`;
       const actionUrl = `${siteUrl}/booking/vendor-action?token=${vendorToken}`;
       const acceptUrl = `${actionUrl}&action=accept`;
       const isMobile = booking.delivery_mode === 'mobile';
@@ -157,10 +160,17 @@ export async function POST(req: NextRequest) {
                 <div style="margin-top:24px;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
                   <p style="margin:0;font-size:14px;"><strong>What happens next?</strong></p>
                   <ol style="margin:8px 0 0;padding-left:20px;font-size:14px;">
-                    <li>Your commissioner will confirm your appointment time.</li>
+                    <li>Your commissioner will review your request and respond shortly with a confirmation. <strong>This appointment is not final unless it is confirmed by the commissioner.</strong></li>
                     <li>You'll receive a confirmation email with final details.</li>
                     <li>If the time doesn't work, you'll be offered alternatives or a refund.</li>
                   </ol>
+                </div>
+
+                <div style="margin-top:16px;padding:16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;">
+                  <p style="margin:0;font-size:14px;"><strong>Need to cancel?</strong></p>
+                  <p style="margin:8px 0 0;font-size:13px;">Cancellations made more than 12 hours before your appointment are eligible for a full refund. Cancellations within 12 hours are treated as a no-show and no refund will be issued.</p>
+                  <p style="margin:8px 0 0;"><a href="${cancelUrl}" style="color:#C8922A;font-weight:bold;text-decoration:underline;font-size:14px;">Cancel this booking</a></p>
+                  <p style="margin:8px 0 0;font-size:12px;color:#6B6B68;">By booking, you agree to our <a href="${siteUrl}/terms-and-conditions" style="color:#C8922A;">Terms & Conditions</a>.</p>
                 </div>
 
                 <p style="margin-top:20px;font-size:13px;color:#6B6B68;">Questions? <a href="mailto:info@calgaryoaths.com">info@calgaryoaths.com</a> or <a href="tel:5876000746">(587) 600-0746</a></p>

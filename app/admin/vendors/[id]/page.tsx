@@ -131,6 +131,14 @@ export default function EditVendorPage() {
   const [newBlockEndDate, setNewBlockEndDate] = useState('');
   const [newBlockReason, setNewBlockReason] = useState('');
 
+  // Custom times
+  type CustomTime = { id: string; custom_date: string; start_time: string; end_time: string; reason: string };
+  const [customTimes, setCustomTimes] = useState<CustomTime[]>([]);
+  const [newCustomDate, setNewCustomDate] = useState('');
+  const [newCustomStart, setNewCustomStart] = useState('09:00');
+  const [newCustomEnd, setNewCustomEnd] = useState('17:00');
+  const [newCustomReason, setNewCustomReason] = useState('');
+
   function fetchVendorRates() {
     fetch(`/api/admin/vendor-rates?commissionerId=${id}`)
       .then((r) => r.json())
@@ -165,6 +173,7 @@ export default function EditVendorPage() {
       setRules(Array.isArray(availRes?.rules) ? availRes.rules : Array.isArray(availRes) ? availRes : []);
       if (Array.isArray(availRes?.locations)) setAvailLocations(availRes.locations);
       if (Array.isArray(availRes?.blockedDates)) setBlockedDates(availRes.blockedDates);
+      if (Array.isArray(availRes?.customTimes)) setCustomTimes(availRes.customTimes);
       if (Array.isArray(ratesRes?.rates)) setVendorRates(ratesRes.rates);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -861,6 +870,108 @@ export default function EditVendorPage() {
             className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
           >
             <Plus className="h-4 w-4" /> Block
+          </button>
+        </div>
+      </div>
+      {/* Custom Times */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
+        <h2 className="text-lg font-medium text-gray-900">Custom Time Slots</h2>
+        <p className="text-sm text-gray-500">
+          Add extra time slots on specific dates (e.g. extended hours, special availability).
+          These are added on top of regular availability rules.
+        </p>
+
+        {customTimes.length > 0 ? (
+          <div className="space-y-2">
+            {customTimes.map((ct) => (
+              <div key={ct.id} className="flex items-center gap-2 text-sm">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-700">
+                  {new Date(ct.custom_date + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                  {' '}{ct.start_time.slice(0, 5)} – {ct.end_time.slice(0, 5)}
+                  {ct.reason && <span className="text-green-500">({ct.reason})</span>}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await fetch(`/api/admin/availability?id=${ct.id}&type=custom_time`, { method: 'DELETE' });
+                      setCustomTimes((prev) => prev.filter((t) => t.id !== ct.id));
+                    }}
+                    className="text-green-300 hover:text-red-500"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">No custom time slots set.</p>
+        )}
+
+        <div className="flex items-end gap-3 border-t border-gray-200 pt-4 flex-wrap">
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">Date</label>
+            <input
+              type="date"
+              value={newCustomDate}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => setNewCustomDate(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">Start</label>
+            <input
+              type="time"
+              value={newCustomStart}
+              onChange={(e) => setNewCustomStart(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">End</label>
+            <input
+              type="time"
+              value={newCustomEnd}
+              onChange={(e) => setNewCustomEnd(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="mb-1 block text-xs text-gray-500">Reason (optional)</label>
+            <input
+              type="text"
+              value={newCustomReason}
+              onChange={(e) => setNewCustomReason(e.target.value)}
+              placeholder="e.g. Extended hours, Special request"
+              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={!newCustomDate || !newCustomStart || !newCustomEnd}
+            onClick={async () => {
+              const res = await fetch('/api/admin/availability', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'custom_time',
+                  commissioner_id: id,
+                  custom_date: newCustomDate,
+                  start_time: newCustomStart,
+                  end_time: newCustomEnd,
+                  reason: newCustomReason,
+                }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                setCustomTimes((prev) => [...prev, data].sort((a, b) => a.custom_date.localeCompare(b.custom_date)));
+                setNewCustomDate('');
+                setNewCustomReason('');
+              }
+            }}
+            className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" /> Add Time
           </button>
         </div>
       </div>

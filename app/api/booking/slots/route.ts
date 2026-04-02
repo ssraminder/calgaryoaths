@@ -105,6 +105,9 @@ export async function GET(req: NextRequest) {
   // Generate candidate slots from availability rules (skip blocked dates)
   const [sy, sm, sd] = startDate.split('-').map(Number);
   const base = new Date(sy, sm - 1, sd);
+  const windowEnd = new Date(base);
+  windowEnd.setDate(windowEnd.getDate() + DAYS_AHEAD);
+  const endDateStr = windowEnd.toISOString().slice(0, 10);
   const allSlots: string[] = [];
 
   for (let i = 0; i < DAYS_AHEAD; i++) {
@@ -115,13 +118,33 @@ export async function GET(req: NextRequest) {
     allSlots.push(...generateSlotsForDay(dateStr, availRules, SLOT_MINUTES));
   }
 
+  // Custom time slots by date (additional one-off slots)
+  const { data: customTimesData } = await supabase
+    .from('co_custom_times')
+    .select('custom_date, start_time, end_time')
+    .eq('commissioner_id', commissionerId)
+    .gte('custom_date', startDate)
+    .lte('custom_date', endDateStr);
+
+  for (const ct of customTimesData ?? []) {
+    if (blockedDates.has(ct.custom_date)) continue;
+    const customRule: AvailabilityRule = {
+      day_of_week: new Date(ct.custom_date + 'T12:00:00').getDay(),
+      start_time: ct.start_time,
+      end_time: ct.end_time,
+    };
+    allSlots.push(...generateSlotsForDay(ct.custom_date, [customRule], SLOT_MINUTES));
+  }
+
   // Filter out past slots (buffer hours from now)
   const cutoff = new Date(Date.now() + bufferHours * 60 * 60 * 1000);
   let available = allSlots.filter((s) => new Date(s) > cutoff);
 
+  // Deduplicate slots (custom times might overlap with regular rules)
+  const uniqueSlots = [...new Set(available)];
+  available = uniqueSlots;
+
   // Filter out booked slots from DB (across ALL locations for this commissioner)
-  const windowEnd = new Date(base);
-  windowEnd.setDate(windowEnd.getDate() + DAYS_AHEAD);
 
   const { data: booked } = await supabase
     .from('co_bookings')

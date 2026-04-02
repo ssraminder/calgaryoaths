@@ -38,7 +38,15 @@ export async function GET(req: NextRequest) {
     .gte('blocked_date', new Date().toISOString().split('T')[0])
     .order('blocked_date', { ascending: true });
 
-  return NextResponse.json({ rules: data ?? [], locations: locations ?? [], blockedDates: blockedDates ?? [] });
+  // Custom times
+  const { data: customTimes } = await supabaseAdmin
+    .from('co_custom_times')
+    .select('id, custom_date, start_time, end_time, reason')
+    .eq('commissioner_id', commissionerId)
+    .gte('custom_date', new Date().toISOString().split('T')[0])
+    .order('custom_date', { ascending: true });
+
+  return NextResponse.json({ rules: data ?? [], locations: locations ?? [], blockedDates: blockedDates ?? [], customTimes: customTimes ?? [] });
 }
 
 export async function POST(req: NextRequest) {
@@ -47,6 +55,30 @@ export async function POST(req: NextRequest) {
   if (user.role === 'viewer') return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
 
   const body = await req.json();
+
+  // Handle custom time creation
+  if (body.type === 'custom_time') {
+    const { commissioner_id, custom_date, start_time, end_time, reason, location_id } = body as {
+      type: string; commissioner_id: string; custom_date: string; start_time: string; end_time: string; reason?: string; location_id?: string;
+    };
+    if (!commissioner_id || !custom_date || !start_time || !end_time) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+    const { data, error } = await supabaseAdmin
+      .from('co_custom_times')
+      .insert({
+        commissioner_id,
+        custom_date,
+        start_time,
+        end_time,
+        reason: reason || '',
+        location_id: location_id || null,
+      })
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data, { status: 201 });
+  }
 
   // Handle blocked date creation
   if (body.type === 'blocked_date') {
@@ -136,6 +168,12 @@ export async function DELETE(req: NextRequest) {
 
   if (type === 'blocked_date') {
     const { error } = await supabaseAdmin.from('co_blocked_dates').delete().eq('id', id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true });
+  }
+
+  if (type === 'custom_time') {
+    const { error } = await supabaseAdmin.from('co_custom_times').delete().eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
   }
