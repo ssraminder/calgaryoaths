@@ -73,10 +73,10 @@
   animation: slide-up 0.3s ease-out;
 }
 
-/* Vendor mobile: pad bottom for bottom nav */
+/* Dashboard mobile: pad bottom for bottom nav */
 @media (max-width: 767px) {
   .vendor-main-content {
-    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 }
 
