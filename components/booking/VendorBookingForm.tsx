@@ -1,3 +1,6 @@
+// Multi-step vendor booking form — service selection, customer details with delivery mode
+// (in-office/mobile/virtual), Google Places address autocomplete for mobile, booking_notice
+// display before payment, and T&C agreement. Step 3: slot picker + confirm & pay.
 'use client';
 
 import { useState, useEffect } from 'react';

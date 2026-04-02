@@ -1,3 +1,6 @@
+// Vendor availability management page — weekly schedule rules with day presets
+// (Weekdays/Weekends/All), blocked dates (full-day), and date overrides
+// (block time windows or add extra availability on specific dates).
 'use client';
 
 import { useEffect, useState } from 'react';

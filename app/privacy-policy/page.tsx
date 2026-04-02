@@ -1,3 +1,5 @@
+// Privacy policy page — covers data collection, usage, sharing, security,
+// retention, cookies, and customer rights under Canadian privacy legislation.
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {

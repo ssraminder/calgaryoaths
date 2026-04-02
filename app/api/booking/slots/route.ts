@@ -1,3 +1,6 @@
+// Slot availability API — generates bookable time slots from availability rules,
+// applies date overrides (add extra time or block time windows), filters blocked dates,
+// booked slots, and buffer hours. Future-ready for calendar integration (Google/M365).
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 

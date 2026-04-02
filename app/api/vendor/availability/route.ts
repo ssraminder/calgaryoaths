@@ -1,3 +1,6 @@
+// Vendor availability API — CRUD for availability rules, blocked dates, and date overrides
+// (custom times with mode 'add' or 'block'). Supports multi-day rule creation and
+// day presets (Weekdays/Weekends/All). Fault-tolerant if co_custom_times table is missing.
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyVendor } from '@/lib/vendor-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';

@@ -1,3 +1,5 @@
+// Admin service edit page — manage service details, pricing, review settings,
+// and booking_notice (important info shown to customers before payment).
 'use client';
 
 import { useEffect, useState } from 'react';

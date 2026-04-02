@@ -1,3 +1,5 @@
+// Admin vendor edit page — commissioner details, service pricing, availability rules,
+// blocked dates (full-day), and date overrides (block or add time windows by date).
 'use client';
 
 import { useEffect, useState } from 'react';

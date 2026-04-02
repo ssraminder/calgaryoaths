@@ -1,3 +1,6 @@
+// Google Places autocomplete address input for mobile booking flow.
+// Fetches suggestions from /api/places/autocomplete, geocodes on selection,
+// and auto-triggers travel fee calculation.
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';

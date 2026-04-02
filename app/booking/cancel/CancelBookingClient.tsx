@@ -1,3 +1,6 @@
+// Customer-facing booking cancellation page — accessed via cancel_token link in email.
+// Shows booking details, refund eligibility (>12h = full refund, <12h = no-show),
+// and a confirmation screen with cancel/keep buttons.
 'use client';
 
 import { useEffect, useState } from 'react';

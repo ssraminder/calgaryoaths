@@ -1,3 +1,6 @@
+// Terms & Conditions page — cancellation policy (12h rule), customer responsibilities
+// (valid ID, unsigned docs), commissioner cancellation rights (invalid ID, misrepresentation,
+// incomplete docs), drafting services, mobile/virtual terms, and governing law.
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
