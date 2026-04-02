@@ -1,12 +1,20 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, Phone } from 'lucide-react';
+import { trackBookingConversion, trackPhoneClick } from '@/lib/analytics';
 
 export default function BookingSuccessClient() {
   const params = useSearchParams();
   const confirmed = params.get('appointment') === 'confirmed';
+
+  useEffect(() => {
+    if (confirmed) {
+      trackBookingConversion();
+    }
+  }, [confirmed]);
 
   if (!confirmed) {
     return (
@@ -57,7 +65,7 @@ export default function BookingSuccessClient() {
         <div className="text-center text-sm text-mid-grey mt-8">
           <p>
             Questions?{' '}
-            <a href="tel:5876000746" className="text-gold hover:underline inline-flex items-center gap-1">
+            <a href="tel:5876000746" onClick={() => trackPhoneClick('booking_success')} className="text-gold hover:underline inline-flex items-center gap-1">
               <Phone size={13} />
               (587) 600-0746
             </a>

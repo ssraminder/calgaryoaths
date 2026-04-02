@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle } from 'lucide-react';
 import BookButton from '@/components/shared/BookButton';
+import PhoneLink from '@/components/shared/PhoneLink';
 import { supabase } from '@/lib/supabase';
 
 export const metadata: Metadata = {
@@ -163,7 +164,7 @@ export default async function ServicesPage() {
           <h2 className="font-display font-bold text-2xl text-white mb-3">
             Not sure which service you need?
           </h2>
-          <p className="text-white/70 mb-6">Call us at <a href="tel:5876000746" className="text-gold font-medium">(587) 600-0746</a> and we&apos;ll point you in the right direction.</p>
+          <p className="text-white/70 mb-6">Call us at <PhoneLink location="services" className="text-gold font-medium" /> and we&apos;ll point you in the right direction.</p>
           <BookButton label="Book Your Appointment" variant="primary" size="lg" />
         </div>
       </div>

@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, Inter } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
+import Script from 'next/script';
+import { GOOGLE_ADS_ID } from '@/lib/analytics';
 import './globals.css';
 import { BookingModalProvider } from '@/lib/context/BookingModalContext';
 import Navbar from '@/components/layout/Navbar';
@@ -71,6 +73,19 @@ export default async function RootLayout({
           <AuthRedirect />
         </BookingModalProvider>
         {ga4Id && <GoogleAnalytics gaId={ga4Id} />}
+        {/* Google Ads global site tag — required for conversion tracking */}
+        <Script
+          id="google-ads-gtag"
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`}
+        />
+        <Script
+          id="google-ads-config"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('config','${GOOGLE_ADS_ID}');`,
+          }}
+        />
       </body>
     </html>
   );

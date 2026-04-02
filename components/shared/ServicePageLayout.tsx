@@ -4,6 +4,7 @@ import { Service, services } from '@/lib/data/services';
 import FaqAccordion from '@/components/shared/FaqAccordion';
 import SchemaSEO from '@/components/shared/SchemaSEO';
 import BookButton from '@/components/shared/BookButton';
+import PhoneLink from '@/components/shared/PhoneLink';
 import { commissioners } from '@/lib/data/commissioners';
 
 interface ServicePageLayoutProps {
@@ -141,7 +142,7 @@ export default function ServicePageLayout({ service, intro }: ServicePageLayoutP
                 <p className="font-display font-semibold text-charcoal">Book your appointment</p>
                 <BookButton label="Book Appointment" variant="primary" size="md" className="w-full justify-center" />
                 <p className="text-xs text-mid-grey text-center">
-                  Or call <a href="tel:5876000746" className="text-gold font-medium">(587) 600-0746</a>
+                  Or call <PhoneLink location="service_page" className="text-gold font-medium" />
                 </p>
               </div>
 
