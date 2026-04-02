@@ -68,22 +68,27 @@ export async function POST(req: NextRequest) {
     if (!commissioner_id || !custom_date || !start_time || !end_time) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
-    const { data, error } = await supabaseAdmin
-      .from('co_custom_times')
-      .insert({
-        commissioner_id,
-        custom_date,
-        start_time,
-        end_time,
-        mode: mode === 'block' ? 'block' : 'add',
-        source: 'manual',
-        reason: reason || '',
-        location_id: location_id || null,
-      })
-      .select()
-      .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data, { status: 201 });
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('co_custom_times')
+        .insert({
+          commissioner_id,
+          custom_date,
+          start_time,
+          end_time,
+          mode: mode === 'block' ? 'block' : 'add',
+          source: 'manual',
+          reason: reason || '',
+          location_id: location_id || null,
+        })
+        .select()
+        .single();
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(data, { status: 201 });
+    } catch (err) {
+      console.error('Custom time insert error:', err);
+      return NextResponse.json({ error: 'Failed to create date override. The database migration may need to be applied.' }, { status: 500 });
+    }
   }
 
   // Handle blocked date creation
