@@ -5,6 +5,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import VendorSidebar from '@/components/vendor/VendorSidebar';
 import TopBar from '@/components/admin/TopBar';
+import BottomNav from '@/components/vendor/BottomNav';
+import OfflineBanner from '@/components/vendor/OfflineBanner';
+import InstallPrompt from '@/components/vendor/InstallPrompt';
+import VendorPageTransition from '@/components/vendor/VendorPageTransition';
+import VendorViewportMeta from '@/components/vendor/VendorViewportMeta';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,11 +59,19 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="flex h-screen bg-gray-50">
+      <VendorViewportMeta />
+      <OfflineBanner />
       <VendorSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar userName={user?.fullName || ''} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <TopBar userName={user?.fullName || ''} logoutRedirect="/vendor/login" />
+        <main className="vendor-main-content flex-1 overflow-y-auto p-4 md:p-6">
+          <VendorPageTransition>
+            {children}
+          </VendorPageTransition>
+        </main>
       </div>
+      <BottomNav />
+      <InstallPrompt />
     </div>
   );
 }

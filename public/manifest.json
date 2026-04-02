@@ -1,0 +1,25 @@
+{
+  "name": "Calgary Oaths Partner Portal",
+  "short_name": "CO Partner",
+  "description": "Manage your bookings, availability, and rates as a Calgary Oaths partner.",
+  "start_url": "/vendor",
+  "scope": "/vendor",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1B3A5C",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

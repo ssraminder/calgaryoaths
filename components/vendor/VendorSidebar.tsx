@@ -16,7 +16,7 @@ export default function VendorSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-60 flex-col border-r border-gray-200 bg-white">
+    <aside className="hidden md:flex w-60 flex-col border-r border-gray-200 bg-white">
       <div className="flex h-14 items-center border-b border-gray-200 px-4">
         <Link href="/vendor" className="text-lg font-semibold text-navy">
           Partner Portal
