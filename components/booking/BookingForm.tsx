@@ -930,7 +930,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             {scheduling ? (
               <><Loader2 size={16} className="animate-spin" /> Confirming…</>
             ) : (
-              <><Calendar size={16} /> Confirm & pay — ${totalCharged ? `$${(totalCharged / 100).toFixed(2)}` : '…'}</>
+              <><Calendar size={16} /> Confirm & pay — {totalCharged ? `$${(totalCharged / 100).toFixed(2)}` : '…'}</>
             )}
           </button>
 
