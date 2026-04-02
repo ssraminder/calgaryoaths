@@ -186,28 +186,27 @@ export default function VendorRatesPage() {
       <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
         <h2 className="text-lg font-medium text-gray-900">Your Profile</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <ReadOnlyField label="Name" value={settings.name} />
-          <ReadOnlyField label="Title" value={settings.title} />
-          <ReadOnlyField label="Email" value={settings.email} />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-            <input type="tel" value={settings.phone || ''}
-              onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-base focus:border-navy focus:ring-1 focus:ring-navy" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <p className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-base text-gray-700">{settings.name || '—'}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+            <p className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-base text-gray-700">{settings.title || '—'}</p>
+          </div>
+          <EditableField label="Email" type="email" value={settings.email || ''}
+            onChange={(v) => setSettings({ ...settings, email: v })} />
+          <EditableField label="Phone" type="tel" value={settings.phone || ''}
+            onChange={(v) => setSettings({ ...settings, phone: v })} />
+          <div className="sm:col-span-2">
+            <EditableField label="Office Address" value={settings.address || ''}
+              onChange={(v) => setSettings({ ...settings, address: v })}
+              placeholder="e.g. 123 Main St NW, Calgary, AB" />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Office Address</label>
-            <input type="text" value={settings.address || ''}
-              onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-              placeholder="e.g. 123 Main St NW, Calgary, AB"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-base focus:border-navy focus:ring-1 focus:ring-navy" />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-            <textarea rows={3} value={settings.bio || ''}
-              onChange={(e) => setSettings({ ...settings, bio: e.target.value })}
-              placeholder="A brief description shown on your public profile..."
-              className="w-full rounded border border-gray-300 px-3 py-2 text-base focus:border-navy focus:ring-1 focus:ring-navy" />
+            <EditableField label="Bio" value={settings.bio || ''} multiline
+              onChange={(v) => setSettings({ ...settings, bio: v })}
+              placeholder="A brief description shown on your public profile..." />
           </div>
         </div>
         {settings.location && (
@@ -606,15 +605,58 @@ export default function VendorRatesPage() {
   );
 }
 
-function ReadOnlyField({ label, value }: { label: string; value: string }) {
+function EditableField({ label, value, onChange, type = 'text', placeholder, multiline }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+  multiline?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+        {multiline ? (
+          <textarea
+            rows={3}
+            autoFocus
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={() => setEditing(false)}
+            placeholder={placeholder}
+            className="w-full rounded border border-navy px-3 py-2 text-base focus:border-navy focus:ring-1 focus:ring-navy"
+          />
+        ) : (
+          <input
+            type={type}
+            autoFocus
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={() => setEditing(false)}
+            placeholder={placeholder}
+            className="w-full rounded border border-navy px-3 py-2 text-base focus:border-navy focus:ring-1 focus:ring-navy"
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <div className="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
-        <span className="flex-1 text-base text-gray-500 truncate">{value || '—'}</span>
-        <Pencil className="h-3.5 w-3.5 flex-shrink-0 text-gray-300" />
-      </div>
-      <p className="text-xs text-gray-400 mt-1">Contact admin to change</p>
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="flex w-full items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-left hover:bg-gray-100 transition-colors"
+      >
+        <span className={`flex-1 text-base truncate ${value ? 'text-gray-700' : 'text-gray-400'}`}>
+          {value || placeholder || '—'}
+        </span>
+        <Pencil className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+      </button>
     </div>
   );
 }
