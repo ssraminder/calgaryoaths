@@ -15,10 +15,11 @@
 /calgary-oaths-service                              /locations                                  301
 /calgary-oaths-service/                             /locations                                  301
 
-# Old WP: Booking confirmation pages → Contact (kept for old WP URL)
+# Old WP: Booking confirmation pages → Contact
 /booking-confirmation                               /contact                                    301
 /booking-confirmation/                              /contact                                    301
-# /booking-confirmed is now a real page used for Google Ads conversion tracking
+/booking-confirmed                                  /contact                                    301
+/booking-confirmed/                                 /contact                                    301
 
 # Old WP: Downtown landing page → Downtown location detail
 /notary-commissioner-services-in-downtown-calgary   /locations/downtown-calgary                 301
