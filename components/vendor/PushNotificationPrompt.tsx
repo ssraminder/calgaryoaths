@@ -46,29 +46,40 @@ export default function PushNotificationPrompt() {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidKey) {
-        console.warn('VAPID public key not configured');
+        console.error('NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set');
+        alert('Push notifications are not configured yet. Please contact admin.');
         setShow(false);
         return;
       }
 
+      // Wait for service worker with a timeout
+      const swReady = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Service worker not ready')), 5000)),
+      ]);
+      if (!swReady) throw new Error('No service worker');
+
+      const registration = swReady as ServiceWorkerRegistration;
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
       });
 
-      await fetch('/api/vendor/push', {
+      const res = await fetch('/api/vendor/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subscription: subscription.toJSON() }),
       });
 
+      if (!res.ok) throw new Error('Failed to save subscription');
+
       setSubscribed(true);
       setShow(false);
     } catch (err) {
       console.error('Push subscription failed:', err);
+      alert('Could not enable notifications. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -158,13 +169,15 @@ export function PushToggle() {
       } else {
         // Subscribe
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          setLoading(false);
-          return;
-        }
-        const registration = await navigator.serviceWorker.ready;
+        if (permission !== 'granted') return;
+
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        if (!vapidKey) { setLoading(false); return; }
+        if (!vapidKey) throw new Error('VAPID key not configured');
+
+        const registration = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('SW timeout')), 5000)),
+        ]) as ServiceWorkerRegistration;
 
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
