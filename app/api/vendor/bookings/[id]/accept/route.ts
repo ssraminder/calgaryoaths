@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyVendor } from '@/lib/vendor-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
-import { calendarLinksHtml } from '@/lib/calendar';
+import { calendarLinksHtml, locationHtml } from '@/lib/calendar';
 
 export async function POST(
   req: NextRequest,
@@ -66,7 +66,7 @@ export async function POST(
         <p>Your appointment for <strong>${booking.service_name}</strong> has been confirmed.</p>
         <p><strong>Date & Time:</strong> ${apptDate}</p>
         <p><strong>Commissioner:</strong> ${vendor.commissionerName}</p>
-        <p><strong>Location:</strong> ${isMobile ? `Mobile — we will come to: ${booking.customer_address || 'your location'}` : commDetail?.address || ''}</p>
+        ${locationHtml(commDetail?.address || 'Calgary, AB', isMobile, booking.customer_address)}
         <p><strong>Phone:</strong> ${commDetail?.phone || '(587) 600-0746'}</p>
         ${calHtml}
         <h3>What to bring:</h3>

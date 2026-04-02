@@ -1,6 +1,20 @@
 /**
- * Generate calendar links (Google Calendar URL + ICS file content) for appointment emails.
+ * Calendar links + location helpers for appointment emails.
  */
+
+/** Generate a clickable Google Maps link for an address */
+export function googleMapsLink(address: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
+/** Generate HTML for a clickable address with Google Maps icon */
+export function locationHtml(address: string, isMobile: boolean, customerAddress?: string): string {
+  if (isMobile) {
+    const addr = customerAddress || 'Customer location';
+    return `<p><strong>Location:</strong> Mobile service — <a href="${googleMapsLink(addr)}" target="_blank" rel="noopener noreferrer" style="color:#C8922A;">${addr} ↗</a></p>`;
+  }
+  return `<p><strong>Location:</strong> <a href="${googleMapsLink(address)}" target="_blank" rel="noopener noreferrer" style="color:#C8922A;">${address} ↗</a></p>`;
+}
 
 type CalendarEventParams = {
   title: string;

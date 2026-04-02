@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
-import { calendarLinksHtml } from '@/lib/calendar';
+import { calendarLinksHtml, locationHtml } from '@/lib/calendar';
 import crypto from 'crypto';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -74,9 +74,14 @@ export async function POST(req: NextRequest) {
           })
         : 'To be confirmed';
 
-      const locationText = isMobile
-        ? `Mobile service — ${booking.customer_address || 'Customer location'}`
+      const locationAddr = isMobile
+        ? booking.customer_address || 'Customer location'
+        : location?.address || commissioner?.address || 'Calgary, AB';
+      const locationLabel = isMobile
+        ? `Mobile service — ${locationAddr}`
         : location?.name ? `${location.name} — ${location.address}` : commissioner?.address || '';
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddr)}`;
+      const locationText = `<a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="color:#C8922A;text-decoration:underline;">${locationLabel} ↗</a>`;
 
       const whatToBring = service?.what_to_bring ?? ['Valid government-issued photo ID', 'Your documents — unsigned'];
       const importantNotes = service?.important_notes ?? ['Do NOT sign documents before the appointment'];
