@@ -19,7 +19,6 @@
 /booking-confirmation                               /contact                                    301
 /booking-confirmation/                              /contact                                    301
 # /booking-confirmed is now a real page used for Google Ads conversion tracking
-# (Calendly redirects here after a booking is completed)
 
 # Old WP: Downtown landing page → Downtown location detail
 /notary-commissioner-services-in-downtown-calgary   /locations/downtown-calgary                 301

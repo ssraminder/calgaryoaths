@@ -23,7 +23,7 @@ export default function BookingConfirmedPage() {
           </h1>
           <p className="text-mid-grey leading-relaxed">
             Your appointment has been successfully booked. You will receive a
-            confirmation email from Calendly with all the details.
+            confirmation email with all the details.
           </p>
         </div>
 
