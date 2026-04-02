@@ -1,3 +1,5 @@
+// Admin availability API — CRUD for availability rules, blocked dates, and date overrides
+// (custom times with mode 'add' or 'block'). Supports multi-day rule creation.
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';

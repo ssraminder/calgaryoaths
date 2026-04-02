@@ -1,3 +1,6 @@
+// Stripe webhook handler — processes checkout.session.completed events.
+// Updates booking status, generates cancel_token for customer self-service cancellation,
+// and sends confirmation emails (customer with cancel link, vendor, admin).
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-server';

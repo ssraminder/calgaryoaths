@@ -1,3 +1,6 @@
+// Customer booking cancellation API — GET checks eligibility, POST executes cancellation.
+// Cancellations >12h before appointment get a full Stripe refund; <12h treated as no-show.
+// Uses cancel_token from the booking confirmation email for authentication.
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import Stripe from 'stripe';

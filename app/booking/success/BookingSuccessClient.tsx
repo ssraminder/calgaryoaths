@@ -1,3 +1,5 @@
+// Booking success page — shown after Stripe payment completes.
+// Displays pending commissioner review notice, next steps, and cancellation info.
 'use client';
 
 import { useEffect } from 'react';

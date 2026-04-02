@@ -1,3 +1,5 @@
+// Vendor profile API for the booking flow — returns vendor info, enriched services
+// (with effective pricing and booking_notice), and primary location ID.
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 

@@ -1,3 +1,5 @@
+// Booking cancellation page — server component wrapper for CancelBookingClient.
+// Route: /booking/cancel?token=<cancel_token>
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import CancelBookingClient from './CancelBookingClient';

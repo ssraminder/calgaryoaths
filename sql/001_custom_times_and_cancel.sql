@@ -1,3 +1,4 @@
+-- Migration: Custom times, cancel tokens, booking notices, and calendar readiness.
 -- Custom date/time overrides: add extra availability OR block specific time windows
 -- This replaces the previous co_custom_times definition.
 -- mode = 'add'   → extra time slot on that date (beyond regular rules)
