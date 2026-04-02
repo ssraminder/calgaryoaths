@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import Sidebar from '@/components/admin/Sidebar';
 import TopBar from '@/components/admin/TopBar';
+import AdminBottomNav from '@/components/admin/AdminBottomNav';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,13 +51,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (loading) {
     return (
-      <html lang="en">
-        <body className="bg-gray-50">
-          <div className="flex h-screen items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy border-t-transparent" />
-          </div>
-        </body>
-      </html>
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy border-t-transparent" />
+      </div>
     );
   }
 
@@ -64,9 +61,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar userName={user?.fullName || ''} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <TopBar userName={user?.fullName || ''} portalName="Calgary Oaths Admin" />
+        <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
       </div>
+      <AdminBottomNav />
     </div>
   );
 }
