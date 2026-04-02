@@ -1,6 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Trash2, Plus, Search } from 'lucide-react';
+
+type AvailableService = {
+  slug: string;
+  name: string;
+  price: number | null;
+  price_label: string;
+};
 
 type VendorSettings = {
   mobile_available: boolean;
@@ -26,6 +34,11 @@ type VendorRate = {
 
 export default function VendorRatesPage() {
   const [rates, setRates] = useState<VendorRate[]>([]);
+  const [available, setAvailable] = useState<AvailableService[]>([]);
+  const [showAddService, setShowAddService] = useState(false);
+  const [addSearch, setAddSearch] = useState('');
+  const [customName, setCustomName] = useState('');
+  const [customSent, setCustomSent] = useState(false);
   const [settings, setSettings] = useState<VendorSettings>({
     mobile_available: false,
     virtual_available: false,
@@ -47,6 +60,7 @@ export default function VendorRatesPage() {
       fetch('/api/vendor/settings').then((r) => r.ok ? r.json() : null),
     ]).then(([ratesData, settingsData]) => {
       setRates(ratesData.rates ?? []);
+      setAvailable(ratesData.available ?? []);
       if (settingsData) setSettings(settingsData);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -63,6 +77,45 @@ export default function VendorRatesPage() {
     setSavedSettings(true);
     setSavingSettings(false);
     setTimeout(() => setSavedSettings(false), 3000);
+  }
+
+  async function handleDeleteService(slug: string) {
+    if (!confirm('Remove this service? You can add it back later.')) return;
+    await fetch(`/api/vendor/rates?slug=${slug}`, { method: 'DELETE' });
+    setRates((prev) => prev.filter((r) => r.service_slug !== slug));
+    // Move back to available
+    const removed = rates.find((r) => r.service_slug === slug);
+    if (removed) {
+      setAvailable((prev) => [...prev, { slug: removed.service_slug, name: removed.service_name, price: removed.service_price, price_label: removed.service_price_label }]);
+    }
+  }
+
+  async function handleAddService(slug: string) {
+    const res = await fetch('/api/vendor/rates', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug }),
+    });
+    if (res.ok) {
+      // Refresh rates
+      const ratesRes = await fetch('/api/vendor/rates').then((r) => r.json());
+      setRates(ratesRes.rates ?? []);
+      setAvailable(ratesRes.available ?? []);
+    }
+  }
+
+  async function handleCustomServiceRequest() {
+    if (!customName.trim()) return;
+    const res = await fetch('/api/vendor/rates', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customServiceName: customName.trim() }),
+    });
+    if (res.ok) {
+      setCustomSent(true);
+      setCustomName('');
+      setTimeout(() => setCustomSent(false), 5000);
+    }
   }
 
   async function handleSave() {
@@ -239,6 +292,7 @@ export default function VendorRatesPage() {
               <th className="px-4 py-3 w-24">Rate ($)</th>
               <th className="px-4 py-3 w-24">Add&apos;l ($)</th>
               <th className="px-4 py-3 w-16">Min</th>
+              <th className="px-4 py-3 w-10"></th>
             </tr>
           </thead>
           <tbody>
@@ -285,6 +339,16 @@ export default function VendorRatesPage() {
                   <td className="px-4 py-3 text-xs text-gray-400">
                     {rate.min_vendor_rate_cents != null ? `$${rate.min_vendor_rate_cents / 100}` : '—'}
                   </td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteService(rate.service_slug)}
+                      className="text-gray-300 hover:text-red-500 transition-colors"
+                      title="Remove service"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -302,6 +366,89 @@ export default function VendorRatesPage() {
         </button>
         {saved && <span className="text-sm text-green-600">Saved!</span>}
         {error && <span className="text-sm text-red-600">{error}</span>}
+      </div>
+
+      {/* Add Services */}
+      <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-medium text-gray-900">Add Services</h2>
+            <p className="text-sm text-gray-500">Add services from the catalog or request a custom one.</p>
+          </div>
+          <button
+            onClick={() => setShowAddService(!showAddService)}
+            className="inline-flex items-center gap-1 rounded-md bg-navy px-3 py-1.5 text-xs font-medium text-white hover:bg-navy/90"
+          >
+            <Plus size={14} /> Add Service
+          </button>
+        </div>
+
+        {showAddService && (
+          <div className="space-y-4 border-t border-gray-200 pt-4">
+            {/* Search existing services */}
+            {available.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">From catalog</label>
+                <div className="relative mb-2">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search available services..."
+                    value={addSearch}
+                    onChange={(e) => setAddSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {available
+                    .filter((s) => !addSearch || s.name.toLowerCase().includes(addSearch.toLowerCase()))
+                    .map((s) => (
+                      <div key={s.slug} className="flex items-center justify-between px-3 py-2 rounded hover:bg-gray-50 text-sm">
+                        <div>
+                          <span className="text-gray-900">{s.name}</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            {s.price != null ? `$${(s.price / 100).toFixed(0)}` : s.price_label}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleAddService(s.slug)}
+                          className="text-xs text-navy hover:text-gold font-medium"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+            {available.length === 0 && (
+              <p className="text-sm text-gray-400">You&apos;re offering all available services.</p>
+            )}
+
+            {/* Custom service request */}
+            <div className="border-t border-gray-200 pt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Request a custom service</label>
+              <p className="text-xs text-gray-500 mb-2">Don&apos;t see a service you offer? Request it and our team will review and add it.</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. Passport application witnessing"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+                />
+                <button
+                  onClick={handleCustomServiceRequest}
+                  disabled={!customName.trim()}
+                  className="rounded bg-gold px-4 py-2 text-sm font-medium text-white hover:bg-gold-light disabled:opacity-50 flex-shrink-0"
+                >
+                  Request
+                </button>
+              </div>
+              {customSent && <p className="text-sm text-green-600 mt-2">Request sent! We&apos;ll review and get back to you.</p>}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
