@@ -1,12 +1,14 @@
 // Customer-facing booking cancellation page — accessed via cancel_token link in email.
-// Shows booking details, refund eligibility (>12h = full refund, <12h = no-show),
-// and a confirmation screen with cancel/keep buttons.
+// Three-tier cancellation policy (configurable per vendor):
+//   > free_cancel_hours: automatic full refund
+//   free_cancel_hours to request_cancel_hours: request sent to vendor for approval
+//   < request_cancel_hours: no cancellation allowed
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle, XCircle, Loader2, Phone } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, Clock, Loader2, Phone } from 'lucide-react';
 import { trackPhoneClick } from '@/lib/analytics';
 
 type BookingInfo = {
@@ -18,17 +20,19 @@ type BookingInfo = {
   status: string;
 };
 
+type CancelTier = 'free' | 'request' | 'blocked' | 'pending';
+
 export default function CancelBookingClient() {
   const params = useSearchParams();
   const token = params.get('token');
 
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState<BookingInfo | null>(null);
-  const [canCancelFree, setCanCancelFree] = useState(true);
+  const [cancelTier, setCancelTier] = useState<CancelTier>('free');
   const [hoursUntil, setHoursUntil] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
-  const [result, setResult] = useState<{ refunded: boolean; noShow: boolean } | null>(null);
+  const [result, setResult] = useState<{ refunded?: boolean; pendingApproval?: boolean; cancelTier?: string } | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -45,7 +49,7 @@ export default function CancelBookingClient() {
           if (data.booking) setBooking(data.booking);
         } else {
           setBooking(data.booking);
-          setCanCancelFree(data.canCancelFree);
+          setCancelTier(data.cancelTier || (data.canCancelFree ? 'free' : 'blocked'));
           setHoursUntil(data.hoursUntilAppointment);
         }
         setLoading(false);
@@ -86,7 +90,7 @@ export default function CancelBookingClient() {
     );
   }
 
-  // Already cancelled
+  // Fatal error — no booking found
   if (error && !booking) {
     return (
       <div className="py-12 lg:py-20">
@@ -102,49 +106,79 @@ export default function CancelBookingClient() {
     );
   }
 
-  // Cancellation complete
-  if (result) {
+  // Result: cancellation request sent to vendor
+  if (result?.pendingApproval) {
     return (
       <div className="py-12 lg:py-20">
         <div className="max-content max-w-2xl mx-auto">
-          <div className={`${result.refunded ? 'bg-teal/10 border-teal/30' : 'bg-amber-50 border-amber-200'} border rounded-card p-8 text-center mb-8`}>
-            <div className={`w-16 h-16 rounded-full ${result.refunded ? 'bg-teal/10' : 'bg-amber-100'} flex items-center justify-center mx-auto mb-4`}>
-              <CheckCircle size={32} className={result.refunded ? 'text-teal' : 'text-amber-600'} />
+          <div className="bg-amber-50 border border-amber-200 rounded-card p-8 text-center mb-8">
+            <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+              <Clock size={32} className="text-amber-600" />
             </div>
             <h1 className="font-display font-bold text-2xl text-charcoal mb-2">
-              {result.refunded ? 'Booking Cancelled' : 'Booking Cancelled — No Refund'}
+              Cancellation Request Submitted
             </h1>
-            {result.refunded ? (
-              <p className="text-mid-grey leading-relaxed">
-                Your booking for <strong>{booking?.service_name}</strong> has been cancelled and a full refund of <strong>${((booking?.amount_paid || 0) / 100).toFixed(2)}</strong> has been initiated.
-                Please allow 5–10 business days for the refund to appear on your statement.
-              </p>
-            ) : (
-              <p className="text-mid-grey leading-relaxed">
-                Your booking for <strong>{booking?.service_name}</strong> has been cancelled.
-                Since this cancellation was made within 12 hours of your appointment, it is treated as a no-show and <strong>no refund will be issued</strong> per our{' '}
-                <Link href="/terms-and-conditions" className="text-gold hover:underline">cancellation policy</Link>.
-              </p>
-            )}
-          </div>
-
-          <div className="text-center text-sm text-mid-grey">
-            <p>
-              Questions?{' '}
-              <a href="tel:5876000746" onClick={() => trackPhoneClick('cancel_page')} className="text-gold hover:underline inline-flex items-center gap-1">
-                <Phone size={13} />
-                (587) 600-0746
-              </a>
-              {' '}or{' '}
-              <a href="mailto:info@calgaryoaths.com" className="text-gold hover:underline">
-                info@calgaryoaths.com
-              </a>
+            <p className="text-mid-grey leading-relaxed">
+              Your cancellation request for <strong>{booking?.service_name}</strong> has been sent to your service provider for review.
+              You will receive an email once a decision has been made.
+            </p>
+            <p className="text-sm text-mid-grey mt-3">
+              Your appointment remains active until the request is approved.
             </p>
           </div>
+
+          <ContactFooter />
 
           <div className="text-center mt-6">
             <Link href="/" className="btn-primary inline-flex">Back to Calgary Oaths</Link>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Result: cancellation complete (free tier — refunded)
+  if (result) {
+    return (
+      <div className="py-12 lg:py-20">
+        <div className="max-content max-w-2xl mx-auto">
+          <div className="bg-teal/10 border border-teal/30 rounded-card p-8 text-center mb-8">
+            <div className="w-16 h-16 rounded-full bg-teal/10 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle size={32} className="text-teal" />
+            </div>
+            <h1 className="font-display font-bold text-2xl text-charcoal mb-2">
+              Booking Cancelled
+            </h1>
+            <p className="text-mid-grey leading-relaxed">
+              Your booking for <strong>{booking?.service_name}</strong> has been cancelled and a full refund of <strong>${((booking?.amount_paid || 0) / 100).toFixed(2)}</strong> has been initiated.
+              Please allow 5–10 business days for the refund to appear on your statement.
+            </p>
+          </div>
+
+          <ContactFooter />
+
+          <div className="text-center mt-6">
+            <Link href="/" className="btn-primary inline-flex">Back to Calgary Oaths</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Already pending cancellation
+  if (cancelTier === 'pending') {
+    return (
+      <div className="py-12 lg:py-20">
+        <div className="max-content max-w-2xl mx-auto text-center">
+          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+            <Clock size={32} className="text-amber-600" />
+          </div>
+          <h1 className="font-display font-bold text-2xl text-charcoal mb-2">Cancellation Pending</h1>
+          <p className="text-mid-grey">
+            Your cancellation request for <strong>{booking?.service_name}</strong> is currently being reviewed.
+            You will receive an email once a decision has been made.
+          </p>
+          <Link href="/" className="btn-primary inline-flex mt-6">Back to Calgary Oaths</Link>
         </div>
       </div>
     );
@@ -192,56 +226,83 @@ export default function CancelBookingClient() {
           </div>
 
           {/* Cancellation policy notice */}
-          {canCancelFree ? (
+          {cancelTier === 'free' && (
             <div className="bg-teal/10 border border-teal/30 rounded-card p-4 mb-6">
               <p className="text-sm text-charcoal">
-                <strong>Free cancellation available.</strong> Your appointment is more than 12 hours away.
-                You will receive a full refund of <strong>${((booking?.amount_paid || 0) / 100).toFixed(2)}</strong>.
+                <strong>Free cancellation available.</strong> You will receive a full refund of <strong>${((booking?.amount_paid || 0) / 100).toFixed(2)}</strong>.
               </p>
             </div>
-          ) : (
+          )}
+
+          {cancelTier === 'request' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-card p-4 mb-6">
+              <p className="text-sm text-amber-800">
+                <strong>Cancellation requires approval.</strong> Your appointment is{' '}
+                {hoursUntil !== null ? `${hoursUntil} hours` : 'less than the free cancellation window'} away.
+                Your cancellation request will be sent to the service provider for review. If approved, you will receive a full refund.
+              </p>
+            </div>
+          )}
+
+          {cancelTier === 'blocked' && (
             <div className="bg-red-50 border border-red-200 rounded-card p-4 mb-6">
               <p className="text-sm text-red-800">
-                <strong>No refund — late cancellation.</strong> Your appointment is{' '}
-                {hoursUntil !== null ? `${hoursUntil} hours` : 'less than 12 hours'} away.
-                Cancellations within 12 hours of the appointment are treated as a no-show and{' '}
-                <strong>no refund will be issued</strong> per our{' '}
-                <Link href="/terms-and-conditions" className="text-gold hover:underline">cancellation policy</Link>.
+                <strong>Cancellation is no longer available.</strong> Your appointment is{' '}
+                {hoursUntil !== null ? `${hoursUntil} hours` : 'very close'} away.
+                Please attend your appointment as scheduled. Missing your appointment will be treated as a no-show.
               </p>
             </div>
           )}
 
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
-          <div className="flex gap-3">
-            <Link href="/" className="btn-primary flex-1 justify-center !bg-border !text-charcoal hover:!bg-gray-300">
-              Keep My Booking
-            </Link>
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={cancelling}
-              className="btn-primary flex-1 justify-center !bg-red-600 hover:!bg-red-700 disabled:opacity-50"
-            >
-              {cancelling ? 'Cancelling...' : canCancelFree ? 'Cancel & Refund' : 'Cancel Without Refund'}
-            </button>
-          </div>
+          {cancelTier !== 'blocked' ? (
+            <div className="flex gap-3">
+              <Link href="/" className="btn-primary flex-1 justify-center !bg-border !text-charcoal hover:!bg-gray-300">
+                Keep My Booking
+              </Link>
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="btn-primary flex-1 justify-center !bg-red-600 hover:!bg-red-700 disabled:opacity-50"
+              >
+                {cancelling
+                  ? 'Submitting...'
+                  : cancelTier === 'free'
+                    ? 'Cancel & Refund'
+                    : 'Request Cancellation'}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <Link href="/" className="btn-primary flex-1 justify-center">
+                Keep My Booking
+              </Link>
+            </div>
+          )}
         </div>
 
-        <div className="text-center text-sm text-mid-grey">
-          <p>
-            Need to reschedule instead? Contact us at{' '}
-            <a href="tel:5876000746" onClick={() => trackPhoneClick('cancel_page')} className="text-gold hover:underline inline-flex items-center gap-1">
-              <Phone size={13} />
-              (587) 600-0746
-            </a>
-            {' '}or{' '}
-            <a href="mailto:info@calgaryoaths.com" className="text-gold hover:underline">
-              info@calgaryoaths.com
-            </a>
-          </p>
-        </div>
+        <ContactFooter label="Need to reschedule instead?" />
       </div>
+    </div>
+  );
+}
+
+function ContactFooter({ label = 'Questions?' }: { label?: string }) {
+  return (
+    <div className="text-center text-sm text-mid-grey">
+      <p>
+        {label}{' '}
+        <a href="tel:5876000746" onClick={() => trackPhoneClick('cancel_page')} className="text-gold hover:underline inline-flex items-center gap-1">
+          <Phone size={13} />
+          (587) 600-0746
+        </a>
+        {' '}or{' '}
+        <a href="mailto:info@calgaryoaths.com" className="text-gold hover:underline">
+          info@calgaryoaths.com
+        </a>
+      </p>
     </div>
   );
 }

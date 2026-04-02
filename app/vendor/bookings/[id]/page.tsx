@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle, Clock, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle, Clock, ClipboardCheck } from 'lucide-react';
 import StatusBadge from '@/components/admin/StatusBadge';
 import DocumentUpload from '@/components/vendor/DocumentUpload';
 
@@ -182,6 +182,15 @@ export default function VendorBookingDetailPage() {
         </div>
       )}
 
+      {/* Cancellation Request — vendor approve/deny */}
+      {booking.status === 'pending_cancellation' && (
+        <CancelRequestCard bookingId={booking.id} customerName={booking.name} serviceName={booking.service_name}
+          onDecision={(decision) => {
+            setBooking((prev) => prev ? { ...prev, status: decision === 'approve' ? 'cancelled' : 'confirmed' } : null);
+          }}
+        />
+      )}
+
       {/* Complete Appointment — for confirmed bookings */}
       {['confirmed', 'paid'].includes(booking.status) && (
         <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
@@ -279,6 +288,68 @@ export default function VendorBookingDetailPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CancelRequestCard({ bookingId, customerName, serviceName, onDecision }: {
+  bookingId: string;
+  customerName: string;
+  serviceName: string;
+  onDecision: (decision: 'approve' | 'deny') => void;
+}) {
+  const [acting, setActing] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleDecision(decision: 'approve' | 'deny') {
+    if (!confirm(decision === 'approve'
+      ? 'Approve cancellation and issue a full refund?'
+      : 'Deny cancellation? The booking will remain active.'
+    )) return;
+
+    setActing(true);
+    setError('');
+    const res = await fetch(`/api/vendor/bookings/${bookingId}/cancel-decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision }),
+    });
+    if (res.ok) {
+      onDecision(decision);
+    } else {
+      const data = await res.json();
+      setError(data.error || 'Failed');
+    }
+    setActing(false);
+  }
+
+  return (
+    <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-5 space-y-3">
+      <h2 className="text-base font-semibold text-amber-800 flex items-center gap-2">
+        <AlertTriangle className="h-5 w-5" />
+        Cancellation Request
+      </h2>
+      <p className="text-sm text-amber-700">
+        <strong>{customerName}</strong> is requesting to cancel their booking for <strong>{serviceName}</strong>.
+        This is within the approval window. You can approve the cancellation with a full refund, or deny it.
+      </p>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex gap-3">
+        <button
+          onClick={() => handleDecision('approve')}
+          disabled={acting}
+          className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+        >
+          {acting ? 'Processing...' : 'Approve & Refund'}
+        </button>
+        <button
+          onClick={() => handleDecision('deny')}
+          disabled={acting}
+          className="flex-1 inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 min-h-[44px]"
+        >
+          {acting ? 'Processing...' : 'Deny — Keep Booking'}
+        </button>
+      </div>
     </div>
   );
 }

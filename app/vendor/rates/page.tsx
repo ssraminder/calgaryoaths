@@ -12,12 +12,23 @@ type AvailableService = {
 };
 
 type VendorSettings = {
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+  address: string;
+  location: string;
+  bio: string;
+  languages: string[];
+  credentials: string[];
   mobile_available: boolean;
   virtual_available: boolean;
   mobile_rate_per_km_cents: number;
   mobile_minimum_fee_cents: number;
   min_booking_buffer_hours: number;
   auto_accept_all: boolean;
+  free_cancel_hours: number;
+  request_cancel_hours: number;
 };
 
 type VendorRate = {
@@ -42,12 +53,23 @@ export default function VendorRatesPage() {
   const [customSent, setCustomSent] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<{ id: string; service_slug: string | null; custom_service_name: string | null; created_at: string }[]>([]);
   const [settings, setSettings] = useState<VendorSettings>({
+    name: '',
+    title: '',
+    email: '',
+    phone: '',
+    address: '',
+    location: '',
+    bio: '',
+    languages: [],
+    credentials: [],
     mobile_available: false,
     virtual_available: false,
     mobile_rate_per_km_cents: 300,
     mobile_minimum_fee_cents: 3000,
     min_booking_buffer_hours: 4,
     auto_accept_all: false,
+    free_cancel_hours: 12,
+    request_cancel_hours: 6,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -159,6 +181,63 @@ export default function VendorRatesPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-2xl font-semibold text-gray-900">Rates & Services</h1>
+
+      {/* Profile */}
+      <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
+        <h2 className="text-lg font-medium text-gray-900">Your Profile</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input type="text" value={settings.name || ''} disabled
+              className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed" />
+            <p className="text-xs text-gray-400 mt-1">Contact admin to change</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+            <input type="text" value={settings.title || ''} disabled
+              className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input type="email" value={settings.email || ''} disabled
+              className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed" />
+            <p className="text-xs text-gray-400 mt-1">Contact admin to change</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input type="tel" value={settings.phone || ''}
+              onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-navy focus:ring-1 focus:ring-navy" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Office Address</label>
+            <input type="text" value={settings.address || ''}
+              onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+              placeholder="e.g. 123 Main St NW, Calgary, AB"
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-navy focus:ring-1 focus:ring-navy" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+            <textarea rows={3} value={settings.bio || ''}
+              onChange={(e) => setSettings({ ...settings, bio: e.target.value })}
+              placeholder="A brief description shown on your public profile..."
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-navy focus:ring-1 focus:ring-navy" />
+          </div>
+        </div>
+        {settings.location && (
+          <p className="text-xs text-gray-400">Location: {settings.location}</p>
+        )}
+        {settings.credentials && settings.credentials.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {settings.credentials.map((c) => (
+              <span key={c} className="inline-flex items-center rounded-full bg-navy/10 px-2.5 py-0.5 text-xs font-medium text-navy">{c}</span>
+            ))}
+          </div>
+        )}
+        {settings.languages && settings.languages.length > 0 && (
+          <p className="text-xs text-gray-500">Languages: {settings.languages.join(', ')}</p>
+        )}
+      </div>
 
       {/* Notification Settings */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
@@ -274,6 +353,60 @@ export default function VendorRatesPage() {
               className="rounded border-gray-300 text-navy focus:ring-navy h-5 w-5 flex-shrink-0 ml-4"
             />
           </label>
+        </div>
+
+        {/* Cancellation Policy */}
+        <div className="border-t border-gray-200 pt-4 space-y-4">
+          <h3 className="text-sm font-medium text-gray-900">Cancellation Policy</h3>
+          <p className="text-xs text-gray-500">
+            Define when customers can cancel and receive an automatic refund, when they need your approval, and when cancellation is not allowed.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Free cancellation window</label>
+              <select
+                value={settings.free_cancel_hours}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setSettings((s) => ({
+                    ...s,
+                    free_cancel_hours: val,
+                    request_cancel_hours: Math.min(s.request_cancel_hours, val - 1),
+                  }));
+                }}
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+              >
+                <option value={6}>6 hours before</option>
+                <option value={8}>8 hours before</option>
+                <option value={12}>12 hours before</option>
+                <option value={24}>24 hours before</option>
+                <option value={48}>48 hours before</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Customer gets automatic full refund</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Request window cutoff</label>
+              <select
+                value={settings.request_cancel_hours}
+                onChange={(e) => setSettings({ ...settings, request_cancel_hours: Number(e.target.value) })}
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+              >
+                {[0, 1, 2, 3, 4, 6, 8, 12, 24].filter((h) => h < settings.free_cancel_hours).map((h) => (
+                  <option key={h} value={h}>{h === 0 ? 'No request window' : `${h} hour${h !== 1 ? 's' : ''} before`}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Below this, no cancellation allowed</p>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 space-y-1">
+            <p><strong>More than {settings.free_cancel_hours}h before:</strong> Customer can cancel freely, automatic refund</p>
+            {settings.request_cancel_hours > 0 && (
+              <p><strong>{settings.free_cancel_hours}h to {settings.request_cancel_hours}h before:</strong> Customer can request cancellation, you decide whether to approve the refund</p>
+            )}
+            <p><strong>Less than {settings.request_cancel_hours > 0 ? settings.request_cancel_hours : settings.free_cancel_hours}h before:</strong> No cancellation, treated as no-show if missed</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

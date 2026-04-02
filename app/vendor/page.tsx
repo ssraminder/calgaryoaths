@@ -32,7 +32,7 @@ export default function VendorDashboard() {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
-  const activeStatuses = ['paid', 'confirmed'];
+  const activeStatuses = ['paid', 'confirmed', 'pending_cancellation'];
   const activeBookings = bookings.filter((b) => activeStatuses.includes(b.status));
   const pending = bookings.filter((b) => b.status === 'paid');
   const confirmed = bookings.filter((b) => b.status === 'confirmed');
