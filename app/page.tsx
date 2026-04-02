@@ -46,7 +46,7 @@ const homepageSchema = {
       name: 'Calgary Oaths — Downtown',
       address: {
         '@type': 'PostalAddress',
-        streetAddress: '421 7th Ave SW, #3000',
+        streetAddress: '421 7th Ave SW, Floor 30',
         addressLocality: 'Calgary',
         addressRegion: 'AB',
         postalCode: 'T2P 4K9',

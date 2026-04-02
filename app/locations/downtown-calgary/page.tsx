@@ -61,7 +61,7 @@ export default function DowntownCalgaryPage() {
                 Serving Downtown and surrounding neighbourhoods
               </h2>
               <p className="text-mid-grey leading-relaxed mb-4">
-                Located at 421 7th Ave SW, #3000, our downtown office is easily accessible from the Beltline, Mission,
+                Located at 421 7th Ave SW, Floor 30, our downtown office is easily accessible from the Beltline, Mission,
                 Cliff Bungalow, and Victoria Park. We also serve clients who work in the Downtown Core and need
                 documents commissioned during business hours or after work.
               </p>
