@@ -39,6 +39,7 @@ export default function VendorRatesPage() {
   const [addSearch, setAddSearch] = useState('');
   const [customName, setCustomName] = useState('');
   const [customSent, setCustomSent] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<{ id: string; service_slug: string | null; custom_service_name: string | null; created_at: string }[]>([]);
   const [settings, setSettings] = useState<VendorSettings>({
     mobile_available: false,
     virtual_available: false,
@@ -61,6 +62,7 @@ export default function VendorRatesPage() {
     ]).then(([ratesData, settingsData]) => {
       setRates(ratesData.rates ?? []);
       setAvailable(ratesData.available ?? []);
+      setPendingRequests(ratesData.pendingRequests ?? []);
       if (settingsData) setSettings(settingsData);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -97,10 +99,14 @@ export default function VendorRatesPage() {
       body: JSON.stringify({ slug }),
     });
     if (res.ok) {
-      // Refresh rates
+      // Refresh to get updated pending requests
       const ratesRes = await fetch('/api/vendor/rates').then((r) => r.json());
       setRates(ratesRes.rates ?? []);
       setAvailable(ratesRes.available ?? []);
+      setPendingRequests(ratesRes.pendingRequests ?? []);
+    } else {
+      const data = await res.json();
+      alert(data.error || 'Failed');
     }
   }
 
@@ -410,12 +416,16 @@ export default function VendorRatesPage() {
                             {s.price != null ? `$${(s.price / 100).toFixed(0)}` : s.price_label}
                           </span>
                         </div>
-                        <button
-                          onClick={() => handleAddService(s.slug)}
-                          className="text-xs text-navy hover:text-gold font-medium"
-                        >
-                          + Add
-                        </button>
+                        {pendingRequests.some((r) => r.service_slug === s.slug) ? (
+                          <span className="text-xs text-amber-600 font-medium">Pending</span>
+                        ) : (
+                          <button
+                            onClick={() => handleAddService(s.slug)}
+                            className="text-xs text-navy hover:text-gold font-medium"
+                          >
+                            Request
+                          </button>
+                        )}
                       </div>
                     ))}
                 </div>
@@ -423,6 +433,22 @@ export default function VendorRatesPage() {
             )}
             {available.length === 0 && (
               <p className="text-sm text-gray-400">You&apos;re offering all available services.</p>
+            )}
+
+            {/* Pending requests */}
+            {pendingRequests.length > 0 && (
+              <div className="border-t border-gray-200 pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Pending approval</label>
+                <div className="space-y-1">
+                  {pendingRequests.map((r) => (
+                    <div key={r.id} className="flex items-center gap-2 px-3 py-2 rounded bg-amber-50 border border-amber-200 text-sm">
+                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Pending</span>
+                      <span className="text-gray-900">{r.custom_service_name || available.find((s) => s.slug === r.service_slug)?.name || r.service_slug}</span>
+                      <span className="text-xs text-gray-400 ml-auto">{new Date(r.created_at).toLocaleDateString('en-CA')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Custom service request */}
