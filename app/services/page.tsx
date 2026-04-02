@@ -128,16 +128,12 @@ export default async function ServicesPage() {
                             <span className="text-gold font-semibold">{svc.price_label}</span>
                           )}
                         </span>
-                        <div className="flex items-center gap-2">
-                          {svc.requires_review ? (
-                            <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-pill font-medium">Review</span>
-                          ) : (
-                            <span className="text-[10px] bg-teal/10 text-teal border border-teal/20 px-1.5 py-0.5 rounded-pill font-medium">Book instantly</span>
-                          )}
-                          {svc.is_in_house && (
-                            <span className="text-[10px] bg-navy/5 text-navy border border-navy/10 px-1.5 py-0.5 rounded-pill font-medium">In-house</span>
-                          )}
-                        </div>
+                        <Link
+                          href={`/services/${svc.slug}`}
+                          className="text-sm text-gold hover:text-gold-light font-medium flex items-center gap-1 transition-colors"
+                        >
+                          Learn more <ArrowRight size={14} />
+                        </Link>
                       </div>
                     </div>
                   ))}

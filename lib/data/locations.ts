@@ -5,7 +5,7 @@ export const locations = [
     name: 'Downtown Calgary',
     commissionerId: 'raminder-shah',
     commissionerName: 'Raminder Shah',
-    address: '421 7th Ave SW, #3000, Calgary, AB T2P 4K9',
+    address: '421 7th Ave SW, Floor 30, Calgary, AB T2P 4K9',
     phone: '(587) 600-0746',
     parking: 'Paid parking available nearby. Accessible via CTrain.',
     nearbyNeighbourhoods: ['Beltline', '17th Ave SW', 'Mission', 'Cliff Bungalow', 'Victoria Park', 'Downtown Core'],
