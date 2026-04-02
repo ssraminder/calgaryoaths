@@ -728,6 +728,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                       value={customerAddr}
                       onChange={(val) => { setCustomerAddr(val); setValue('customerAddress', val); }}
                       loading={travelFeeLoading}
+                      travelFeeData={travelFeeData}
                     />
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -749,21 +750,6 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                         />
                       </div>
                     </div>
-
-                    {travelFeeData && (
-                      <div className="bg-gold/5 border border-gold/20 rounded-btn p-3 text-sm">
-                        <div className="flex justify-between text-charcoal">
-                          <span>
-                            Travel fee
-                            {travelFeeData.distanceKm != null && (
-                              <span className="text-mid-grey font-normal"> ({travelFeeData.distanceText}{travelFeeData.durationText ? ` · ~${travelFeeData.durationText}` : ''})</span>
-                            )}
-                          </span>
-                          <span className="font-semibold text-gold">${(travelFeeData.travelFeeCents / 100).toFixed(2)}</span>
-                        </div>
-                        <p className="text-xs text-mid-grey mt-1">$3/km, minimum $30. Charged upfront with your booking.</p>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

@@ -366,6 +366,7 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
                   value={customerAddr}
                   onChange={(val) => { setCustomerAddr(val); setValue('customerAddress', val); }}
                   loading={travelFeeLoading}
+                  travelFeeData={travelFeeData}
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -379,12 +380,6 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
                       className="w-full border border-border rounded-btn px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40" />
                   </div>
                 </div>
-                {travelFeeData && (
-                  <div className="flex justify-between text-sm text-charcoal">
-                    <span>Travel fee {travelFeeData.distanceText ? `(${travelFeeData.distanceText})` : ''}</span>
-                    <span className="font-semibold text-gold">${(travelFeeData.travelFeeCents / 100).toFixed(2)}</span>
-                  </div>
-                )}
               </div>
             )}
 
