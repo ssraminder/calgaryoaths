@@ -9,10 +9,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing commissionerId or address' }, { status: 400 });
   }
 
-  // Get commissioner address
+  // Get commissioner address + mobile pricing
   const { data: commissioner } = await supabase
     .from('co_commissioners')
-    .select('address')
+    .select('address, mobile_rate_per_km_cents, mobile_minimum_fee_cents')
     .eq('id', commissionerId)
     .single();
 
@@ -20,15 +20,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Commissioner address not found' }, { status: 404 });
   }
 
-  // Get mobile pricing config
-  const { data: settings } = await supabase
-    .from('co_settings')
-    .select('key, value')
-    .in('key', ['mobile_rate_per_km_cents', 'mobile_minimum_fee_cents']);
+  // Use vendor-specific rates, fall back to global settings
+  let ratePerKmCents = commissioner.mobile_rate_per_km_cents;
+  let minimumFeeCents = commissioner.mobile_minimum_fee_cents;
 
-  const config = Object.fromEntries((settings ?? []).map((r) => [r.key, r.value]));
-  const ratePerKmCents = parseInt(config.mobile_rate_per_km_cents || '300', 10);
-  const minimumFeeCents = parseInt(config.mobile_minimum_fee_cents || '3000', 10);
+  if (ratePerKmCents == null || minimumFeeCents == null) {
+    const { data: settings } = await supabase
+      .from('co_settings')
+      .select('key, value')
+      .in('key', ['mobile_rate_per_km_cents', 'mobile_minimum_fee_cents']);
+    const config = Object.fromEntries((settings ?? []).map((r) => [r.key, r.value]));
+    ratePerKmCents = ratePerKmCents ?? parseInt(config.mobile_rate_per_km_cents || '300', 10);
+    minimumFeeCents = minimumFeeCents ?? parseInt(config.mobile_minimum_fee_cents || '3000', 10);
+  }
 
   // Call Google Maps Distance Matrix API
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
