@@ -68,20 +68,8 @@ export default function PushNotificationPrompt() {
         return;
       }
 
-      // Ensure service worker is registered
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      if (registrations.length === 0) {
-        await navigator.serviceWorker.register('/sw.js', { scope: '/vendor' });
-      }
-
-      // Wait for service worker with a timeout
-      const swReady = await Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Service worker not ready. Try reopening the app.')), 10000)),
-      ]);
-      if (!swReady) throw new Error('No service worker');
-
-      const registration = swReady as ServiceWorkerRegistration;
+      // Get an active service worker registration
+      const registration = await getServiceWorkerRegistration();
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
@@ -225,16 +213,8 @@ export function PushToggle() {
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
         if (!vapidKey) throw new Error('VAPID key not configured. Contact admin.');
 
-        // Ensure service worker is registered
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        if (registrations.length === 0) {
-          await navigator.serviceWorker.register('/sw.js', { scope: '/vendor' });
-        }
-
-        const registration = await Promise.race([
-          navigator.serviceWorker.ready,
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Service worker not ready. Try reopening the app.')), 10000)),
-        ]) as ServiceWorkerRegistration;
+        // Get an active service worker registration
+        const registration = await getServiceWorkerRegistration();
 
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
@@ -303,6 +283,29 @@ export function PushToggle() {
       </div>
     </div>
   );
+}
+
+async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  // First check if there's already an active registration we can use
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  const active = registrations.find((r) => r.active);
+  if (active) return active;
+
+  // Try registering the SW (next-pwa generates /sw.js at build time)
+  try {
+    await navigator.serviceWorker.register('/sw.js');
+  } catch {
+    // SW file might not exist in dev — fall through to ready
+  }
+
+  // Wait for ready with timeout
+  const reg = await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Service worker not available. Close and reopen the app.')), 15000)
+    ),
+  ]);
+  return reg as ServiceWorkerRegistration;
 }
 
 function urlBase64ToUint8Array(base64String: string) {
