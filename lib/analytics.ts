@@ -1,17 +1,14 @@
 /** Google Analytics 4 + GTM + Google Ads event helpers for conversion tracking */
 
-/* ── Google Ads conversion IDs ───────────────────────────────────────
- *  Account 631-615-9162  →  AW-6316159162
- *  Conversion labels come from Google Ads → Goals → Conversions → Tag setup.
- *  Open each conversion action, click "Use Google Tag Manager", and copy
- *  the label value shown (e.g. "AbC1dEfGhIjKlMnO").
- *  Replace the placeholders below with those real labels.
- * ──────────────────────────────────────────────────────────────────── */
-export const GOOGLE_ADS_ID = 'AW-6316159162';
-/** Label for "Oath Commissioner Online Booking" conversion action */
-export const BOOKING_CONVERSION_LABEL = 'REPLACE_WITH_BOOKING_LABEL';
-/** Label for "Call (587-600-0746)" conversion action */
-export const PHONE_CONVERSION_LABEL = 'REPLACE_WITH_PHONE_LABEL';
+type AdsConfig = { id: string; bookingLabel: string | null; phoneLabel: string | null };
+
+/** Read the Google Ads config injected by the root layout script tag. */
+function getAdsConfig(): AdsConfig | null {
+  if (typeof window !== 'undefined' && (window as Record<string, unknown>).__ADS_CONFIG) {
+    return (window as Record<string, unknown>).__ADS_CONFIG as AdsConfig;
+  }
+  return null;
+}
 
 type GtagEvent = {
   event_category?: string;
@@ -100,18 +97,20 @@ export function trackPhoneClick(location: string) {
   pushDataLayer({ event: 'phone_click', location });
 
   // Fire Google Ads phone-call conversion
-  if (typeof window !== 'undefined' && window.gtag && PHONE_CONVERSION_LABEL !== 'REPLACE_WITH_PHONE_LABEL') {
+  const phoneCfg = getAdsConfig();
+  if (phoneCfg?.phoneLabel && window.gtag) {
     window.gtag('event', 'conversion', {
-      send_to: `${GOOGLE_ADS_ID}/${PHONE_CONVERSION_LABEL}`,
+      send_to: `${phoneCfg.id}/${phoneCfg.phoneLabel}`,
     });
   }
 }
 
 /** Fire the Google Ads booking-confirmed conversion (call once on confirmation page) */
 export function trackBookingConversion() {
-  if (typeof window !== 'undefined' && window.gtag && BOOKING_CONVERSION_LABEL !== 'REPLACE_WITH_BOOKING_LABEL') {
+  const cfg = getAdsConfig();
+  if (cfg?.bookingLabel && typeof window !== 'undefined' && window.gtag) {
     window.gtag('event', 'conversion', {
-      send_to: `${GOOGLE_ADS_ID}/${BOOKING_CONVERSION_LABEL}`,
+      send_to: `${cfg.id}/${cfg.bookingLabel}`,
     });
   }
   pushDataLayer({ event: 'booking_conversion' });

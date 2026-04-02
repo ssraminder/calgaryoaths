@@ -132,6 +132,9 @@ export function dbToLocation(row: DbLocation): Location {
 export type AnalyticsSettings = {
   ga4Id: string | null;
   gtmId: string | null;
+  googleAdsId: string | null;
+  googleAdsBookingLabel: string | null;
+  googleAdsPhoneLabel: string | null;
 };
 
 export async function getAnalyticsSettings(): Promise<AnalyticsSettings> {
@@ -139,6 +142,9 @@ export async function getAnalyticsSettings(): Promise<AnalyticsSettings> {
   return {
     ga4Id: settings.ga4_id ?? null,
     gtmId: settings.gtm_id ?? null,
+    googleAdsId: settings.google_ads_id ?? null,
+    googleAdsBookingLabel: settings.google_ads_booking_label ?? null,
+    googleAdsPhoneLabel: settings.google_ads_phone_label ?? null,
   };
 }
 
