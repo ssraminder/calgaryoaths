@@ -50,6 +50,14 @@ function generateSlotsForDay(
   return slots;
 }
 
+/** Convert a Calgary-local HH:MM + date string to a UTC ISO string */
+function localTimeToUtc(dateStr: string, time: string): Date {
+  const offset = calgaryOffset();
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [h, m] = time.split(':').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, h - offset, m, 0));
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const commissionerId = searchParams.get('commissionerId');
@@ -90,11 +98,7 @@ export async function GET(req: NextRequest) {
   const { data: rules } = await rulesQuery;
   const availRules = (rules ?? []) as AvailabilityRule[];
 
-  if (availRules.length === 0) {
-    return NextResponse.json({ slots: [] });
-  }
-
-  // Blocked dates
+  // Blocked dates (full-day blocks)
   const { data: blockedDatesData } = await supabase
     .from('co_blocked_dates')
     .select('blocked_date')
@@ -102,12 +106,30 @@ export async function GET(req: NextRequest) {
     .gte('blocked_date', startDate);
   const blockedDates = new Set((blockedDatesData ?? []).map((b) => b.blocked_date));
 
-  // Generate candidate slots from availability rules (skip blocked dates)
+  // Date overrides: both 'add' (extra time) and 'block' (remove time windows)
   const [sy, sm, sd] = startDate.split('-').map(Number);
   const base = new Date(sy, sm - 1, sd);
   const windowEnd = new Date(base);
   windowEnd.setDate(windowEnd.getDate() + DAYS_AHEAD);
   const endDateStr = windowEnd.toISOString().slice(0, 10);
+
+  const { data: customTimesData } = await supabase
+    .from('co_custom_times')
+    .select('custom_date, start_time, end_time, mode')
+    .eq('commissioner_id', commissionerId)
+    .gte('custom_date', startDate)
+    .lte('custom_date', endDateStr);
+
+  // Separate add vs block overrides, grouped by date
+  const addOverrides = new Map<string, { start_time: string; end_time: string }[]>();
+  const blockOverrides = new Map<string, { start_time: string; end_time: string }[]>();
+  for (const ct of customTimesData ?? []) {
+    const map = ct.mode === 'block' ? blockOverrides : addOverrides;
+    if (!map.has(ct.custom_date)) map.set(ct.custom_date, []);
+    map.get(ct.custom_date)!.push({ start_time: ct.start_time, end_time: ct.end_time });
+  }
+
+  // Generate candidate slots from regular availability rules
   const allSlots: string[] = [];
 
   for (let i = 0; i < DAYS_AHEAD; i++) {
@@ -115,37 +137,50 @@ export async function GET(req: NextRequest) {
     d.setDate(base.getDate() + i);
     const dateStr = d.toISOString().slice(0, 10);
     if (blockedDates.has(dateStr)) continue;
+
+    // Regular rule slots
     allSlots.push(...generateSlotsForDay(dateStr, availRules, SLOT_MINUTES));
-  }
 
-  // Custom time slots by date (additional one-off slots)
-  const { data: customTimesData } = await supabase
-    .from('co_custom_times')
-    .select('custom_date, start_time, end_time')
-    .eq('commissioner_id', commissionerId)
-    .gte('custom_date', startDate)
-    .lte('custom_date', endDateStr);
-
-  for (const ct of customTimesData ?? []) {
-    if (blockedDates.has(ct.custom_date)) continue;
-    const customRule: AvailabilityRule = {
-      day_of_week: new Date(ct.custom_date + 'T12:00:00').getDay(),
-      start_time: ct.start_time,
-      end_time: ct.end_time,
-    };
-    allSlots.push(...generateSlotsForDay(ct.custom_date, [customRule], SLOT_MINUTES));
+    // Extra slots from 'add' overrides
+    const extras = addOverrides.get(dateStr);
+    if (extras) {
+      for (const ex of extras) {
+        const customRule: AvailabilityRule = {
+          day_of_week: d.getDay(),
+          start_time: ex.start_time,
+          end_time: ex.end_time,
+        };
+        allSlots.push(...generateSlotsForDay(dateStr, [customRule], SLOT_MINUTES));
+      }
+    }
   }
 
   // Filter out past slots (buffer hours from now)
   const cutoff = new Date(Date.now() + bufferHours * 60 * 60 * 1000);
   let available = allSlots.filter((s) => new Date(s) > cutoff);
 
-  // Deduplicate slots (custom times might overlap with regular rules)
-  const uniqueSlots = [...new Set(available)];
-  available = uniqueSlots;
+  // Deduplicate
+  available = [...new Set(available)];
+
+  // Remove slots that fall within 'block' override windows
+  if (blockOverrides.size > 0) {
+    available = available.filter((slotIso) => {
+      const slotTime = new Date(slotIso);
+      // Check each date's block windows
+      for (const [dateStr, blocks] of blockOverrides) {
+        for (const block of blocks) {
+          const blockStart = localTimeToUtc(dateStr, block.start_time);
+          const blockEnd = localTimeToUtc(dateStr, block.end_time);
+          if (slotTime >= blockStart && slotTime < blockEnd) {
+            return false; // slot falls within a blocked time window
+          }
+        }
+      }
+      return true;
+    });
+  }
 
   // Filter out booked slots from DB (across ALL locations for this commissioner)
-
   const { data: booked } = await supabase
     .from('co_bookings')
     .select('appointment_datetime')
@@ -158,7 +193,12 @@ export async function GET(req: NextRequest) {
   const bookedSet = new Set((booked ?? []).map((b) => b.appointment_datetime));
   available = available.filter((s) => !bookedSet.has(s));
 
-  // TODO: Calendar integration (Google/Microsoft) will add busy-time filtering here
+  // TODO: Calendar integration — when co_calendar_connections exist for this vendor:
+  // 1. Fetch busy times from Google Calendar API / Microsoft Graph API
+  // 2. Convert busy periods to block windows and filter out matching slots
+  // 3. Calendar-sourced blocks are stored in co_custom_times with source='calendar'
+  //    and synced periodically via a background job or webhook
+  // See: co_calendar_connections table for connection metadata
 
   return NextResponse.json({ slots: available });
 }
