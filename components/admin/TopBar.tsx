@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { LogOut, Bell } from 'lucide-react';
@@ -9,14 +11,18 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+const LOGO_URL = 'https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/calgaryoaths.png';
+
 export default function TopBar({
   userName,
   logoutRedirect,
   portalName,
+  homeHref,
 }: {
   userName: string;
   logoutRedirect?: string;
   portalName?: string;
+  homeHref?: string;
 }) {
   const router = useRouter();
 
@@ -27,10 +33,16 @@ export default function TopBar({
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 md:px-6">
-      {/* Mobile: show portal branding (sidebar hidden on mobile) */}
-      <div className="md:hidden">
-        <span className="text-sm font-semibold text-navy">{portalName || 'Calgary Oaths'}</span>
-      </div>
+      {/* Mobile: logo + portal name (sidebar hidden on mobile) */}
+      <Link href={homeHref || '/admin'} className="flex items-center gap-2 md:hidden">
+        <Image
+          src={LOGO_URL}
+          alt="Calgary Oaths"
+          width={100}
+          height={34}
+          className="h-8 w-auto object-contain"
+        />
+      </Link>
       {/* Desktop: empty spacer (sidebar shows brand) */}
       <div className="hidden md:block" />
 

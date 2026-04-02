@@ -47,9 +47,9 @@ export default function VendorDashboard() {
         <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">Dashboard</h1>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <StatCard label="Awaiting Confirmation" value={pending.length} icon={AlertTriangle} highlight={pending.length > 0} />
-          <StatCard label="Today's Appointments" value={today.length} icon={CalendarCheck} />
-          <StatCard label="Confirmed Upcoming" value={confirmed.length} icon={Clock} />
+          <StatCard label="Awaiting Confirmation" value={pending.length} icon={AlertTriangle} highlight={pending.length > 0} href="/vendor/bookings?status=paid" />
+          <StatCard label="Today's Appointments" value={today.length} icon={CalendarCheck} href="/vendor/bookings" />
+          <StatCard label="Confirmed Upcoming" value={confirmed.length} icon={Clock} href="/vendor/bookings?status=confirmed" />
         </div>
 
         {/* Booking link */}

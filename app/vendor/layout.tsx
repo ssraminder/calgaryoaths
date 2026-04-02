@@ -63,7 +63,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
       <OfflineBanner />
       <VendorSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar userName={user?.fullName || ''} logoutRedirect="/vendor/login" portalName="Partner Portal" />
+        <TopBar userName={user?.fullName || ''} logoutRedirect="/vendor/login" portalName="Partner Portal" homeHref="/vendor" />
         <main className="vendor-main-content flex-1 overflow-y-auto p-4 md:p-6">
           <VendorPageTransition>
             {children}

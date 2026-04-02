@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { type LucideIcon } from 'lucide-react';
 
 type StatCardProps = {
@@ -5,14 +6,15 @@ type StatCardProps = {
   value: string | number;
   icon: LucideIcon;
   highlight?: boolean;
+  href?: string;
 };
 
-export default function StatCard({ label, value, icon: Icon, highlight }: StatCardProps) {
-  return (
+export default function StatCard({ label, value, icon: Icon, highlight, href }: StatCardProps) {
+  const card = (
     <div
       className={`rounded-lg border p-5 ${
         highlight ? 'border-gold bg-gold/5' : 'border-gray-200 bg-white'
-      }`}
+      } ${href ? 'active:bg-gray-50' : ''}`}
     >
       <div className="flex items-center justify-between">
         <div>
@@ -23,4 +25,10 @@ export default function StatCard({ label, value, icon: Icon, highlight }: StatCa
       </div>
     </div>
   );
+
+  if (href) {
+    return <Link href={href} className="block">{card}</Link>;
+  }
+
+  return card;
 }
