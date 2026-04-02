@@ -15,6 +15,7 @@ type Service = {
   slot_duration_minutes: number;
   display_order: number;
   active: boolean;
+  booking_notice: string | null;
 };
 
 export default function EditServicePage() {
@@ -48,6 +49,7 @@ export default function EditServicePage() {
       slot_duration_minutes: Number(fd.get('slot_duration_minutes') || 30),
       display_order: Number(fd.get('display_order') || 0),
       active: fd.get('active') === 'on',
+      booking_notice: fd.get('booking_notice') || null,
     };
 
     const res = await fetch(`/api/admin/services/${slug}`, {
@@ -92,6 +94,7 @@ export default function EditServicePage() {
           <Field name="display_order" label="Display Order" type="number" defaultValue={String(service.display_order)} />
         </div>
         <Field name="review_reason" label="Review Reason" defaultValue={service.review_reason || ''} />
+        <Field name="booking_notice" label="Booking Notice (shown before payment)" textarea defaultValue={service.booking_notice || ''} />
 
         <div className="flex gap-6">
           <label className="flex items-center gap-2 text-sm">

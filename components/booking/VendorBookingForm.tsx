@@ -29,6 +29,7 @@ type VendorService = {
   requiresReview: boolean;
   reviewReason?: string;
   slotDurationMinutes: number;
+  bookingNotice?: string | null;
 };
 
 type VendorProfile = {
@@ -436,11 +437,29 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
             onSelect={(slot) => setSelectedSlot(slot)}
           />
 
+          {selectedService?.bookingNotice && (
+            <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-card">
+              <div className="flex items-start gap-2">
+                <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800 mb-1">Important Information</p>
+                  <p className="text-sm text-amber-700">{selectedService.bookingNotice}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {slotError && <p className="text-red-500 text-sm mt-3">{slotError}</p>}
+
+          <p className="text-xs text-mid-grey mt-4 text-center">
+            By proceeding, you agree to our{' '}
+            <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">Terms & Conditions</a>
+            {' '}including the cancellation policy.
+          </p>
 
           <button type="button" disabled={!selectedSlot || scheduling}
             onClick={handleConfirmSlot}
-            className="btn-primary w-full justify-center mt-5 disabled:opacity-40">
+            className="btn-primary w-full justify-center mt-3 disabled:opacity-40">
             {scheduling ? 'Booking...' : 'Confirm & Pay'} <ChevronRight size={16} />
           </button>
         </div>
