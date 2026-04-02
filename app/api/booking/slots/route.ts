@@ -60,13 +60,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing commissionerId or startDate' }, { status: 400 });
   }
 
-  // Get buffer hours from settings
-  const { data: bufferSetting } = await supabase
-    .from('co_settings')
-    .select('value')
-    .eq('key', 'min_booking_buffer_hours')
+  // Get buffer hours: vendor-specific → global setting → default
+  const { data: commData } = await supabase
+    .from('co_commissioners')
+    .select('min_booking_buffer_hours')
+    .eq('id', commissionerId)
     .single();
-  const bufferHours = parseInt(bufferSetting?.value || String(DEFAULT_BUFFER_HOURS), 10);
+  let bufferHours = commData?.min_booking_buffer_hours;
+  if (bufferHours == null) {
+    const { data: bufferSetting } = await supabase
+      .from('co_settings')
+      .select('value')
+      .eq('key', 'min_booking_buffer_hours')
+      .single();
+    bufferHours = parseInt(bufferSetting?.value || String(DEFAULT_BUFFER_HOURS), 10);
+  }
 
   // Fetch availability rules — filter by location if provided
   let rulesQuery = supabase

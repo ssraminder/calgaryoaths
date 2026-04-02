@@ -7,6 +7,8 @@ type VendorSettings = {
   virtual_available: boolean;
   mobile_rate_per_km_cents: number;
   mobile_minimum_fee_cents: number;
+  min_booking_buffer_hours: number;
+  auto_accept_all: boolean;
 };
 
 type VendorRate = {
@@ -29,6 +31,8 @@ export default function VendorRatesPage() {
     virtual_available: false,
     mobile_rate_per_km_cents: 300,
     mobile_minimum_fee_cents: 3000,
+    min_booking_buffer_hours: 4,
+    auto_accept_all: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -160,6 +164,51 @@ export default function VendorRatesPage() {
             </p>
           </div>
         )}
+
+        {/* Booking Settings */}
+        <div className="border-t border-gray-200 pt-4 space-y-4">
+          <h3 className="text-sm font-medium text-gray-900">Booking Settings</h3>
+
+          {/* Lead time */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Minimum lead time (hours)</label>
+            <select
+              value={settings.min_booking_buffer_hours}
+              onChange={(e) => setSettings({ ...settings, min_booking_buffer_hours: Number(e.target.value) })}
+              className="w-full sm:w-48 rounded border border-gray-300 px-3 py-2 text-sm focus:border-navy focus:ring-1 focus:ring-navy"
+            >
+              <option value={1}>1 hour</option>
+              <option value={2}>2 hours</option>
+              <option value={4}>4 hours</option>
+              <option value={8}>8 hours</option>
+              <option value={12}>12 hours</option>
+              <option value={24}>24 hours (1 day)</option>
+              <option value={48}>48 hours (2 days)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              The earliest a customer can book is {settings.min_booking_buffer_hours} hour{settings.min_booking_buffer_hours !== 1 ? 's' : ''} from now.
+              For example, if a customer is booking at 10:00 AM, the earliest available slot would be {settings.min_booking_buffer_hours === 1 ? '11:00 AM' : settings.min_booking_buffer_hours === 2 ? '12:00 PM' : settings.min_booking_buffer_hours === 4 ? '2:00 PM' : settings.min_booking_buffer_hours === 8 ? '6:00 PM' : 'the next day'} today.
+              Set this to give yourself enough time to prepare for appointments.
+            </p>
+          </div>
+
+          {/* Auto-accept */}
+          <label className="flex items-center justify-between rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Accept all bookings automatically</p>
+              <p className="text-xs text-gray-500">
+                When enabled, paid bookings are automatically confirmed without requiring your manual review.
+                When disabled, you&apos;ll receive an email for each booking and must click &quot;Confirm&quot; to accept it.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.auto_accept_all}
+              onChange={(e) => setSettings({ ...settings, auto_accept_all: e.target.checked })}
+              className="rounded border-gray-300 text-navy focus:ring-navy h-5 w-5 flex-shrink-0 ml-4"
+            />
+          </label>
+        </div>
 
         <div className="flex items-center gap-3">
           <button onClick={handleSaveSettings} disabled={savingSettings}
