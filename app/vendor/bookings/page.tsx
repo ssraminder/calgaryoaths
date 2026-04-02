@@ -33,7 +33,7 @@ function VendorBookingsContent() {
   const searchParams = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState(searchParams.get('status') || '');
+  const [filter, setFilter] = useState(searchParams.get('status') || 'paid');
 
   const fetchBookings = useCallback(async () => {
     const params = filter ? `?status=${filter}` : '';
