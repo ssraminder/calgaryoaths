@@ -16,18 +16,18 @@ export default function AdminBottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white md:hidden">
-      <div className="flex">
+      <div className="flex px-2 pt-2 pb-1">
         {navItems.map(({ label, href, icon: Icon }) => {
           const active = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
-              className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
+              className={`flex flex-1 flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium transition-colors ${
                 active ? 'text-navy' : 'text-gray-400'
               }`}
             >
-              <Icon className="h-6 w-6" />
+              <Icon className="h-5 w-5" />
               {label}
             </Link>
           );
