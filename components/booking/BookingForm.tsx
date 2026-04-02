@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2, Calendar, Search } from 'lucide-react';
 import { BOOKING_FEES, type BookingService } from '@/lib/data/booking';
 import SlotPicker from '@/components/booking/SlotPicker';
+import BookingAddressInput from '@/components/booking/BookingAddressInput';
 import { trackServiceSelected, trackBookingCreated, trackSlotConfirmed, trackConversion } from '@/lib/analytics';
 
 /* ── Validation ─────────────────────────────────────────────────────────── */
@@ -717,27 +718,17 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 </div>
                 {(
                   <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-charcoal mb-1">Your address *</label>
-                      <div className="flex gap-2">
-                        <input
-                          {...register('customerAddress')}
-                          type="text"
-                          placeholder="123 Main St, Calgary, AB"
-                          value={customerAddr}
-                          onChange={(e) => { setCustomerAddr(e.target.value); setValue('customerAddress', e.target.value); }}
-                          className="flex-1 border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
-                        />
-                        <button
-                          type="button"
-                          disabled={!customerAddr || travelFeeLoading}
-                          onClick={() => calcTravelFee(customerAddr)}
-                          className="rounded-btn bg-navy px-4 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 flex-shrink-0"
-                        >
-                          {travelFeeLoading ? 'Calculating...' : 'Calculate'}
-                        </button>
-                      </div>
-                    </div>
+                    <BookingAddressInput
+                      onAddressSelected={(address) => {
+                        setCustomerAddr(address);
+                        setValue('customerAddress', address);
+                        calcTravelFee(address);
+                      }}
+                      onManualCalculate={() => { if (customerAddr) calcTravelFee(customerAddr); }}
+                      value={customerAddr}
+                      onChange={(val) => { setCustomerAddr(val); setValue('customerAddress', val); }}
+                      loading={travelFeeLoading}
+                    />
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-charcoal mb-1">Facility name</label>
