@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS co_custom_times;
 CREATE TABLE co_custom_times (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   commissioner_id text NOT NULL REFERENCES co_commissioners(id) ON DELETE CASCADE,
-  location_id uuid REFERENCES co_locations(id) ON DELETE SET NULL,
+  location_id text REFERENCES co_locations(id) ON DELETE SET NULL,
   custom_date date NOT NULL,
   start_time text NOT NULL,  -- HH:MM format (Calgary local time)
   end_time text NOT NULL,    -- HH:MM format (Calgary local time)
