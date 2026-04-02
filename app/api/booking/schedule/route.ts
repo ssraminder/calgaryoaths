@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       .eq('id', booking.commissioner_id)
       .single();
 
-    // Booking fee = first document rate (vendor rate → service price only)
+    // Price resolution: vendor rate → suggested rate → error
     const { data: vendorRate } = await supabase
       .from('co_vendor_rates')
       .select('first_page_cents')
@@ -72,10 +72,12 @@ export async function POST(req: NextRequest) {
         .select('price')
         .eq('slug', booking.service_slug)
         .single();
-      baseServiceFee = service?.price ?? null;
+      // Suggested rate = service price × 80%, rounded to nearest $5 (500 cents)
+      if (service?.price) {
+        baseServiceFee = Math.round((service.price * 0.8) / 500) * 500;
+      }
     }
 
-    // If no price found, this service requires manual review / quote
     if (!baseServiceFee) {
       return NextResponse.json(
         { error: 'This service requires a quote. Please contact us at (587) 600-0746.' },

@@ -42,6 +42,16 @@ export async function GET(req: NextRequest) {
     .in('commissioner_id', ids);
   const rateMap = new Map((rates ?? []).map((r) => [r.commissioner_id, r]));
 
+  // Fetch service price for suggested rate fallback
+  const { data: serviceData } = await supabase
+    .from('co_services')
+    .select('price')
+    .eq('slug', serviceSlug)
+    .single();
+  const suggestedRate = serviceData?.price
+    ? Math.round((serviceData.price * 0.8) / 500) * 500
+    : null;
+
   // All active locations for these commissioners
   const { data: locations } = await supabase
     .from('co_locations')
@@ -139,8 +149,8 @@ export async function GET(req: NextRequest) {
         commission_rate: comm.commission_rate,
         commission_mode: comm.commission_mode,
         booking_fee_cents: comm.booking_fee_cents,
-        // Rates
-        first_page_cents: rate?.first_page_cents ?? null,
+        // Rates (vendor rate → suggested rate fallback)
+        first_page_cents: rate?.first_page_cents ?? suggestedRate,
         additional_page_cents: rate?.additional_page_cents ?? null,
         drafting_fee_cents: rate?.drafting_fee_cents ?? null,
         // Availability

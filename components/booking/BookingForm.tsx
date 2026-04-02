@@ -308,7 +308,9 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   }
 
   // Booking fee = minimum service charge (first document rate), adjusted for commission mode
-  const baseServiceFee = selectedOption?.first_page_cents ?? selectedService?.price ?? null;
+  // Price: vendor rate → suggested rate (service price × 80%, rounded to $5)
+  const baseServiceFee = selectedOption?.first_page_cents
+    ?? (selectedService?.price ? Math.round((selectedService.price * 0.8) / 500) * 500 : null);
   const bookingFee = baseServiceFee && selectedOption ? customerPrice(baseServiceFee, selectedOption) : baseServiceFee;
   const bookingFeeLabel = bookingFee ? `$${(bookingFee / 100).toFixed(2)}` : null;
 
@@ -584,7 +586,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 }
                 return filtered;
               })(), commFilter).map((opt) => {
-                const basePrice = opt.first_page_cents ?? selectedService?.price ?? null;
+                const basePrice = opt.first_page_cents
+                  ?? (selectedService?.price ? Math.round((selectedService.price * 0.8) / 500) * 500 : null);
                 const price = basePrice ? customerPrice(basePrice, opt) : null;
                 const priceLabel = price ? `$${(price / 100).toFixed(0)}` : 'Quote';
                 const soonest = opt.soonestSlot
