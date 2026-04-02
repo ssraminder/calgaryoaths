@@ -94,24 +94,26 @@ export function trackPhoneClick(location: string) {
     event_category: 'contact',
     event_label: location,
   });
-  pushDataLayer({ event: 'phone_click', location });
 
-  // Fire Google Ads phone-call conversion
-  const phoneCfg = getAdsConfig();
-  if (phoneCfg?.phoneLabel && window.gtag) {
-    window.gtag('event', 'conversion', {
-      send_to: `${phoneCfg.id}/${phoneCfg.phoneLabel}`,
-    });
-  }
+  // Google Ads phone-call conversion is handled by GTM listening for
+  // the 'phone_click' dataLayer event — do NOT also call gtag directly
+  // here, as that would double-count the conversion.
+  const cfg = getAdsConfig();
+  pushDataLayer({
+    event: 'phone_click',
+    location,
+    ads_send_to: cfg ? `${cfg.id}/${cfg.phoneLabel}` : undefined,
+  });
 }
 
-/** Fire the Google Ads booking-confirmed conversion (call once on confirmation page) */
+/** Fire the Google Ads booking-confirmed conversion (call once on confirmation page).
+ *  The actual gtag conversion call is handled by a GTM tag that triggers on the
+ *  'booking_conversion' dataLayer event — do NOT also call gtag directly here,
+ *  as that would double-count the conversion. */
 export function trackBookingConversion() {
   const cfg = getAdsConfig();
-  if (cfg?.bookingLabel && typeof window !== 'undefined' && window.gtag) {
-    window.gtag('event', 'conversion', {
-      send_to: `${cfg.id}/${cfg.bookingLabel}`,
-    });
-  }
-  pushDataLayer({ event: 'booking_conversion' });
+  pushDataLayer({
+    event: 'booking_conversion',
+    ads_send_to: cfg ? `${cfg.id}/${cfg.bookingLabel}` : undefined,
+  });
 }
