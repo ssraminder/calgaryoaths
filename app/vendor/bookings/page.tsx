@@ -18,7 +18,7 @@ type Booking = {
   created_at: string;
 };
 
-const STATUSES = ['paid', 'confirmed', 'pending_scheduling', 'cancelled', 'completed'];
+const STATUSES = ['paid', 'confirmed', 'pending_scheduling', 'pending_cancellation', 'cancelled', 'completed'];
 
 export default function VendorBookingsPage() {
   return (

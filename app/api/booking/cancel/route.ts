@@ -1,5 +1,8 @@
 // Customer booking cancellation API — GET checks eligibility, POST executes cancellation.
-// Cancellations >12h before appointment get a full Stripe refund; <12h treated as no-show.
+// Uses vendor-configurable cancellation windows:
+//   > free_cancel_hours: automatic full refund
+//   free_cancel_hours to request_cancel_hours: request sent to vendor for approval
+//   < request_cancel_hours: no cancellation, treated as no-show
 // Uses cancel_token from the booking confirmation email for authentication.
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
@@ -11,7 +14,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-03-25.dahlia',
 });
 
-const CANCEL_WINDOW_HOURS = 12;
+// Defaults if vendor hasn't configured
+const DEFAULT_FREE_CANCEL_HOURS = 12;
+const DEFAULT_REQUEST_CANCEL_HOURS = 6;
+
+async function getVendorCancelPolicy(commissionerId: string) {
+  const { data } = await supabaseAdmin
+    .from('co_commissioners')
+    .select('free_cancel_hours, request_cancel_hours')
+    .eq('id', commissionerId)
+    .single();
+  return {
+    freeCancelHours: data?.free_cancel_hours ?? DEFAULT_FREE_CANCEL_HOURS,
+    requestCancelHours: data?.request_cancel_hours ?? DEFAULT_REQUEST_CANCEL_HOURS,
+  };
+}
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token');
@@ -21,7 +38,7 @@ export async function GET(req: NextRequest) {
 
   const { data: booking, error } = await supabaseAdmin
     .from('co_bookings')
-    .select('id, service_name, name, email, appointment_datetime, status, amount_paid')
+    .select('id, service_name, name, email, appointment_datetime, status, amount_paid, commissioner_id')
     .eq('cancel_token', token)
     .single();
 
@@ -33,15 +50,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'This booking has already been cancelled', booking: { service_name: booking.service_name, name: booking.name } }, { status: 400 });
   }
 
+  if (booking.status === 'pending_cancellation') {
+    return NextResponse.json({
+      booking: {
+        id: booking.id,
+        service_name: booking.service_name,
+        name: booking.name,
+        appointment_datetime: booking.appointment_datetime,
+        amount_paid: booking.amount_paid,
+        status: booking.status,
+      },
+      cancelTier: 'pending',
+      canCancelFree: false,
+      hoursUntilAppointment: null,
+    });
+  }
+
   if (!['paid', 'confirmed', 'pending_payment'].includes(booking.status)) {
     return NextResponse.json({ error: 'This booking cannot be cancelled at this time' }, { status: 400 });
   }
 
-  // Determine if within cancellation window
+  // Get vendor-specific cancel policy
+  const { freeCancelHours, requestCancelHours } = await getVendorCancelPolicy(booking.commissioner_id);
+
   const now = new Date();
   const apptTime = booking.appointment_datetime ? new Date(booking.appointment_datetime) : null;
   const hoursUntilAppt = apptTime ? (apptTime.getTime() - now.getTime()) / (1000 * 60 * 60) : null;
-  const isWithinWindow = hoursUntilAppt !== null && hoursUntilAppt < CANCEL_WINDOW_HOURS;
+
+  // Determine cancellation tier
+  let cancelTier: 'free' | 'request' | 'blocked';
+  if (hoursUntilAppt === null || hoursUntilAppt >= freeCancelHours) {
+    cancelTier = 'free';
+  } else if (requestCancelHours > 0 && hoursUntilAppt >= requestCancelHours) {
+    cancelTier = 'request';
+  } else {
+    cancelTier = 'blocked';
+  }
 
   return NextResponse.json({
     booking: {
@@ -52,8 +96,11 @@ export async function GET(req: NextRequest) {
       amount_paid: booking.amount_paid,
       status: booking.status,
     },
-    canCancelFree: !isWithinWindow,
+    cancelTier,
+    canCancelFree: cancelTier === 'free',
     hoursUntilAppointment: hoursUntilAppt ? Math.round(hoursUntilAppt * 10) / 10 : null,
+    freeCancelHours,
+    requestCancelHours,
   });
 }
 
@@ -77,19 +124,96 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Already cancelled' }, { status: 400 });
   }
 
+  if (booking.status === 'pending_cancellation') {
+    return NextResponse.json({ error: 'Cancellation is already pending vendor review' }, { status: 400 });
+  }
+
   if (!['paid', 'confirmed', 'pending_payment'].includes(booking.status)) {
     return NextResponse.json({ error: 'This booking cannot be cancelled' }, { status: 400 });
   }
 
+  // Get vendor-specific cancel policy
+  const { freeCancelHours, requestCancelHours } = await getVendorCancelPolicy(booking.commissioner_id);
+
   const now = new Date();
   const apptTime = booking.appointment_datetime ? new Date(booking.appointment_datetime) : null;
   const hoursUntilAppt = apptTime ? (apptTime.getTime() - now.getTime()) / (1000 * 60 * 60) : null;
-  const canRefund = hoursUntilAppt === null || hoursUntilAppt >= CANCEL_WINDOW_HOURS;
 
+  // Determine cancellation tier
+  let cancelTier: 'free' | 'request' | 'blocked';
+  if (hoursUntilAppt === null || hoursUntilAppt >= freeCancelHours) {
+    cancelTier = 'free';
+  } else if (requestCancelHours > 0 && hoursUntilAppt >= requestCancelHours) {
+    cancelTier = 'request';
+  } else {
+    cancelTier = 'blocked';
+  }
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+  // TIER: blocked — no cancellation allowed
+  if (cancelTier === 'blocked') {
+    return NextResponse.json({
+      error: `Cancellations are not allowed within ${requestCancelHours > 0 ? requestCancelHours : freeCancelHours} hours of the appointment`,
+    }, { status: 400 });
+  }
+
+  // TIER: request — send to vendor for approval
+  if (cancelTier === 'request') {
+    await supabaseAdmin
+      .from('co_bookings')
+      .update({
+        status: 'pending_cancellation',
+        cancellation_requested_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      })
+      .eq('id', booking.id);
+
+    // Notify admin
+    try {
+      await sendEmail({
+        to: 'info@calgaryoaths.com',
+        subject: `[Cancel Request] ${booking.name} — ${booking.service_name}`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+            <div style="background:#b45309;padding:24px;border-radius:8px 8px 0 0;">
+              <h1 style="color:white;margin:0;font-size:22px;">Cancellation Request</h1>
+            </div>
+            <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
+              <p>${booking.name} is requesting to cancel their booking for <strong>${booking.service_name}</strong>.</p>
+              <p>This is within the vendor approval window (${freeCancelHours}h–${requestCancelHours}h before appointment).</p>
+              <p>The vendor needs to approve or deny this request in their dashboard.</p>
+              <div style="margin:20px 0;text-align:center;">
+                <a href="${siteUrl}/admin/bookings/${booking.id}" style="display:inline-block;padding:12px 24px;background:#1B3A5C;color:white;text-decoration:none;border-radius:6px;font-size:14px;">View in Admin Panel</a>
+              </div>
+            </div>
+          </div>
+        `,
+      });
+    } catch (e) { console.error('Cancel request admin email error:', e); }
+
+    // Push notification to vendor
+    if (booking.commissioner_id) {
+      try {
+        await sendPushToCommissioner(booking.commissioner_id, {
+          title: 'Cancellation Request',
+          body: `${booking.name} is requesting to cancel ${booking.service_name}. Tap to review.`,
+          url: `/vendor/bookings/${booking.id}`,
+          tag: `cancel-request-${booking.id}`,
+        });
+      } catch (e) { console.error('Push notification error:', e); }
+    }
+
+    return NextResponse.json({
+      success: true,
+      cancelTier: 'request',
+      pendingApproval: true,
+    });
+  }
+
+  // TIER: free — automatic refund
   let refundId: string | null = null;
-
-  // Issue refund if cancelling more than 12 hours before appointment
-  if (canRefund && booking.stripe_payment_intent_id) {
+  if (booking.stripe_payment_intent_id) {
     try {
       const stripeRefund = await stripe.refunds.create({
         payment_intent: booking.stripe_payment_intent_id,
@@ -97,38 +221,32 @@ export async function POST(req: NextRequest) {
       refundId = stripeRefund.id;
     } catch (err) {
       console.error('Stripe refund error during customer cancel:', err);
-      // Continue with cancellation even if refund fails — admin can handle manually
     }
   }
 
-  // Update booking status
   await supabaseAdmin
     .from('co_bookings')
     .update({
-      status: canRefund ? 'cancelled' : 'no_show',
+      status: 'cancelled',
       cancelled_at: now.toISOString(),
-      cancelled_reason: canRefund
-        ? 'Cancelled by customer (more than 12 hours before appointment)'
-        : 'Cancelled by customer within 12 hours — treated as no-show',
+      cancelled_reason: `Cancelled by customer (more than ${freeCancelHours} hours before appointment)`,
       cancel_token: null,
       updated_at: now.toISOString(),
     })
     .eq('id', booking.id);
 
   // Notify admin
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
   try {
     await sendEmail({
       to: 'info@calgaryoaths.com',
-      subject: `[Cancellation] ${booking.name} — ${booking.service_name}${!canRefund ? ' (NO-SHOW)' : ''}`,
+      subject: `[Cancellation] ${booking.name} — ${booking.service_name}`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-          <div style="background:${canRefund ? '#dc2626' : '#b45309'};padding:24px;border-radius:8px 8px 0 0;">
-            <h1 style="color:white;margin:0;font-size:22px;">${canRefund ? 'Booking Cancelled' : 'Late Cancellation (No-Show)'}</h1>
+          <div style="background:#dc2626;padding:24px;border-radius:8px 8px 0 0;">
+            <h1 style="color:white;margin:0;font-size:22px;">Booking Cancelled</h1>
           </div>
           <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
             <p>${booking.name} has cancelled their booking for <strong>${booking.service_name}</strong>.</p>
-            ${!canRefund ? '<p style="color:#b45309;font-weight:bold;">This was within 12 hours of the appointment and is treated as a no-show. No refund was issued.</p>' : ''}
             ${refundId ? `<p>Stripe refund issued: <code>${refundId}</code></p>` : ''}
             <table style="border-collapse:collapse;width:100%;margin:16px 0;font-size:14px;">
               <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Booking ID</td><td style="padding:8px;border:1px solid #e2e0da"><code>${booking.id}</code></td></tr>
@@ -150,8 +268,8 @@ export async function POST(req: NextRequest) {
   if (booking.commissioner_id) {
     try {
       await sendPushToCommissioner(booking.commissioner_id, {
-        title: canRefund ? 'Booking Cancelled' : 'Late Cancellation',
-        body: `${booking.name} cancelled ${booking.service_name}${!canRefund ? ' (no-show)' : ''}`,
+        title: 'Booking Cancelled',
+        body: `${booking.name} cancelled ${booking.service_name}`,
         url: `/vendor/bookings`,
         tag: `booking-${booking.id}`,
       });
@@ -160,7 +278,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    refunded: canRefund && !!refundId,
-    noShow: !canRefund,
+    cancelTier: 'free',
+    refunded: !!refundId,
   });
 }

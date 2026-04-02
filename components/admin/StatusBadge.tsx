@@ -2,6 +2,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
   pending_review: { label: 'Pending Review', className: 'bg-orange-100 text-orange-800' },
   pending_scheduling: { label: 'Pending Scheduling', className: 'bg-blue-100 text-blue-800' },
+  pending_cancellation: { label: 'Cancel Requested', className: 'bg-amber-100 text-amber-800' },
   pending_payment: { label: 'Pending Payment', className: 'bg-purple-100 text-purple-800' },
   paid: { label: 'Paid', className: 'bg-green-100 text-green-800' },
   confirmed: { label: 'Confirmed', className: 'bg-green-100 text-green-800' },
