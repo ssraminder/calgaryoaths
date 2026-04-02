@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyVendor } from '@/lib/vendor-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
+import { calendarLinksHtml } from '@/lib/calendar';
 
 export async function POST(
   req: NextRequest,
@@ -42,6 +43,19 @@ export async function POST(
   });
   const isMobile = booking.delivery_mode === 'mobile';
 
+  const locationText = isMobile
+    ? booking.customer_address || 'Mobile service'
+    : commDetail?.address || 'Calgary, AB';
+
+  const calHtml = booking.appointment_datetime
+    ? calendarLinksHtml({
+        title: `${booking.service_name} — Calgary Oaths`,
+        description: `Commissioner: ${vendor.commissionerName}\nPhone: ${commDetail?.phone || '(587) 600-0746'}`,
+        location: locationText,
+        startTime: booking.appointment_datetime,
+      })
+    : '';
+
   try {
     await sendEmail({
       to: booking.email,
@@ -52,11 +66,9 @@ export async function POST(
         <p>Your appointment for <strong>${booking.service_name}</strong> has been confirmed.</p>
         <p><strong>Date & Time:</strong> ${apptDate}</p>
         <p><strong>Commissioner:</strong> ${vendor.commissionerName}</p>
-        ${isMobile
-          ? `<p><strong>Location:</strong> Mobile — we will come to: ${booking.customer_address || 'your location'}</p>`
-          : `<p><strong>Location:</strong> ${commDetail?.address || 'See confirmation details'}</p>`
-        }
+        <p><strong>Location:</strong> ${isMobile ? `Mobile — we will come to: ${booking.customer_address || 'your location'}` : commDetail?.address || ''}</p>
         <p><strong>Phone:</strong> ${commDetail?.phone || '(587) 600-0746'}</p>
+        ${calHtml}
         <h3>What to bring:</h3>
         <ul>
           <li>Valid government-issued photo ID</li>
