@@ -113,17 +113,22 @@ export async function GET(req: NextRequest) {
   windowEnd.setDate(windowEnd.getDate() + DAYS_AHEAD);
   const endDateStr = windowEnd.toISOString().slice(0, 10);
 
-  const { data: customTimesData } = await supabase
-    .from('co_custom_times')
-    .select('custom_date, start_time, end_time, mode')
-    .eq('commissioner_id', commissionerId)
-    .gte('custom_date', startDate)
-    .lte('custom_date', endDateStr);
+  // Date overrides (table may not exist yet if migration hasn't run)
+  let customTimesData: { custom_date: string; start_time: string; end_time: string; mode: string }[] = [];
+  try {
+    const { data: ctData, error: ctError } = await supabase
+      .from('co_custom_times')
+      .select('custom_date, start_time, end_time, mode')
+      .eq('commissioner_id', commissionerId)
+      .gte('custom_date', startDate)
+      .lte('custom_date', endDateStr);
+    if (!ctError && ctData) customTimesData = ctData;
+  } catch { /* table may not exist yet */ }
 
   // Separate add vs block overrides, grouped by date
   const addOverrides = new Map<string, { start_time: string; end_time: string }[]>();
   const blockOverrides = new Map<string, { start_time: string; end_time: string }[]>();
-  for (const ct of customTimesData ?? []) {
+  for (const ct of customTimesData) {
     const map = ct.mode === 'block' ? blockOverrides : addOverrides;
     if (!map.has(ct.custom_date)) map.set(ct.custom_date, []);
     map.get(ct.custom_date)!.push({ start_time: ct.start_time, end_time: ct.end_time });

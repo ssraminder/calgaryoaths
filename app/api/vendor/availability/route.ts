@@ -36,19 +36,23 @@ export async function GET(req: NextRequest) {
     .gte('blocked_date', new Date().toISOString().split('T')[0])
     .order('blocked_date', { ascending: true });
 
-  // Custom times
-  const { data: customTimes } = await supabaseAdmin
-    .from('co_custom_times')
-    .select('id, custom_date, start_time, end_time, mode, reason')
-    .eq('commissioner_id', vendor.commissionerId)
-    .gte('custom_date', new Date().toISOString().split('T')[0])
-    .order('custom_date', { ascending: true });
+  // Custom times (table may not exist yet if migration hasn't run)
+  let customTimes: { id: string; custom_date: string; start_time: string; end_time: string; mode: string; reason: string }[] = [];
+  try {
+    const { data: ctData, error: ctError } = await supabaseAdmin
+      .from('co_custom_times')
+      .select('id, custom_date, start_time, end_time, mode, reason')
+      .eq('commissioner_id', vendor.commissionerId)
+      .gte('custom_date', new Date().toISOString().split('T')[0])
+      .order('custom_date', { ascending: true });
+    if (!ctError && ctData) customTimes = ctData;
+  } catch { /* table may not exist yet */ }
 
   return NextResponse.json({
     rules: data ?? [],
     locations: locations ?? [],
     blockedDates: blockedDates ?? [],
-    customTimes: customTimes ?? [],
+    customTimes,
   });
 }
 
