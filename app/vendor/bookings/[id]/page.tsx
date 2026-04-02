@@ -215,7 +215,7 @@ export default function VendorBookingDetailPage() {
               value={completionNotes}
               onChange={(e) => setCompletionNotes(e.target.value)}
               placeholder="Any notes about the appointment..."
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-base"
             />
           </div>
 
@@ -264,18 +264,18 @@ export default function VendorBookingDetailPage() {
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Date</label>
                   <input type="date" value={proposeDate} onChange={(e) => setProposeDate(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-base" />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Time</label>
                   <input type="time" value={proposeTime} onChange={(e) => setProposeTime(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-base" />
                 </div>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Reason (optional, shown to customer)</label>
                 <textarea rows={2} value={proposeReason} onChange={(e) => setProposeReason(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="e.g. Schedule conflict..." />
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-base" placeholder="e.g. Schedule conflict..." />
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
