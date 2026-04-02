@@ -43,6 +43,16 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  manifest: '/manifest.json',
+  themeColor: '#1B3A5C',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'CO Partner',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export default async function RootLayout({
@@ -61,6 +71,9 @@ export default async function RootLayout({
       className={`${playfair.variable} ${inter.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
+      </head>
       {gtmId && <GTMHead gtmId={gtmId} />}
       <body className="min-h-full flex flex-col bg-bg text-charcoal font-body" suppressHydrationWarning>
         {gtmId && <GTMNoScript gtmId={gtmId} />}

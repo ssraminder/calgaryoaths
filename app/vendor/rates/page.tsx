@@ -286,8 +286,8 @@ export default function VendorRatesPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-lg border border-gray-200 bg-white overflow-x-auto">
+        <table className="w-full min-w-[540px] text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
               <th className="px-4 py-3">Service</th>
@@ -366,7 +366,7 @@ export default function VendorRatesPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-md bg-navy px-5 py-2 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50"
+          className="rounded-md bg-navy px-5 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 min-h-[44px]"
         >
           {saving ? 'Saving...' : 'Save Rates'}
         </button>

@@ -170,12 +170,12 @@ export default function VendorBookingDetailPage() {
       {booking.status === 'paid' && (
         <div className="space-y-3">
           <button onClick={handleAccept} disabled={acting}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-3 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 min-h-[44px]">
             <CheckCircle className="h-4 w-4" />
             {acting ? 'Confirming...' : 'Accept — Confirm This Time'}
           </button>
           <button onClick={() => setShowPropose(true)} disabled={acting}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-orange-300 px-4 py-2.5 text-sm font-medium text-orange-600 hover:bg-orange-50 disabled:opacity-50">
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-orange-300 px-4 py-3 text-sm font-medium text-orange-600 hover:bg-orange-50 disabled:opacity-50 min-h-[44px]">
             <Clock className="h-4 w-4" />
             Propose Different Time
           </button>
@@ -216,7 +216,7 @@ export default function VendorBookingDetailPage() {
             type="button"
             onClick={handleComplete}
             disabled={!canComplete || completing}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-navy px-4 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-navy px-4 py-3 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
           >
             <CheckCircle size={16} />
             {completing ? 'Completing...' : 'Mark as Complete'}
@@ -246,8 +246,8 @@ export default function VendorBookingDetailPage() {
 
       {/* Propose modal */}
       {showPropose && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-t-xl sm:rounded-lg bg-white p-5 sm:p-6 shadow-lg mx-0 sm:mx-4">
             <h3 className="text-lg font-medium text-gray-900">Propose a New Time</h3>
             <p className="mt-1 text-sm text-gray-500">The customer will be emailed with the option to accept or request a refund.</p>
             <div className="mt-4 space-y-3">
