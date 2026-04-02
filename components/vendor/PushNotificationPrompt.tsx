@@ -172,6 +172,12 @@ export function PushToggle() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // On iOS, push only works in standalone (home screen) mode
+    const isIos = /iP(hone|ad|od)/.test(navigator.userAgent);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || ('standalone' in navigator && (navigator as unknown as { standalone: boolean }).standalone);
+    if (isIos && !isStandalone) return; // not supported in Safari
+
     if ('Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window) {
       setSupported(true);
       checkSubscription();
@@ -230,15 +236,34 @@ export function PushToggle() {
       }
     } catch (err) {
       console.error('Push toggle failed:', err);
+      alert('Could not toggle notifications. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
-  if (!supported) return null;
+  if (!supported) {
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center gap-3">
+          <BellOff className="h-5 w-5 text-gray-400" />
+          <div>
+            <p className="text-sm font-medium text-gray-900">Push Notifications</p>
+            <p className="text-xs text-gray-500">Not supported on this device</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <label className="flex items-center justify-between rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={toggle}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggle(); }}
+      className="flex items-center justify-between rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50"
+    >
       <div className="flex items-center gap-3">
         {subscribed ? (
           <Bell className="h-5 w-5 text-navy" />
@@ -248,18 +273,16 @@ export function PushToggle() {
         <div>
           <p className="text-sm font-medium text-gray-900">Push Notifications</p>
           <p className="text-xs text-gray-500">
-            {subscribed ? 'Alerts enabled for new bookings' : 'Enable to get booking alerts'}
+            {loading ? 'Updating...' : subscribed ? 'Alerts enabled for new bookings' : 'Enable to get booking alerts'}
           </p>
         </div>
       </div>
-      <button
-        onClick={toggle}
-        disabled={loading}
-        className={`relative h-6 w-11 rounded-full transition-colors ${subscribed ? 'bg-navy' : 'bg-gray-300'} disabled:opacity-50`}
+      <div
+        className={`relative h-6 w-11 rounded-full transition-colors flex-shrink-0 ${subscribed ? 'bg-navy' : 'bg-gray-300'} ${loading ? 'opacity-50' : ''}`}
       >
         <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${subscribed ? 'translate-x-5' : 'translate-x-0'}`} />
-      </button>
-    </label>
+      </div>
+    </div>
   );
 }
 
