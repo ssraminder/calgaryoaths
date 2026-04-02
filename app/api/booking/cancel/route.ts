@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import Stripe from 'stripe';
 import { sendEmail } from '@/lib/email';
+import { sendPushToCommissioner } from '@/lib/push';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-03-25.dahlia',
@@ -143,6 +144,18 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     console.error('Cancel admin email error:', e);
+  }
+
+  // Push notification to vendor
+  if (booking.commissioner_id) {
+    try {
+      await sendPushToCommissioner(booking.commissioner_id, {
+        title: canRefund ? 'Booking Cancelled' : 'Late Cancellation',
+        body: `${booking.name} cancelled ${booking.service_name}${!canRefund ? ' (no-show)' : ''}`,
+        url: `/vendor/bookings`,
+        tag: `booking-${booking.id}`,
+      });
+    } catch (e) { console.error('Push notification error:', e); }
   }
 
   return NextResponse.json({

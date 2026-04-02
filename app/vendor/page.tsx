@@ -6,6 +6,7 @@ import { CalendarCheck, Clock, AlertTriangle, Link as LinkIcon, Copy, Check } fr
 import StatCard from '@/components/admin/StatCard';
 import StatusBadge from '@/components/admin/StatusBadge';
 import PullToRefresh from '@/components/vendor/PullToRefresh';
+import PushNotificationPrompt from '@/components/vendor/PushNotificationPrompt';
 
 type Booking = {
   id: string;
@@ -45,6 +46,8 @@ export default function VendorDashboard() {
     <PullToRefresh onRefresh={fetchBookings}>
       <div className="space-y-6">
         <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">Dashboard</h1>
+
+        <PushNotificationPrompt />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard label="Awaiting Confirmation" value={pending.length} icon={AlertTriangle} highlight={pending.length > 0} href="/vendor/bookings?status=paid" />

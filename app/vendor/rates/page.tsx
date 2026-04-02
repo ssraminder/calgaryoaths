@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Trash2, Plus, Search } from 'lucide-react';
+import { PushToggle } from '@/components/vendor/PushNotificationPrompt';
 
 type AvailableService = {
   slug: string;
@@ -158,6 +159,12 @@ export default function VendorRatesPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-2xl font-semibold text-gray-900">Rates & Services</h1>
+
+      {/* Notification Settings */}
+      <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
+        <h2 className="text-lg font-medium text-gray-900">Notifications</h2>
+        <PushToggle />
+      </div>
 
       {/* Service Delivery Settings */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-4">

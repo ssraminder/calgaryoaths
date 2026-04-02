@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
+import { sendPushToCommissioner } from '@/lib/push';
 import { calendarLinksHtml, locationHtml } from '@/lib/calendar';
 import crypto from 'crypto';
 
@@ -217,6 +218,18 @@ export async function POST(req: NextRequest) {
             `,
           });
         } catch (e) { console.error('Vendor email error:', e); }
+      }
+
+      // ──────── PUSH NOTIFICATION TO VENDOR ────────
+      if (booking.commissioner_id) {
+        try {
+          await sendPushToCommissioner(booking.commissioner_id, {
+            title: 'New Booking',
+            body: `${booking.name} — ${booking.service_name} — ${apptDate}`,
+            url: `/vendor/bookings`,
+            tag: `booking-${bookingId}`,
+          });
+        } catch (e) { console.error('Push notification error:', e); }
       }
 
       // ──────── 3. ADMIN EMAIL ────────

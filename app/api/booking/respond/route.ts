@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
+import { sendPushToCommissioner } from '@/lib/push';
 import Stripe from 'stripe';
 import crypto from 'crypto';
 
@@ -48,6 +49,21 @@ export async function GET(req: NextRequest) {
       });
     } catch (e) { console.error('Accept notification error:', e); }
 
+    // Push notification to vendor
+    if (booking.commissioner_id) {
+      try {
+        const proposedDate = booking.proposed_datetime
+          ? new Date(booking.proposed_datetime).toLocaleString('en-CA', { timeZone: 'America/Edmonton', dateStyle: 'medium', timeStyle: 'short' })
+          : '';
+        await sendPushToCommissioner(booking.commissioner_id, {
+          title: 'Time Accepted',
+          body: `${booking.name} accepted the proposed time${proposedDate ? ` — ${proposedDate}` : ''}`,
+          url: `/vendor/bookings`,
+          tag: `booking-${booking.id}`,
+        });
+      } catch (e) { console.error('Push notification error:', e); }
+    }
+
     return NextResponse.redirect(`${siteUrl}/booking/respond?result=accepted`);
   }
 
@@ -78,6 +94,18 @@ export async function GET(req: NextRequest) {
         html: `<p>${booking.name} (${booking.email}) requested a refund for ${booking.service_name}. ${refundId ? `Refund ID: ${refundId}` : 'Manual refund may be needed.'}</p>`,
       });
     } catch (e) { console.error('Refund notification error:', e); }
+
+    // Push notification to vendor
+    if (booking.commissioner_id) {
+      try {
+        await sendPushToCommissioner(booking.commissioner_id, {
+          title: 'Booking Cancelled',
+          body: `${booking.name} requested a refund for ${booking.service_name}`,
+          url: `/vendor/bookings`,
+          tag: `booking-${booking.id}`,
+        });
+      } catch (e) { console.error('Push notification error:', e); }
+    }
 
     return NextResponse.redirect(`${siteUrl}/booking/respond?result=refunded`);
   }
