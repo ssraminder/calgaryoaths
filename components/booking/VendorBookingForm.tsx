@@ -133,7 +133,7 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
   const subtotal = (bookingFee ?? 0) + travelFee + convFee;
   const taxAmount = Math.round(subtotal * pricing.tax.total_rate);
   const totalCharged = subtotal + taxAmount;
-  const totalSteps = selectedService?.requiresReview ? 1 : 3;
+  const totalSteps = selectedService?.requiresReview ? 2 : 3;
 
   async function calcTravelFee(address: string) {
     if (!address) return;
