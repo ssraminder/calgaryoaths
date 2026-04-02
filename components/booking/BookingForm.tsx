@@ -151,8 +151,8 @@ function sortedOptions(list: LocationOption[], filter: 'all' | 'soonest' | 'pric
     });
   } else if (filter === 'price') {
     sorted.sort((a, b) => {
-      const pa = a.first_page_cents ?? a.booking_fee_cents ?? 999999;
-      const pb = b.first_page_cents ?? b.booking_fee_cents ?? 999999;
+      const pa = a.first_page_cents ?? 999999;
+      const pb = b.first_page_cents ?? 999999;
       return pa - pb;
     });
   }
@@ -308,7 +308,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   }
 
   // Booking fee = minimum service charge (first document rate), adjusted for commission mode
-  const baseServiceFee = selectedOption?.first_page_cents ?? selectedService?.price ?? selectedOption?.booking_fee_cents ?? null;
+  const baseServiceFee = selectedOption?.first_page_cents ?? selectedService?.price ?? null;
   const bookingFee = baseServiceFee && selectedOption ? customerPrice(baseServiceFee, selectedOption) : baseServiceFee;
   const bookingFeeLabel = bookingFee ? `$${(bookingFee / 100).toFixed(2)}` : null;
 
@@ -584,7 +584,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 }
                 return filtered;
               })(), commFilter).map((opt) => {
-                const basePrice = opt.first_page_cents ?? selectedService?.price ?? opt.booking_fee_cents;
+                const basePrice = opt.first_page_cents ?? selectedService?.price ?? null;
                 const price = basePrice ? customerPrice(basePrice, opt) : null;
                 const priceLabel = price ? `$${(price / 100).toFixed(0)}` : 'Quote';
                 const soonest = opt.soonestSlot
