@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
+import { calendarLinksHtml, locationHtml } from '@/lib/calendar';
 import crypto from 'crypto';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -73,9 +74,14 @@ export async function POST(req: NextRequest) {
           })
         : 'To be confirmed';
 
-      const locationText = isMobile
-        ? `Mobile service — ${booking.customer_address || 'Customer location'}`
+      const locationAddr = isMobile
+        ? booking.customer_address || 'Customer location'
+        : location?.address || commissioner?.address || 'Calgary, AB';
+      const locationLabel = isMobile
+        ? `Mobile service — ${locationAddr}`
         : location?.name ? `${location.name} — ${location.address}` : commissioner?.address || '';
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddr)}`;
+      const locationText = `<a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="color:#C8922A;text-decoration:underline;">${locationLabel} ↗</a>`;
 
       const whatToBring = service?.what_to_bring ?? ['Valid government-issued photo ID', 'Your documents — unsigned'];
       const importantNotes = service?.important_notes ?? ['Do NOT sign documents before the appointment'];
@@ -103,6 +109,18 @@ export async function POST(req: NextRequest) {
           ${booking.notes ? `<tr><td style="padding:10px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Customer Notes</td><td style="padding:10px;border:1px solid #e2e0da">${booking.notes}</td></tr>` : ''}
         </table>`;
 
+      const calendarHtml = booking.appointment_datetime
+        ? calendarLinksHtml({
+            title: `${booking.service_name} — Calgary Oaths`,
+            description: `Commissioner: ${commissioner?.name || 'Calgary Oaths'}\nCustomer: ${booking.name}\nPhone: ${commissioner?.phone || '(587) 600-0746'}`,
+            location: isMobile
+              ? booking.customer_address || 'Mobile service'
+              : commissioner?.address || 'Calgary, AB',
+            startTime: booking.appointment_datetime,
+            durationMinutes: 30,
+          })
+        : '';
+
       // ──────── 1. CUSTOMER EMAIL ────────
       try {
         await sendEmail({
@@ -118,6 +136,8 @@ export async function POST(req: NextRequest) {
                 <p>Thank you for your booking. Your payment of <strong>$${((booking.amount_paid || 0) / 100).toFixed(2)}</strong> has been received.</p>
 
                 ${bookingDetailsTable}
+
+                ${calendarHtml}
 
                 <p><strong>Commissioner:</strong> ${commissioner?.name || ''}</p>
                 ${commissioner?.phone ? `<p><strong>Commissioner Phone:</strong> <a href="tel:${commissioner.phone}">${commissioner.phone}</a></p>` : ''}
@@ -163,6 +183,8 @@ export async function POST(req: NextRequest) {
                   <p>A customer has booked and paid. Please confirm or suggest a different time.</p>
 
                   ${bookingDetailsTable}
+
+                  ${calendarHtml}
 
                   ${signersNote}
 

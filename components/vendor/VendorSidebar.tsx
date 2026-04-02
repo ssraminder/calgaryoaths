@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, CalendarCheck, Clock, Calendar, Settings } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, Clock, Calendar, DollarSign } from 'lucide-react';
 
 const navItems = [
   { label: 'Dashboard', href: '/vendor', icon: LayoutDashboard },
   { label: 'Bookings', href: '/vendor/bookings', icon: CalendarCheck },
+  { label: 'Rates', href: '/vendor/rates', icon: DollarSign },
   { label: 'Availability', href: '/vendor/availability', icon: Clock },
   { label: 'Calendar', href: '/vendor/calendar', icon: Calendar },
 ];
