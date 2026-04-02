@@ -12,7 +12,7 @@ const service = services.find((s) => s.slug === 'affidavit')!;
 export const metadata: Metadata = {
   title: 'Affidavit Drafting & Commissioning Calgary | Same-Day Service | Calgary Oaths',
   description:
-    'Professional affidavit drafting and commissioning in Calgary. We draft it for you — bring your ID. From $30 (commissioning) or $40 (drafting + commissioning). Same-day available.',
+    'Professional affidavit drafting and commissioning in Calgary. We draft it for you — bring your ID. Drafting from $120/hr (commissioning included), billed every 30 min after 1 hr. Same-day available.',
   alternates: { canonical: 'https://calgaryoaths.com/services/affidavit' },
   openGraph: { title: 'Affidavit Drafting Calgary | Calgary Oaths', url: 'https://calgaryoaths.com/services/affidavit' },
 };
@@ -24,7 +24,7 @@ const schema = {
   description: service.shortDescription,
   provider: { '@type': 'LocalBusiness', name: 'Calgary Oaths', telephone: '+15876000746' },
   areaServed: { '@type': 'City', name: 'Calgary' },
-  offers: { '@type': 'Offer', price: '40', priceCurrency: 'CAD' },
+  offers: { '@type': 'Offer', price: '120', priceCurrency: 'CAD', unitText: 'HOUR' },
 };
 
 const faqSchema = {
@@ -64,7 +64,7 @@ export default function AffidavitPage() {
                 </h1>
                 <p className="text-mid-grey text-lg leading-relaxed">
                   An affidavit is a written statement of facts you swear or affirm to be true before a Commissioner of Oaths.
-                  We witness your signature and commission the affidavit with our official seal. Drafting is available at an extra charge if you need the document prepared from scratch.
+                  We witness your signature and commission the affidavit with our official seal. Drafting starts at $120/hr (commissioning included), billed every 30 minutes after the first hour.
                 </p>
               </div>
 
