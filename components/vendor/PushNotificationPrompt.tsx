@@ -291,21 +291,29 @@ async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration
   const active = registrations.find((r) => r.active);
   if (active) return active;
 
-  // Try registering the SW (next-pwa generates /sw.js at build time)
-  try {
-    await navigator.serviceWorker.register('/sw.js');
-  } catch {
-    // SW file might not exist in dev — fall through to ready
+  // Register push-sw.js directly — it's a real static file that handles push events
+  // Try /sw.js first (next-pwa build output), then /push-sw.js as fallback
+  for (const swPath of ['/sw.js', '/push-sw.js']) {
+    try {
+      const reg = await navigator.serviceWorker.register(swPath);
+      // Wait for it to activate
+      await new Promise<void>((resolve, reject) => {
+        const sw = reg.installing || reg.waiting || reg.active;
+        if (reg.active) { resolve(); return; }
+        if (!sw) { reject(new Error('No SW instance')); return; }
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'activated') resolve();
+          if (sw.state === 'redundant') reject(new Error('SW became redundant'));
+        });
+        setTimeout(() => reject(new Error('SW activation timeout')), 10000);
+      });
+      return reg;
+    } catch {
+      continue;
+    }
   }
 
-  // Wait for ready with timeout
-  const reg = await Promise.race([
-    navigator.serviceWorker.ready,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Service worker not available. Close and reopen the app.')), 15000)
-    ),
-  ]);
-  return reg as ServiceWorkerRegistration;
+  throw new Error('Could not register service worker. Try closing and reopening the app.');
 }
 
 function urlBase64ToUint8Array(base64String: string) {
