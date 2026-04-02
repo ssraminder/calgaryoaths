@@ -8,9 +8,12 @@
 - Legacy `calendly_url` fields exist in the database (`co_commissioners`, `co_locations`) and admin forms but are unused by the booking flow.
 
 ## Google Ads Conversion Tracking
-- Google Ads account: 631-615-9162 (AW-6316159162) — shared account with cethos.com
+- Google Ads customer ID: 631-615-9162 — shared account with cethos.com
+- Conversion tracking ID: AW-366617885 (this is the `google_ads_id` value, NOT the customer ID)
+- Booking conversion label: UyijCLK45IkbEJ3K6K4B
 - Config is stored in `co_settings` table (keys: `google_ads_id`, `google_ads_booking_label`, `google_ads_phone_label`)
 - Managed via /admin/settings, same pattern as `ga4_id` and `gtm_id`
+- Conversion tracking is handled via GTM dataLayer events (not direct gtag calls) to avoid double-counting
 - Phone number: (587) 600-0746 — do not use 5876000786 (that is the cethos.com number)
 
 ## Analytics Settings Flow
