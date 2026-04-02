@@ -9,6 +9,7 @@ import Footer from '@/components/layout/Footer';
 import BookingModal from '@/components/layout/BookingModal';
 import WhatsAppButton from '@/components/layout/WhatsAppButton';
 import AuthRedirect from '@/components/shared/AuthRedirect';
+import PublicShell from '@/components/layout/PublicShell';
 import { GTMHead, GTMNoScript } from '@/components/shared/GoogleTagManager';
 import { getAnalyticsSettings } from '@/lib/data/db';
 
@@ -78,11 +79,18 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-bg text-charcoal font-body" suppressHydrationWarning>
         {gtmId && <GTMNoScript gtmId={gtmId} />}
         <BookingModalProvider>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
-          <BookingModal />
-          <WhatsAppButton />
+          <PublicShell
+            navbar={<Navbar />}
+            footer={<Footer />}
+            publicExtras={
+              <>
+                <BookingModal />
+                <WhatsAppButton />
+              </>
+            }
+          >
+            {children}
+          </PublicShell>
           <AuthRedirect />
         </BookingModalProvider>
         {ga4Id && <GoogleAnalytics gaId={ga4Id} />}
