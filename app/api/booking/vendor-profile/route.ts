@@ -50,16 +50,17 @@ export async function GET(req: NextRequest) {
 
   const enrichedServices = (services ?? []).map((s) => {
     const rate = rateMap.get(s.slug);
+    // Suggested rate = service price × 80%, rounded to nearest $5
+    const suggestedRate = s.price ? Math.round((s.price * 0.8) / 500) * 500 : null;
+    const effectivePrice = rate?.first_page_cents ?? suggestedRate;
     return {
       slug: s.slug,
       name: s.name,
       shortDescription: s.short_description,
-      price: rate?.first_page_cents ?? s.price,
-      priceLabel: rate?.first_page_cents
-        ? `$${(rate.first_page_cents / 100).toFixed(0)}`
-        : s.price != null
-          ? `$${(s.price / 100).toFixed(0)}`
-          : s.price_label,
+      price: effectivePrice,
+      priceLabel: effectivePrice != null
+        ? `$${(effectivePrice / 100).toFixed(0)}`
+        : s.price_label,
       additionalPageCents: rate?.additional_page_cents ?? 1500,
       requiresReview: s.requires_review,
       reviewReason: s.review_reason,

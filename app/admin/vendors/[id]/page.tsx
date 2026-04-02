@@ -191,7 +191,6 @@ export default function EditVendorPage() {
       map_url: fd.get('map_url'),
       areas_served: neighbourhoods,
       nearby_neighbourhoods: neighbourhoods,
-      booking_fee_cents: Number(fd.get('booking_fee_dollars') || 40) * 100,
       commission_rate: Number(fd.get('commission_rate') || 20),
       is_partner: fd.get('is_partner') === 'on',
       gst_number: fd.get('gst_number') || null,
@@ -333,11 +332,10 @@ export default function EditVendorPage() {
         <Field name="google_maps_embed" label="Google Maps Embed URL" defaultValue={commissioner.google_maps_embed} />
         <Field name="map_url" label="Google Maps Link" defaultValue={commissioner.map_url} />
 
-        {/* Commission & Fee section */}
+        {/* Commission section */}
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
-          <h3 className="text-sm font-medium text-gray-900">Pricing & Commission</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <Field name="booking_fee_dollars" label="Booking Fee ($)" type="number" defaultValue={String((commissioner.booking_fee_cents ?? 4000) / 100)} />
+          <h3 className="text-sm font-medium text-gray-900">Commission</h3>
+          <div className="grid grid-cols-2 gap-4">
             <Field name="commission_rate" label="Commission (%)" type="number" defaultValue={String(commissioner.commission_rate ?? 20)} />
             <div className="flex items-end gap-2 pb-1">
               <label className="flex items-center gap-2 text-sm">
@@ -347,7 +345,7 @@ export default function EditVendorPage() {
             </div>
           </div>
           <p className="text-xs text-gray-400">
-            Commission is only charged on partner vendors. Platform keeps {commissioner.commission_rate ?? 20}% of the booking fee.
+            Commission is only charged on partner vendors. Platform keeps {commissioner.commission_rate ?? 20}% of each service fee. Per-service rates are set in the Service Pricing table below.
           </p>
         </div>
 

@@ -92,19 +92,8 @@ function VendorActionContent() {
   useEffect(() => {
     if (!token) { setError('Missing token'); setLoading(false); return; }
 
-    // If direct accept from email
-    if (directAction === 'accept') {
-      fetch('/api/booking/vendor-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, action: 'accept' }),
-      }).then((r) => r.json()).then((d) => {
-        if (d.success) setDone('accepted');
-        else setError(d.error || 'Failed');
-        setLoading(false);
-      }).catch(() => { setError('Network error'); setLoading(false); });
-      return;
-    }
+    // If direct accept from email — load booking details first, show confirm button
+    // (Do NOT auto-confirm — email clients pre-fetch URLs which would auto-accept)
 
     // Load booking + availability
     fetch(`/api/booking/vendor-action?token=${token}`)
