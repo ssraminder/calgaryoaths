@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabaseAdmin
     .from('co_commissioners')
-    .select('mobile_available, virtual_available, mobile_rate_per_km_cents, mobile_minimum_fee_cents')
+    .select('mobile_available, virtual_available, mobile_rate_per_km_cents, mobile_minimum_fee_cents, min_booking_buffer_hours, auto_accept_all')
     .eq('id', vendor.commissionerId)
     .single();
 
@@ -26,6 +26,8 @@ export async function PATCH(req: NextRequest) {
   if (body.virtual_available !== undefined) updates.virtual_available = !!body.virtual_available;
   if (body.mobile_rate_per_km_cents !== undefined) updates.mobile_rate_per_km_cents = Number(body.mobile_rate_per_km_cents);
   if (body.mobile_minimum_fee_cents !== undefined) updates.mobile_minimum_fee_cents = Number(body.mobile_minimum_fee_cents);
+  if (body.min_booking_buffer_hours !== undefined) updates.min_booking_buffer_hours = Number(body.min_booking_buffer_hours);
+  if (body.auto_accept_all !== undefined) updates.auto_accept_all = !!body.auto_accept_all;
 
   const { error } = await supabaseAdmin
     .from('co_commissioners')

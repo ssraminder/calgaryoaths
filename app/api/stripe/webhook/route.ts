@@ -32,25 +32,27 @@ export async function POST(req: NextRequest) {
     if (bookingId) {
       const vendorToken = crypto.randomBytes(32).toString('hex');
 
+      // Fetch booking + commissioner to check auto-accept
+      const { data: preBooking } = await supabaseAdmin.from('co_bookings').select('commissioner_id').eq('id', bookingId).single();
+      const { data: commissioner } = preBooking
+        ? await supabaseAdmin.from('co_commissioners').select('name, email, address, phone, auto_accept_all').eq('id', preBooking.commissioner_id).single()
+        : { data: null };
+
+      const autoConfirm = commissioner?.auto_accept_all === true;
+
       await supabaseAdmin
         .from('co_bookings')
         .update({
-          status: 'paid',
+          status: autoConfirm ? 'confirmed' : 'paid',
           stripe_payment_intent_id: session.payment_intent as string,
           amount_paid: session.amount_total,
-          vendor_action_token: vendorToken,
+          vendor_action_token: autoConfirm ? null : vendorToken,
           updated_at: new Date().toISOString(),
         })
         .eq('id', bookingId);
 
       const { data: booking } = await supabaseAdmin.from('co_bookings').select('*').eq('id', bookingId).single();
       if (!booking) return NextResponse.json({ received: true });
-
-      const { data: commissioner } = await supabaseAdmin
-        .from('co_commissioners')
-        .select('name, email, address, phone')
-        .eq('id', booking.commissioner_id)
-        .single();
 
       const { data: service } = await supabaseAdmin
         .from('co_services')

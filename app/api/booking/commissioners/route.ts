@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   // Commissioners
   const { data: commissioners } = await supabase
     .from('co_commissioners')
-    .select('id, name, booking_fee_cents, languages, mobile_available, mobile_travel_fee_cents, virtual_available, commission_rate, commission_mode')
+    .select('id, name, booking_fee_cents, languages, mobile_available, mobile_travel_fee_cents, virtual_available, commission_rate, commission_mode, min_booking_buffer_hours, auto_accept_all')
     .in('id', ids)
     .eq('active', true);
 
@@ -60,13 +60,12 @@ export async function GET(req: NextRequest) {
     .eq('active', true)
     .order('sort_order', { ascending: true });
 
-  // Buffer hours
+  // Global buffer fallback
   const { data: bufferSetting } = await supabase
     .from('co_settings').select('value').eq('key', 'min_booking_buffer_hours').single();
-  const bufferHours = parseInt(bufferSetting?.value || '4', 10);
+  const globalBufferHours = parseInt(bufferSetting?.value || '4', 10);
 
   const now = new Date();
-  const cutoff = new Date(Date.now() + bufferHours * 60 * 60 * 1000);
   const offset = calgaryOffset();
   const commMap = new Map(commissioners.map((c) => [c.id, c]));
 
@@ -74,6 +73,8 @@ export async function GET(req: NextRequest) {
   const options = await Promise.all(
     (locations ?? []).map(async (loc) => {
       const comm = commMap.get(loc.commissioner_id);
+      const bufferHours = comm?.min_booking_buffer_hours ?? globalBufferHours;
+      const cutoff = new Date(Date.now() + bufferHours * 60 * 60 * 1000);
       if (!comm) return null;
 
       // Availability rules for THIS location
