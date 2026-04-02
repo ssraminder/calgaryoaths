@@ -9,11 +9,25 @@ export default function PushNotificationPrompt() {
   const [show, setShow] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [iosNeedsInstall, setIosNeedsInstall] = useState(false);
 
   useEffect(() => {
+    const isIos = /iP(hone|ad|od)/.test(navigator.userAgent);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || ('standalone' in navigator && (navigator as unknown as { standalone: boolean }).standalone);
+
+    // iOS in Safari (not standalone) — can't do push, prompt to install first
+    if (isIos && !isStandalone) {
+      const dismissed = localStorage.getItem(DISMISS_KEY);
+      if (dismissed && Date.now() - Number(dismissed) < 3 * 24 * 60 * 60 * 1000) return;
+      setIosNeedsInstall(true);
+      setShow(true);
+      return;
+    }
+
     // Don't show if notifications not supported
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    // Don't show if already granted
+    // Don't show if already granted — check server subscription
     if (Notification.permission === 'granted') {
       checkSubscription();
       return;
@@ -91,6 +105,30 @@ export default function PushNotificationPrompt() {
   }
 
   if (!show) return null;
+
+  if (iosNeedsInstall) {
+    return (
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-navy/10">
+            <Bell className="h-4 w-4 text-navy" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900">Get Push Notifications</p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              To receive booking alerts, add this app to your Home Screen first.
+            </p>
+            <p className="mt-1.5 text-xs text-gray-500">
+              Tap the <span className="inline-block align-middle"><svg className="inline h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12L8 8m4-4l4 4" /></svg></span> Share button, then <strong>Add to Home Screen</strong>.
+            </p>
+          </div>
+          <button onClick={handleDismiss} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">

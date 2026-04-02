@@ -32,9 +32,11 @@ export default function VendorDashboard() {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
+  const activeStatuses = ['paid', 'confirmed'];
+  const activeBookings = bookings.filter((b) => activeStatuses.includes(b.status));
   const pending = bookings.filter((b) => b.status === 'paid');
   const confirmed = bookings.filter((b) => b.status === 'confirmed');
-  const today = bookings.filter((b) =>
+  const today = activeBookings.filter((b) =>
     b.appointment_datetime && new Date(b.appointment_datetime).toDateString() === new Date().toDateString()
   );
 
@@ -76,7 +78,7 @@ export default function VendorDashboard() {
           <h2 className="mb-3 text-lg font-medium text-gray-900">Recent Bookings</h2>
           {/* Mobile card view */}
           <div className="space-y-3 md:hidden">
-            {bookings.slice(0, 10).map((b) => (
+            {activeBookings.slice(0, 10).map((b) => (
               <div
                 key={b.id}
                 onClick={() => router.push(`/vendor/bookings/${b.id}`)}
@@ -94,7 +96,7 @@ export default function VendorDashboard() {
                 </p>
               </div>
             ))}
-            {bookings.length === 0 && <p className="py-8 text-center text-sm text-gray-400">No bookings yet</p>}
+            {activeBookings.length === 0 && <p className="py-8 text-center text-sm text-gray-400">No active bookings</p>}
           </div>
           {/* Desktop table view */}
           <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 bg-white">
@@ -108,7 +110,7 @@ export default function VendorDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {bookings.slice(0, 10).map((b) => (
+                {activeBookings.slice(0, 10).map((b) => (
                   <tr key={b.id} onClick={() => router.push(`/vendor/bookings/${b.id}`)} className="cursor-pointer hover:bg-gray-50">
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{b.name}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{b.service_name}</td>
@@ -118,7 +120,7 @@ export default function VendorDashboard() {
                     <td className="whitespace-nowrap px-4 py-3 text-sm"><StatusBadge status={b.status} /></td>
                   </tr>
                 ))}
-                {bookings.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">No bookings yet</td></tr>}
+                {activeBookings.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">No active bookings</td></tr>}
               </tbody>
             </table>
           </div>
