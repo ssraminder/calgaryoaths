@@ -23,6 +23,7 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, unknown> = {};
 
   // Profile fields
+  if (typeof body.email === 'string' && body.email.includes('@')) updates.email = body.email.trim();
   if (typeof body.phone === 'string') updates.phone = body.phone.trim();
   if (typeof body.address === 'string') updates.address = body.address.trim();
   if (typeof body.bio === 'string') updates.bio = body.bio.trim();
