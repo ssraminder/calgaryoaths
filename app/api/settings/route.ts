@@ -10,5 +10,6 @@ export async function GET() {
     ga4Id: settings.ga4_id ?? null,
     gtmId: settings.gtm_id ?? null,
     googleAdsId: settings.google_ads_id ?? null,
+    logoUrl: settings.logo_url ?? null,
   });
 }

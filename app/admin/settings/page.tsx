@@ -11,6 +11,7 @@ type Setting = {
 
 /** Settings that should always appear (seeded if missing from DB) */
 const REQUIRED_SETTINGS: { key: string; description: string }[] = [
+  { key: 'logo_url', description: 'Site logo URL — used in vendor/admin portals (full URL or Supabase storage path)' },
   { key: 'ga4_id', description: 'Google Analytics 4 Measurement ID (G-XXXXXXXXXX)' },
   { key: 'gtm_id', description: 'Google Tag Manager Container ID (GTM-XXXXXXX)' },
   { key: 'google_ads_id', description: 'Google Ads Conversion ID (AW-XXXXXXXXXX)' },
