@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabaseAdmin
     .from('co_commissioners')
-    .select('name, title, email, phone, address, location, bio, languages, credentials, mobile_available, virtual_available, mobile_rate_per_km_cents, mobile_minimum_fee_cents, min_booking_buffer_hours, auto_accept_all, free_cancel_hours, request_cancel_hours')
+    .select('name, title, email, phone, address, location, bio, languages, credentials, mobile_available, virtual_available, mobile_rate_per_km_cents, mobile_minimum_fee_cents, min_booking_buffer_hours, auto_accept_all, free_cancel_hours, request_cancel_hours, gst_registered, gst_number')
     .eq('id', vendor.commissionerId)
     .single();
 
@@ -35,6 +35,9 @@ export async function PATCH(req: NextRequest) {
   if (body.mobile_minimum_fee_cents !== undefined) updates.mobile_minimum_fee_cents = Number(body.mobile_minimum_fee_cents);
   if (body.min_booking_buffer_hours !== undefined) updates.min_booking_buffer_hours = Number(body.min_booking_buffer_hours);
   if (body.auto_accept_all !== undefined) updates.auto_accept_all = !!body.auto_accept_all;
+  if (body.gst_registered !== undefined) updates.gst_registered = !!body.gst_registered;
+  if (typeof body.gst_number === 'string') updates.gst_number = body.gst_number.trim() || null;
+
   if (body.free_cancel_hours !== undefined) {
     const val = Number(body.free_cancel_hours);
     if (val >= 1 && val <= 72) updates.free_cancel_hours = val;

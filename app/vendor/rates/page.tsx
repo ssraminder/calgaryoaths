@@ -29,6 +29,8 @@ type VendorSettings = {
   auto_accept_all: boolean;
   free_cancel_hours: number;
   request_cancel_hours: number;
+  gst_registered: boolean;
+  gst_number: string;
 };
 
 type VendorRate = {
@@ -70,6 +72,8 @@ export default function VendorRatesPage() {
     auto_accept_all: false,
     free_cancel_hours: 12,
     request_cancel_hours: 6,
+    gst_registered: false,
+    gst_number: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -392,6 +396,35 @@ export default function VendorRatesPage() {
             )}
             <p><strong>Less than {settings.request_cancel_hours > 0 ? settings.request_cancel_hours : settings.free_cancel_hours}h before:</strong> No cancellation, treated as no-show if missed</p>
           </div>
+        </div>
+
+        {/* GST Information */}
+        <div className="border-t border-gray-200 pt-4 space-y-3">
+          <h3 className="text-sm font-medium text-gray-900">GST Information</h3>
+          <label className="flex items-center justify-between rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50">
+            <div>
+              <p className="text-sm font-medium text-gray-900">GST Registered</p>
+              <p className="text-xs text-gray-500">I am registered to collect GST on my services</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.gst_registered}
+              onChange={(e) => setSettings({ ...settings, gst_registered: e.target.checked })}
+              className="rounded border-gray-300 text-navy focus:ring-navy h-5 w-5 flex-shrink-0 ml-4"
+            />
+          </label>
+          {settings.gst_registered && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">GST Number</label>
+              <input
+                type="text"
+                value={settings.gst_number}
+                onChange={(e) => setSettings({ ...settings, gst_number: e.target.value })}
+                placeholder="e.g. 123456789 RT0001"
+                className="w-full sm:w-64 rounded border border-gray-300 px-3 py-2 text-sm focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
