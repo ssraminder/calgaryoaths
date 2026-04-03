@@ -17,6 +17,8 @@ export default function InstallPrompt() {
   useEffect(() => {
     // Don't show if already installed (standalone mode)
     if (window.matchMedia('(display-mode: standalone)').matches) return;
+    // Mobile only — skip on desktop (pointer: fine = mouse)
+    if (window.matchMedia('(pointer: fine)').matches) return;
     // Don't show if dismissed recently (7 days)
     const dismissed = localStorage.getItem(DISMISS_KEY);
     if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
