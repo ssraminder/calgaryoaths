@@ -336,12 +336,95 @@ export default function JoinForm() {
         </div>
       </section>
 
-      {/* Section H — Consents */}
+      {/* Section H — Partner Agreement */}
       <section>
+        <h2 className="font-display font-semibold text-lg text-charcoal mb-4 pb-2 border-b border-border">Partner Agreement</h2>
+        <p className="text-mid-grey text-sm mb-4">
+          Please read the following terms carefully. By submitting this application you confirm you understand and agree to these terms.
+        </p>
+
+        <div className="rounded-card border border-border bg-bg divide-y divide-border text-sm text-charcoal mb-6">
+
+          {/* Booking charge */}
+          <div className="p-4 space-y-1">
+            <p className="font-semibold text-charcoal">Booking Charge (First Document / Primary Service)</p>
+            <p className="text-mid-grey leading-relaxed">
+              You set your own rate for each service in your Rates &amp; Settings (e.g. $30 for attestation of a document).
+              This is the minimum service charge — the amount the platform collects from the customer on your behalf when they book.
+              Calgary Oaths retains <strong>20% of this amount</strong> as a platform commission; you receive the remaining <strong>80%</strong>.
+            </p>
+            <div className="mt-2 rounded-md bg-white border border-border px-4 py-3 text-xs text-mid-grey space-y-0.5">
+              <p><span className="font-medium text-charcoal">Example:</span> You set $30 for attestation.</p>
+              <p>Platform commission (20%): <strong>$6.00</strong></p>
+              <p>Your payout: <strong>$24.00</strong></p>
+              <p>If GST-registered, you also receive 5% GST on your payout: <strong>+$1.20 = $25.20 total</strong></p>
+            </div>
+          </div>
+
+          {/* Additional documents */}
+          <div className="p-4 space-y-1">
+            <p className="font-semibold text-charcoal">Additional Documents &amp; Services</p>
+            <p className="text-mid-grey leading-relaxed">
+              Any additional documents or services beyond the first (e.g. extra pages, additional copies, travel time)
+              are <strong>your responsibility to charge and collect directly from the customer</strong> at the time of the appointment —
+              whether in-person, remote, or mobile. These additional amounts are not processed through the platform and
+              no commission is charged on them.
+            </p>
+            <div className="mt-2 rounded-md bg-white border border-border px-4 py-3 text-xs text-mid-grey space-y-0.5">
+              <p><span className="font-medium text-charcoal">Example:</span> Customer has 3 extra documents at $15 each.</p>
+              <p>You collect $45 directly from the customer. No platform fee applies to this amount.</p>
+            </div>
+          </div>
+
+          {/* Document uploads */}
+          <div className="p-4 space-y-1">
+            <p className="font-semibold text-charcoal">Document Upload Requirement</p>
+            <p className="text-mid-grey leading-relaxed">
+              To mark a booking as complete and trigger your payout, you <strong>must upload</strong> the following to the partner portal for each appointment:
+            </p>
+            <ul className="mt-2 ml-4 list-disc text-mid-grey space-y-1">
+              <li>A copy of the customer&apos;s government-issued photo ID</li>
+              <li>All commissioned, notarized, or completed documents from the appointment</li>
+            </ul>
+            <p className="text-mid-grey mt-2">
+              Bookings cannot be marked complete without these uploads. This is a legal and audit requirement.
+            </p>
+          </div>
+
+          {/* Cancellation */}
+          <div className="p-4 space-y-1">
+            <p className="font-semibold text-charcoal">Cancellation &amp; Booking Commitment</p>
+            <p className="text-mid-grey leading-relaxed">
+              Once you confirm a booking, you are responsible for honouring it. If you need to cancel or reschedule,
+              you must do so through the partner portal. Repeated late cancellations or no-shows after confirmation
+              may result in account review or suspension.
+            </p>
+          </div>
+
+          {/* Payouts */}
+          <div className="p-4 space-y-1">
+            <p className="font-semibold text-charcoal">Payouts</p>
+            <p className="text-mid-grey leading-relaxed">
+              Your payout (80% of the booking charge, plus GST if applicable) is processed after you mark the booking
+              as complete with all required document uploads. Payout timing depends on the payment processor.
+            </p>
+          </div>
+
+        </div>
+
+        {/* Consents */}
         <div className="space-y-3">
           <label className="flex items-start gap-3 text-sm text-charcoal">
             <input type="checkbox" name="confirmAccurate" value="true" required className="mt-0.5 rounded border-border text-gold focus:ring-gold flex-shrink-0" />
             <span>I confirm all information provided is accurate and truthful.</span>
+          </label>
+          <label className="flex items-start gap-3 text-sm text-charcoal">
+            <input type="checkbox" name="agreeCommission" value="true" required className="mt-0.5 rounded border-border text-gold focus:ring-gold flex-shrink-0" />
+            <span>I understand the commission structure: Calgary Oaths retains 20% of the booking charge (first document/primary service rate). Additional document charges are collected directly by me from the customer with no platform commission.</span>
+          </label>
+          <label className="flex items-start gap-3 text-sm text-charcoal">
+            <input type="checkbox" name="agreeDocUploads" value="true" required className="mt-0.5 rounded border-border text-gold focus:ring-gold flex-shrink-0" />
+            <span>I understand I must upload the customer&apos;s ID and all completed documents to the portal to mark each booking as complete and receive my payout.</span>
           </label>
           <label className="flex items-start gap-3 text-sm text-charcoal">
             <input type="checkbox" name="agreeTerms" value="true" required className="mt-0.5 rounded border-border text-gold focus:ring-gold flex-shrink-0" />

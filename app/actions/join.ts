@@ -25,6 +25,8 @@ const joinSchema = z.object({
   gstRegistered: z.string().optional(),
   referralSource: z.string().optional(),
   confirmAccurate: z.literal('true', { errorMap: () => ({ message: 'You must confirm information is accurate' }) }),
+  agreeCommission: z.literal('true', { errorMap: () => ({ message: 'You must confirm you understand the commission structure' }) }),
+  agreeDocUploads: z.literal('true', { errorMap: () => ({ message: 'You must confirm the document upload requirement' }) }),
   agreeTerms: z.literal('true', { errorMap: () => ({ message: 'You must agree to the partner terms' }) }),
 });
 
