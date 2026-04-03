@@ -1,60 +1,55 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <linearGradient id="quill" x1="0.3" y1="0" x2="0.7" y2="1">
-      <stop offset="0%" stop-color="#2a4f76"/>
+    <linearGradient id="feather" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#1e4470"/>
       <stop offset="100%" stop-color="#1B3A5C"/>
-    </linearGradient>
-    <linearGradient id="well" x1="0.5" y1="0" x2="0.5" y2="1">
-      <stop offset="0%" stop-color="#1B3A5C"/>
-      <stop offset="100%" stop-color="#0f2540"/>
     </linearGradient>
   </defs>
 
-  <!-- Inkwell base/pedestal -->
-  <rect x="138" y="438" width="236" height="24" rx="6" fill="url(#well)"/>
-  <rect x="148" y="418" width="216" height="24" rx="4" fill="#1B3A5C"/>
+  <!-- Feather — large sweeping plume curving left -->
+  <path d="
+    M 268 320
+    C 265 280, 280 220, 310 160
+    C 330 110, 355 65, 370 30
+    C 372 24, 368 20, 362 22
+    C 330 35, 280 80, 250 130
+    C 215 195, 200 260, 210 310
+    Z
+  " fill="url(#feather)"/>
+
+  <!-- Feather barbs — right side -->
+  <path d="M310 160 C340 130, 370 95, 385 55 C365 85, 335 125, 308 158Z" fill="#1B3A5C" opacity="0.7"/>
+  <path d="M295 195 C330 160, 365 120, 382 75 C360 110, 325 155, 293 192Z" fill="#1B3A5C" opacity="0.7"/>
+  <path d="M280 230 C318 192, 355 148, 378 98 C352 140, 315 185, 278 227Z" fill="#1B3A5C" opacity="0.7"/>
+  <path d="M268 265 C305 225, 345 178, 372 125 C344 170, 302 220, 266 262Z" fill="#1B3A5C" opacity="0.7"/>
+
+  <!-- Feather barbs — left side (lighter) -->
+  <path d="M250 130 C225 105, 195 88, 175 78 C190 95, 218 115, 248 132Z" fill="#2a5280" opacity="0.6"/>
+  <path d="M235 170 C208 142, 178 122, 155 108 C172 128, 202 152, 233 172Z" fill="#2a5280" opacity="0.6"/>
+  <path d="M222 210 C195 180, 165 158, 140 142 C158 165, 190 192, 220 212Z" fill="#2a5280" opacity="0.6"/>
+  <path d="M215 250 C188 222, 160 198, 132 178 C152 202, 182 230, 213 252Z" fill="#2a5280" opacity="0.6"/>
+
+  <!-- Central rachis (shaft) -->
+  <path d="M240 318 C238 275, 258 200, 290 140 C318 85, 348 48, 366 28" stroke="#0f2a45" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- Nib (pen tip) -->
+  <path d="M240 318 L232 345 L248 325 Z" fill="#1B3A5C"/>
+
   <!-- Inkwell body -->
-  <path d="M170 418 L170 340 Q170 310 200 310 L312 310 Q342 310 342 340 L342 418 Z" fill="url(#well)"/>
+  <path d="M165 410 L165 355 Q165 330 195 330 L317 330 Q347 330 347 355 L347 410 Z" fill="#1B3A5C"/>
+
   <!-- Inkwell rim -->
-  <ellipse cx="256" cy="312" rx="88" ry="18" fill="#2a4f76"/>
-  <ellipse cx="256" cy="312" rx="65" ry="13" fill="#0f2540"/>
+  <ellipse cx="256" cy="332" rx="94" ry="20" fill="#1e4470"/>
+  <ellipse cx="256" cy="332" rx="70" ry="14" fill="#0f2540"/>
+
   <!-- Ink surface -->
-  <ellipse cx="256" cy="315" rx="60" ry="10" fill="#162d45"/>
+  <ellipse cx="256" cy="335" rx="65" ry="11" fill="#152d48"/>
 
-  <!-- Quill shaft (diagonal, going from inkwell up-right) -->
-  <line x1="245" y1="315" x2="390" y2="42" stroke="#1B3A5C" stroke-width="5" stroke-linecap="round"/>
+  <!-- Inkwell base/pedestal -->
+  <rect x="150" y="410" width="212" height="18" rx="4" fill="#1B3A5C"/>
+  <rect x="138" y="425" width="236" height="22" rx="6" fill="#1B3A5C"/>
 
-  <!-- Feather vane - right side barbs -->
-  <path d="M390 42 Q405 38 410 25 Q395 30 385 40 Z" fill="#1B3A5C"/>
-  <path d="M380 58 Q400 48 412 30 Q392 42 378 55 Z" fill="#1B3A5C"/>
-  <path d="M370 75 Q395 60 410 40 Q388 55 368 72 Z" fill="#1B3A5C"/>
-  <path d="M360 92 Q388 72 405 52 Q382 70 358 89 Z" fill="#1B3A5C"/>
-  <path d="M350 108 Q380 88 398 65 Q375 85 348 105 Z" fill="#1B3A5C"/>
-  <path d="M340 125 Q372 102 390 78 Q367 98 338 122 Z" fill="#1B3A5C"/>
-  <path d="M330 142 Q362 118 382 92 Q358 112 328 139 Z" fill="#1B3A5C"/>
-  <path d="M320 158 Q352 132 374 106 Q348 128 318 155 Z" fill="#1B3A5C"/>
-  <path d="M310 175 Q342 148 365 120 Q338 145 308 172 Z" fill="#1B3A5C"/>
-  <path d="M300 192 Q332 165 356 135 Q328 162 298 189 Z" fill="#1B3A5C"/>
-
-  <!-- Feather vane - left side barbs -->
-  <path d="M388 45 Q375 30 365 22 Q372 35 384 46 Z" fill="#2a4f76"/>
-  <path d="M378 62 Q362 42 350 32 Q358 48 374 62 Z" fill="#2a4f76"/>
-  <path d="M368 78 Q350 55 338 42 Q347 60 364 78 Z" fill="#2a4f76"/>
-  <path d="M358 95 Q340 70 326 55 Q336 74 354 94 Z" fill="#2a4f76"/>
-  <path d="M348 112 Q328 85 315 68 Q325 88 344 110 Z" fill="#2a4f76"/>
-  <path d="M338 128 Q318 100 304 82 Q314 102 334 126 Z" fill="#2a4f76"/>
-  <path d="M328 145 Q308 115 294 96 Q304 118 324 143 Z" fill="#2a4f76"/>
-  <path d="M318 162 Q298 132 284 112 Q294 134 314 160 Z" fill="#2a4f76"/>
-  <path d="M308 178 Q288 148 274 128 Q284 150 304 176 Z" fill="#2a4f76"/>
-  <path d="M298 195 Q278 165 264 145 Q274 166 294 193 Z" fill="#2a4f76"/>
-
-  <!-- Feather rachis (central shaft highlight) -->
-  <line x1="248" y1="310" x2="392" y2="38" stroke="#2a4f76" stroke-width="2" stroke-linecap="round"/>
-
-  <!-- Quill nib tip -->
-  <path d="M245 315 L240 335 L250 320 Z" fill="#1B3A5C"/>
-
-  <!-- Pedestal feet/details -->
-  <rect x="155" y="456" width="50" height="8" rx="3" fill="#1B3A5C"/>
-  <rect x="307" y="456" width="50" height="8" rx="3" fill="#1B3A5C"/>
+  <!-- Pedestal feet -->
+  <rect x="148" y="442" width="55" height="10" rx="4" fill="#0f2540"/>
+  <rect x="310" y="442" width="55" height="10" rx="4" fill="#0f2540"/>
 </svg>
