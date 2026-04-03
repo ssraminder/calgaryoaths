@@ -1,4 +1,4 @@
-// Stripe webhook handler — processes checkout.session.completed events.
+// Stripe webhook handler — processes checkout.session.completed and charge.refunded events.
 // Updates booking status, generates cancel_token for customer self-service cancellation,
 // and sends confirmation emails (customer with cancel link, vendor, admin).
 import { NextRequest, NextResponse } from 'next/server';
@@ -276,6 +276,56 @@ export async function POST(req: NextRequest) {
           `,
         });
       } catch (e) { console.error('Admin email error:', e); }
+    }
+  }
+
+  if (event.type === 'charge.refunded') {
+    const charge = event.data.object as Stripe.Charge;
+    const paymentIntentId = charge.payment_intent as string;
+
+    if (paymentIntentId) {
+      const { data: booking } = await supabaseAdmin
+        .from('co_bookings')
+        .select('id, status, name, service_name, email')
+        .eq('stripe_payment_intent_id', paymentIntentId)
+        .single();
+
+      if (booking && booking.status !== 'refunded') {
+        const isFullRefund = charge.amount_refunded === charge.amount;
+
+        await supabaseAdmin
+          .from('co_bookings')
+          .update({
+            status: isFullRefund ? 'refunded' : booking.status,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', booking.id);
+
+        // Notify admin of dashboard-initiated refund
+        try {
+          await sendEmail({
+            to: 'info@calgaryoaths.com',
+            subject: `[Admin] ${isFullRefund ? 'Full' : 'Partial'} refund — ${booking.name} — ${booking.service_name}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                <div style="background:#b45309;padding:24px;border-radius:8px 8px 0 0;">
+                  <h1 style="color:white;margin:0;font-size:22px;">${isFullRefund ? 'Full' : 'Partial'} Refund Processed</h1>
+                </div>
+                <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
+                  <p>A refund was processed via Stripe for the following booking:</p>
+                  <table style="border-collapse:collapse;width:100%;font-size:14px;margin:16px 0;">
+                    <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Customer</td><td style="padding:8px;border:1px solid #e2e0da">${booking.name}</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Service</td><td style="padding:8px;border:1px solid #e2e0da">${booking.service_name}</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Refunded</td><td style="padding:8px;border:1px solid #e2e0da">$${(charge.amount_refunded / 100).toFixed(2)} of $${(charge.amount / 100).toFixed(2)}</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Stripe PI</td><td style="padding:8px;border:1px solid #e2e0da"><code>${paymentIntentId}</code></td></tr>
+                  </table>
+                  ${isFullRefund ? '<p>Booking status has been updated to <strong>refunded</strong>.</p>' : '<p>Partial refund — booking status unchanged.</p>'}
+                </div>
+              </div>
+            `,
+          });
+        } catch (e) { console.error('Refund admin email error:', e); }
+      }
     }
   }
 
