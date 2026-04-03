@@ -11,7 +11,7 @@ import WhatsAppButton from '@/components/layout/WhatsAppButton';
 import AuthRedirect from '@/components/shared/AuthRedirect';
 import PublicShell from '@/components/layout/PublicShell';
 import { GTMHead, GTMNoScript } from '@/components/shared/GoogleTagManager';
-import { getAnalyticsSettings } from '@/lib/data/db';
+import { getAnalyticsSettings, getSettings } from '@/lib/data/db';
 
 const playfair = Playfair_Display({
   variable: '--font-playfair',
@@ -68,10 +68,11 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const analytics = await getAnalyticsSettings();
+  const [analytics, settings] = await Promise.all([getAnalyticsSettings(), getSettings()]);
   const ga4Id = analytics.ga4Id || process.env.NEXT_PUBLIC_GA4_ID;
   const gtmId = analytics.gtmId || process.env.NEXT_PUBLIC_GTM_ID;
   const gadsId = analytics.googleAdsId || process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
+  const whatsappNumber = settings.whatsapp_number || null;
 
   return (
     <html
@@ -92,7 +93,7 @@ export default async function RootLayout({
             publicExtras={
               <>
                 <BookingModal />
-                <WhatsAppButton />
+                {whatsappNumber && <WhatsAppButton number={whatsappNumber} />}
               </>
             }
           >

@@ -692,10 +692,6 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                             Request time
                           </span>
                         )}
-                        <div className="flex gap-1 mt-0.5">
-                          {opt.mobile_available && <span className="text-[10px] bg-navy/5 text-navy px-1.5 py-0.5 rounded-pill">Mobile</span>}
-                          {opt.virtual_available && <span className="text-[10px] bg-navy/5 text-navy px-1.5 py-0.5 rounded-pill">Virtual</span>}
-                        </div>
                       </div>
                     </div>
                   </button>

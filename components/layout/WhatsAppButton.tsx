@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-const WHATSAPP_URL =
-  'https://wa.me/15876000746?text=Hi%2C%20I%27d%20like%20to%20book%20a%20commissioner%20of%20oaths%20appointment.';
-
-export default function WhatsAppButton() {
+export default function WhatsAppButton({ number }: { number: string }) {
   const [pulse, setPulse] = useState(true);
 
   useEffect(() => {
@@ -13,13 +10,17 @@ export default function WhatsAppButton() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Strip non-digits and ensure country code
+  const digits = number.replace(/\D/g, '');
+  const whatsappUrl = `https://wa.me/${digits}?text=Hi%2C%20I%27d%20like%20to%20book%20a%20commissioner%20of%20oaths%20appointment.`;
+
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {pulse && (
         <span className="absolute inset-0 rounded-full bg-teal animate-ping opacity-60" />
       )}
       <a
-        href={WHATSAPP_URL}
+        href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Chat on WhatsApp"
