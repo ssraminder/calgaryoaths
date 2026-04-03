@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
 
       // Booked slots (across all locations for this commissioner)
       // Stale pending_payment bookings (abandoned checkout > 30 min) don't block slots
-      const staleThreshold = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const windowEnd = new Date(now);
       windowEnd.setDate(windowEnd.getDate() + 7);
       const { data: booked } = await supabaseAdmin
