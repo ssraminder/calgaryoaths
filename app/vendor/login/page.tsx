@@ -60,6 +60,9 @@ function VendorLoginForm() {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
+          <p className="mt-4 text-center text-sm text-gray-500">
+            <a href="/vendor/forgot-password" className="text-navy hover:underline">Forgot password?</a>
+          </p>
         </div>
       </div>
     </div>
