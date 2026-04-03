@@ -592,7 +592,17 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 const price = basePrice ? customerPrice(basePrice, opt) : null;
                 const priceLabel = price ? `$${(price / 100).toFixed(0)}` : 'Quote';
                 const soonest = opt.soonestSlot
-                  ? new Date(opt.soonestSlot).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', weekday: 'short', month: 'short', day: 'numeric' })
+                  ? (() => {
+                      const slot = new Date(opt.soonestSlot);
+                      const calgaryDate = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Edmonton' });
+                      const slotDateStr = calgaryDate(slot);
+                      const todayStr = calgaryDate(new Date());
+                      const tomorrowStr = calgaryDate(new Date(Date.now() + 86_400_000));
+                      const datePart = slot.toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric' });
+                      if (slotDateStr === todayStr) return `Today, ${datePart}`;
+                      if (slotDateStr === tomorrowStr) return `Tomorrow, ${datePart}`;
+                      return slot.toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', weekday: 'short', month: 'short', day: 'numeric' });
+                    })()
                   : null;
                 const isSelected = selectedOption?.locationId === opt.locationId;
 

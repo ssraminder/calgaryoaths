@@ -109,13 +109,15 @@ export async function GET(req: NextRequest) {
       // Find soonest slot at this location
       let soonestSlot: string | null = null;
       if (rules?.length) {
+        // Use Calgary local date so blocked-date checks match the stored YYYY-MM-DD values
+        const calgaryNow = new Date(now.getTime() + offset * 3_600_000);
         for (let i = 0; i < 7 && !soonestSlot; i++) {
-          const d = new Date(now);
-          d.setDate(now.getDate() + i);
+          const d = new Date(calgaryNow);
+          d.setUTCDate(calgaryNow.getUTCDate() + i);
           const dateStr = d.toISOString().slice(0, 10);
           if (blockedDates.has(dateStr)) continue; // Skip blocked dates
-          const dayOfWeek = d.getDay();
-          const [year, month, day] = d.toISOString().slice(0, 10).split('-').map(Number);
+          const dayOfWeek = d.getUTCDay();
+          const [year, month, day] = dateStr.split('-').map(Number);
           const dayRules = rules.filter((r) => r.day_of_week === dayOfWeek);
 
           for (const rule of dayRules) {
