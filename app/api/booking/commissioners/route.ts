@@ -98,27 +98,46 @@ export async function GET(req: NextRequest) {
         .lte('appointment_datetime', windowEnd.toISOString());
       const bookedSet = new Set((booked ?? []).map((b) => b.appointment_datetime));
 
+      // Use Calgary local date for all date comparisons
+      const calgaryToday = new Date(now.getTime() + offset * 3_600_000)
+        .toISOString().slice(0, 10);
+
       // Blocked dates for this commissioner
       const { data: blockedDatesData } = await supabase
         .from('co_blocked_dates')
         .select('blocked_date')
         .eq('commissioner_id', comm.id)
-        .gte('blocked_date', now.toISOString().split('T')[0]);
+        .gte('blocked_date', calgaryToday);
       const blockedDates = new Set((blockedDatesData ?? []).map((b) => b.blocked_date));
+
+      // Time-window blocks from co_custom_times
+      let blockOverrides = new Map<string, { start_time: string; end_time: string }[]>();
+      try {
+        const { data: ctData } = await supabase
+          .from('co_custom_times')
+          .select('custom_date, start_time, end_time, mode')
+          .eq('commissioner_id', comm.id)
+          .eq('mode', 'block')
+          .gte('custom_date', calgaryToday);
+        for (const ct of ctData ?? []) {
+          if (!blockOverrides.has(ct.custom_date)) blockOverrides.set(ct.custom_date, []);
+          blockOverrides.get(ct.custom_date)!.push({ start_time: ct.start_time, end_time: ct.end_time });
+        }
+      } catch { /* table may not exist yet */ }
 
       // Find soonest slot at this location
       let soonestSlot: string | null = null;
       if (rules?.length) {
-        // Use Calgary local date so blocked-date checks match the stored YYYY-MM-DD values
         const calgaryNow = new Date(now.getTime() + offset * 3_600_000);
         for (let i = 0; i < 7 && !soonestSlot; i++) {
           const d = new Date(calgaryNow);
           d.setUTCDate(calgaryNow.getUTCDate() + i);
           const dateStr = d.toISOString().slice(0, 10);
-          if (blockedDates.has(dateStr)) continue; // Skip blocked dates
+          if (blockedDates.has(dateStr)) continue; // Skip fully blocked dates
           const dayOfWeek = d.getUTCDay();
           const [year, month, day] = dateStr.split('-').map(Number);
           const dayRules = rules.filter((r) => r.day_of_week === dayOfWeek);
+          const dayBlocks = blockOverrides.get(dateStr);
 
           for (const rule of dayRules) {
             const [sH, sM] = rule.start_time.split(':').map(Number);
@@ -126,8 +145,24 @@ export async function GET(req: NextRequest) {
             for (let m = sH * 60 + sM; m + 30 <= eH * 60 + eM; m += 30) {
               const slotDate = new Date(Date.UTC(year, month - 1, day, Math.floor(m / 60) - offset, m % 60, 0));
               if (slotDate > cutoff && !bookedSet.has(slotDate.toISOString())) {
-                soonestSlot = slotDate.toISOString();
-                break;
+                // Check time-window blocks
+                let blocked = false;
+                if (dayBlocks) {
+                  for (const blk of dayBlocks) {
+                    const [bsH, bsM] = blk.start_time.split(':').map(Number);
+                    const [beH, beM] = blk.end_time.split(':').map(Number);
+                    const blockStart = new Date(Date.UTC(year, month - 1, day, bsH - offset, bsM, 0));
+                    const blockEnd = new Date(Date.UTC(year, month - 1, day, beH - offset, beM, 0));
+                    if (slotDate >= blockStart && slotDate < blockEnd) {
+                      blocked = true;
+                      break;
+                    }
+                  }
+                }
+                if (!blocked) {
+                  soonestSlot = slotDate.toISOString();
+                  break;
+                }
               }
             }
             if (soonestSlot) break;
