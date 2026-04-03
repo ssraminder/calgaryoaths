@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MapPin, Clock, ExternalLink } from 'lucide-react';
+import { MapPin, Clock, ExternalLink, Car } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { commissioners as fallbackCommissioners } from '@/lib/data/commissioners';
 import BookButton from '@/components/shared/BookButton';
@@ -24,12 +24,15 @@ type LocationCommissioner = {
   calendly_url: string;
   google_maps_embed: string;
   map_url: string;
+  mobile_available: boolean;
+  mobile_radius_km: number;
+  areas_served: string[];
 };
 
 async function getCommissioners() {
   const { data, error } = await supabase
     .from('co_commissioners')
-    .select('id, name, title, location, location_slug, address, calendly_url, google_maps_embed, map_url')
+    .select('id, name, title, location, location_slug, address, calendly_url, google_maps_embed, map_url, mobile_available, mobile_radius_km, areas_served')
     .eq('active', true)
     .order('sort_order', { ascending: true });
 
@@ -45,6 +48,9 @@ async function getCommissioners() {
       calendly_url: c.calendlyUrl,
       google_maps_embed: c.googleMapsEmbed,
       map_url: c.mapUrl,
+      mobile_available: false,
+      mobile_radius_km: 25,
+      areas_served: [] as string[],
     }));
   }
   return data as LocationCommissioner[];
@@ -120,6 +126,35 @@ export default async function LocationsPage() {
                   </Link>
                 </div>
               </div>
+
+              {c.mobile_available && c.areas_served.length > 0 && (
+                <details className="mt-4 border-t border-border pt-4 group">
+                  <summary className="flex items-center justify-between cursor-pointer list-none select-none">
+                    <span className="flex items-center gap-2 text-sm font-medium text-charcoal">
+                      <Car size={15} className="text-gold flex-shrink-0" />
+                      Mobile service available
+                    </span>
+                    <svg
+                      className="w-4 h-4 text-mid-grey transition-transform group-open:rotate-180"
+                      fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+                    >
+                      <path d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-mid-grey">
+                      {c.name.split(' ')[0]} travels to you within a {c.mobile_radius_km} km radius. Travel fee applies.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {c.areas_served.map((area) => (
+                        <span key={area} className="text-xs bg-bg text-charcoal px-2.5 py-0.5 rounded-pill border border-border">
+                          {area}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </details>
+              )}
             </div>
           ))}
         </div>
