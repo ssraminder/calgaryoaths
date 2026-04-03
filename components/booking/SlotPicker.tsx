@@ -67,6 +67,23 @@ export default function SlotPicker({ commissionerId, locationId, onSelect }: Pro
 
   useEffect(() => { fetchSlots(); }, [fetchSlots]);
 
+  // Auto-advance to the week of the first available slot
+  useEffect(() => {
+    if (slots.length === 0) return;
+    const firstSlotDate = new Date(slots[0]).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton' });
+    const [y, m, d] = firstSlotDate.split('-').map(Number);
+    const first = new Date(y, m - 1, d);
+    // Check if the first slot is already visible in the current week
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    if (first > weekEnd) {
+      // Jump to the Monday of the first slot's week
+      const newStart = new Date(first);
+      newStart.setDate(first.getDate() - ((first.getDay() + 6) % 7)); // Monday
+      setWeekStart(newStart);
+    }
+  }, [slots]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Slots for the selected date (in Calgary local time)
   const slotsForDate = slots.filter((s) => {
     const localDate = new Date(s).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton' });
