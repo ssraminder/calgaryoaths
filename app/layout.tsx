@@ -44,6 +44,13 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  icons: {
+    icon: [
+      { url: 'https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.ico', sizes: 'any' },
+      { url: 'https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: 'https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.png',
+  },
   manifest: '/manifest.json',
   themeColor: '#1B3A5C',
   appleWebApp: {
@@ -73,7 +80,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
+        <link rel="apple-touch-icon" href="https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.png" />
       </head>
       {gtmId && <GTMHead gtmId={gtmId} />}
       <body className="min-h-full flex flex-col bg-bg text-charcoal font-body" suppressHydrationWarning>
