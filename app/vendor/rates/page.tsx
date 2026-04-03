@@ -24,6 +24,7 @@ type VendorSettings = {
   credentials: string[];
   mobile_available: boolean;
   virtual_available: boolean;
+  address_type: 'office' | 'residence';
   mobile_rate_per_km_cents: number;
   mobile_minimum_fee_cents: number;
   mobile_radius_km: number;
@@ -68,6 +69,7 @@ export default function VendorRatesPage() {
     credentials: [],
     mobile_available: false,
     virtual_available: false,
+    address_type: 'office' as const,
     mobile_rate_per_km_cents: 300,
     mobile_minimum_fee_cents: 3000,
     mobile_radius_km: 25,
@@ -206,12 +208,12 @@ export default function VendorRatesPage() {
             onChange={(v) => setSettings({ ...settings, email: v })} />
           <EditableField label="Phone" type="tel" value={settings.phone || ''}
             onChange={(v) => setSettings({ ...settings, phone: v })} />
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 space-y-2">
             {editingAddress ? (
               <div>
                 <AddressAutocomplete
                   name="address"
-                  label="Office Address"
+                  label="Address"
                   defaultValue={settings.address || ''}
                   onAddressResolved={(data) => {
                     setSettings({ ...settings, address: data.formattedAddress });
@@ -228,7 +230,7 @@ export default function VendorRatesPage() {
               </div>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Office Address</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
                 <button
                   type="button"
                   onClick={() => setEditingAddress(true)}
@@ -241,6 +243,24 @@ export default function VendorRatesPage() {
                 </button>
               </div>
             )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address type</label>
+              <div className="flex gap-3">
+                {(['office', 'residence'] as const).map((type) => (
+                  <label key={type} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="address_type"
+                      value={type}
+                      checked={settings.address_type === type}
+                      onChange={() => setSettings({ ...settings, address_type: type })}
+                      className="border-gray-300 text-navy focus:ring-navy"
+                    />
+                    <span className="text-sm text-gray-700 capitalize">{type}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="sm:col-span-2">
             <EditableField label="Bio" value={settings.bio || ''} multiline

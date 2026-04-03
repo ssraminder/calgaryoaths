@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabaseAdmin
     .from('co_commissioners')
-    .select('name, title, email, phone, address, location, bio, languages, credentials, mobile_available, virtual_available, mobile_rate_per_km_cents, mobile_minimum_fee_cents, mobile_radius_km, min_booking_buffer_hours, auto_accept_all, free_cancel_hours, request_cancel_hours, gst_registered, gst_number')
+    .select('name, title, email, phone, address, address_type, location, bio, languages, credentials, mobile_available, virtual_available, mobile_rate_per_km_cents, mobile_minimum_fee_cents, mobile_radius_km, min_booking_buffer_hours, auto_accept_all, free_cancel_hours, request_cancel_hours, gst_registered, gst_number')
     .eq('id', vendor.commissionerId)
     .single();
 
@@ -26,6 +26,7 @@ export async function PATCH(req: NextRequest) {
   if (typeof body.email === 'string' && body.email.includes('@')) updates.email = body.email.trim();
   if (typeof body.phone === 'string') updates.phone = body.phone.trim();
   if (typeof body.address === 'string') updates.address = body.address.trim();
+  if (body.address_type === 'office' || body.address_type === 'residence') updates.address_type = body.address_type;
   if (typeof body.bio === 'string') updates.bio = body.bio.trim();
   if (Array.isArray(body.languages)) updates.languages = body.languages;
 
