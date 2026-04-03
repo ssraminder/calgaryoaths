@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, CalendarCheck, Clock, Calendar, Settings } from 'lucide-react';
 
@@ -14,12 +16,23 @@ const navItems = [
 
 export default function VendorSidebar() {
   const pathname = usePathname();
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.logoUrl) setLogoUrl(data.logoUrl); })
+      .catch(() => {});
+  }, []);
 
   return (
     <aside className="hidden md:flex w-60 flex-col border-r border-gray-200 bg-white">
       <div className="flex h-14 items-center border-b border-gray-200 px-4">
-        <Link href="/vendor" className="text-lg font-semibold text-navy">
-          Partner Portal
+        <Link href="/vendor">
+          {logoUrl
+            ? <Image src={logoUrl} alt="Calgary Oaths" width={130} height={44} className="h-8 w-auto object-contain" />
+            : <span className="text-lg font-semibold text-navy">Partner Portal</span>
+          }
         </Link>
       </div>
       <nav className="flex-1 space-y-1 px-2 py-3">
