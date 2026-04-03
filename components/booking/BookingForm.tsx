@@ -635,6 +635,10 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                     (opt.areas_served ?? []).some((a) => a.toLowerCase().includes(q))
                   );
                 }
+                // 3. Hide locations with no matching slots when date/time filter is active
+                if (dateFilter || timeFilter) {
+                  filtered = filtered.filter((o) => o.soonestSlot);
+                }
                 return filtered;
               })(), commFilter).map((opt) => {
                 const basePrice = opt.first_page_cents
@@ -709,10 +713,12 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 const q = areaFilter.toLowerCase();
                 filtered = filtered.filter((o) => o.locationName.toLowerCase().includes(q) || o.locationAddress?.toLowerCase().includes(q) || (o.areas_served ?? []).some((a) => a.toLowerCase().includes(q)));
               }
+              if (dateFilter || timeFilter) filtered = filtered.filter((o) => o.soonestSlot);
               return filtered.length === 0;
             })() && (
               <p className="text-center text-sm text-mid-grey py-6">
-                {deliveryTab === 'mobile' ? 'No commissioners offer mobile service for this service.' :
+                {(dateFilter || timeFilter) ? 'No locations available for the selected date/time. Try a different filter.' :
+                 deliveryTab === 'mobile' ? 'No commissioners offer mobile service for this service.' :
                  deliveryTab === 'virtual' ? 'No commissioners offer virtual service for this service.' :
                  areaFilter ? `No locations match "${areaFilter}".` : 'No locations available.'}
               </p>
