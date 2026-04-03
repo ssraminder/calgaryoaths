@@ -10,15 +10,15 @@
   "theme_color": "#1B3A5C",
   "icons": [
     {
-      "src": "/icons/icon-192x192.svg",
-      "sizes": "192x192",
+      "src": "https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512x512.svg",
+      "src": "https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
