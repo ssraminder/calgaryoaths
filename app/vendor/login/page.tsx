@@ -1,8 +1,9 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
+import Image from 'next/image';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +25,14 @@ function VendorLoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.logoUrl) setLogoUrl(data.logoUrl); })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,6 +49,11 @@ function VendorLoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
+        {logoUrl && (
+          <div className="mb-6 flex justify-center">
+            <Image src={logoUrl} alt="Calgary Oaths" width={160} height={54} className="h-12 w-auto object-contain" />
+          </div>
+        )}
         <div className="rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
           <h1 className="mb-1 text-xl font-semibold text-gray-900">Partner Login</h1>
           <p className="mb-6 text-sm text-gray-500">Calgary Oaths Partner Portal</p>
