@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Trash2, Plus, Search, Pencil } from 'lucide-react';
 import { PushToggle } from '@/components/vendor/PushNotificationPrompt';
+import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 
 type AvailableService = {
   slug: string;
@@ -83,6 +84,7 @@ export default function VendorRatesPage() {
   const [saved, setSaved] = useState(false);
   const [savedSettings, setSavedSettings] = useState(false);
   const [error, setError] = useState('');
+  const [editingAddress, setEditingAddress] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -205,9 +207,40 @@ export default function VendorRatesPage() {
           <EditableField label="Phone" type="tel" value={settings.phone || ''}
             onChange={(v) => setSettings({ ...settings, phone: v })} />
           <div className="sm:col-span-2">
-            <EditableField label="Office Address" value={settings.address || ''}
-              onChange={(v) => setSettings({ ...settings, address: v })}
-              placeholder="e.g. 123 Main St NW, Calgary, AB" />
+            {editingAddress ? (
+              <div>
+                <AddressAutocomplete
+                  name="address"
+                  label="Office Address"
+                  defaultValue={settings.address || ''}
+                  onAddressResolved={(data) => {
+                    setSettings({ ...settings, address: data.formattedAddress });
+                    setEditingAddress(false);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setEditingAddress(false)}
+                  className="mt-1 text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Office Address</label>
+                <button
+                  type="button"
+                  onClick={() => setEditingAddress(true)}
+                  className="flex w-full items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-left hover:bg-gray-100 transition-colors"
+                >
+                  <span className={`flex-1 text-base truncate ${settings.address ? 'text-gray-700' : 'text-gray-400'}`}>
+                    {settings.address || 'e.g. 123 Main St NW, Calgary, AB'}
+                  </span>
+                  <Pencil className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                </button>
+              </div>
+            )}
           </div>
           <div className="sm:col-span-2">
             <EditableField label="Bio" value={settings.bio || ''} multiline

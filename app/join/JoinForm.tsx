@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { submitJoinForm } from '@/app/actions/join';
 import TagInput from '@/components/shared/TagInput';
+import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 
 const credentialOptions = ['Commissioner of Oaths', 'Notary Public', 'Barrister & Solicitor'];
 
@@ -98,8 +99,11 @@ export default function JoinForm() {
             {state.errors?.phone && <p className="text-red-500 text-xs mt-1">{state.errors.phone[0]}</p>}
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor="address" className="block text-sm font-medium text-charcoal mb-1.5">Full address <span className="text-red-500">*</span></label>
-            <input id="address" name="address" type="text" required placeholder="123 Main St, Calgary, AB T2X 0A1" className={inputCls} />
+            <AddressAutocomplete
+              name="address"
+              label="Full address"
+              required
+            />
             {state.errors?.address && <p className="text-red-500 text-xs mt-1">{state.errors.address[0]}</p>}
           </div>
         </div>
