@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     // Check slot is still available (race condition guard)
     // Exclude current booking + stale pending_payment (abandoned checkout > 30 min)
-    const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const staleThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { count } = await supabaseAdmin
       .from('co_bookings')
       .select('id', { count: 'exact', head: true })
