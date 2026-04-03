@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 
 function calgaryOffset(): number {
   const now = new Date();
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Commissioner IDs offering this service
-  const { data: links, error: linkError } = await supabase
+  const { data: links, error: linkError } = await supabaseAdmin
     .from('co_commissioner_services')
     .select('commissioner_id')
     .eq('service_slug', serviceSlug);
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   if (ids.length === 0) return NextResponse.json({ options: [] });
 
   // Commissioners
-  const { data: commissioners } = await supabase
+  const { data: commissioners } = await supabaseAdmin
     .from('co_commissioners')
     .select('id, name, booking_fee_cents, languages, mobile_available, mobile_travel_fee_cents, virtual_available, commission_rate, commission_mode, min_booking_buffer_hours, auto_accept_all')
     .in('id', ids)
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   if (!commissioners?.length) return NextResponse.json({ options: [] });
 
   // Vendor rates for this service
-  const { data: rates } = await supabase
+  const { data: rates } = await supabaseAdmin
     .from('co_vendor_rates')
     .select('commissioner_id, first_page_cents, additional_page_cents, drafting_fee_cents')
     .eq('service_slug', serviceSlug)
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   const rateMap = new Map((rates ?? []).map((r) => [r.commissioner_id, r]));
 
   // Fetch service price for suggested rate fallback
-  const { data: serviceData } = await supabase
+  const { data: serviceData } = await supabaseAdmin
     .from('co_services')
     .select('price')
     .eq('slug', serviceSlug)
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     : null;
 
   // All active locations for these commissioners
-  const { data: locations } = await supabase
+  const { data: locations } = await supabaseAdmin
     .from('co_locations')
     .select('id, name, address, commissioner_id, nearby_neighbourhoods')
     .in('commissioner_id', ids)
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
     .order('sort_order', { ascending: true });
 
   // Global buffer fallback
-  const { data: bufferSetting } = await supabase
+  const { data: bufferSetting } = await supabaseAdmin
     .from('co_settings').select('value').eq('key', 'min_booking_buffer_hours').single();
   const globalBufferHours = parseInt(bufferSetting?.value || '4', 10);
 
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       if (!comm) return null;
 
       // Availability rules for THIS location
-      const { data: rules } = await supabase
+      const { data: rules } = await supabaseAdmin
         .from('co_availability_rules')
         .select('day_of_week, start_time, end_time')
         .eq('commissioner_id', comm.id)
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
       // Booked slots (across all locations for this commissioner)
       const windowEnd = new Date(now);
       windowEnd.setDate(windowEnd.getDate() + 7);
-      const { data: booked } = await supabase
+      const { data: booked } = await supabaseAdmin
         .from('co_bookings')
         .select('appointment_datetime')
         .eq('commissioner_id', comm.id)
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
         .toISOString().slice(0, 10);
 
       // Blocked dates for this commissioner
-      const { data: blockedDatesData } = await supabase
+      const { data: blockedDatesData } = await supabaseAdmin
         .from('co_blocked_dates')
         .select('blocked_date')
         .eq('commissioner_id', comm.id)
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
       // Time-window blocks from co_custom_times
       let blockOverrides = new Map<string, { start_time: string; end_time: string }[]>();
       try {
-        const { data: ctData } = await supabase
+        const { data: ctData } = await supabaseAdmin
           .from('co_custom_times')
           .select('custom_date, start_time, end_time, mode')
           .eq('commissioner_id', comm.id)
