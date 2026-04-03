@@ -25,6 +25,7 @@ type VendorSettings = {
   virtual_available: boolean;
   mobile_rate_per_km_cents: number;
   mobile_minimum_fee_cents: number;
+  mobile_radius_km: number;
   min_booking_buffer_hours: number;
   auto_accept_all: boolean;
   free_cancel_hours: number;
@@ -68,6 +69,7 @@ export default function VendorRatesPage() {
     virtual_available: false,
     mobile_rate_per_km_cents: 300,
     mobile_minimum_fee_cents: 3000,
+    mobile_radius_km: 25,
     min_booking_buffer_hours: 4,
     auto_accept_all: false,
     free_cancel_hours: 12,
@@ -291,6 +293,19 @@ export default function VendorRatesPage() {
                   className="w-full rounded border border-gray-300 px-3 py-2 text-base focus:border-navy focus:ring-1 focus:ring-navy"
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Service radius (km)</label>
+              <select
+                value={settings.mobile_radius_km}
+                onChange={(e) => setSettings({ ...settings, mobile_radius_km: Number(e.target.value) })}
+                className="w-full rounded border border-gray-300 px-3 py-2 text-base focus:border-navy focus:ring-1 focus:ring-navy"
+              >
+                {[10, 15, 20, 25, 30, 40, 50, 75, 100].map((km) => (
+                  <option key={km} value={km}>{km} km</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">How far you&apos;re willing to travel for mobile appointments</p>
             </div>
             <p className="text-xs text-gray-400">
               Example: 15 km trip at ${(settings.mobile_rate_per_km_cents / 100).toFixed(1)}/km = ${((15 * settings.mobile_rate_per_km_cents) / 100).toFixed(0)}.
