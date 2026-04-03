@@ -86,6 +86,8 @@ export async function GET(req: NextRequest) {
         .eq('active', true);
 
       // Booked slots (across all locations for this commissioner)
+      // Stale pending_payment bookings (abandoned checkout > 30 min) don't block slots
+      const staleThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const windowEnd = new Date(now);
       windowEnd.setDate(windowEnd.getDate() + 7);
       const { data: booked } = await supabaseAdmin
@@ -93,7 +95,7 @@ export async function GET(req: NextRequest) {
         .select('appointment_datetime')
         .eq('commissioner_id', comm.id)
         .not('appointment_datetime', 'is', null)
-        .in('status', ['pending_payment', 'paid', 'confirmed'])
+        .or(`status.in.(paid,confirmed),and(status.eq.pending_payment,updated_at.gt.${staleThreshold})`)
         .gte('appointment_datetime', now.toISOString())
         .lte('appointment_datetime', windowEnd.toISOString());
       const bookedSet = new Set((booked ?? []).map((b) => b.appointment_datetime));

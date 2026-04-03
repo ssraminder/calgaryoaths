@@ -189,12 +189,14 @@ export async function GET(req: NextRequest) {
   }
 
   // Filter out booked slots from DB (across ALL locations for this commissioner)
+  // Stale pending_payment bookings (abandoned checkout > 30 min) don't block slots
+  const staleThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const { data: booked } = await supabaseAdmin
     .from('co_bookings')
     .select('appointment_datetime')
     .eq('commissioner_id', commissionerId)
     .not('appointment_datetime', 'is', null)
-    .in('status', ['pending_payment', 'paid', 'confirmed'])
+    .or(`status.in.(paid,confirmed),and(status.eq.pending_payment,updated_at.gt.${staleThreshold})`)
     .gte('appointment_datetime', base.toISOString())
     .lte('appointment_datetime', windowEnd.toISOString());
 
