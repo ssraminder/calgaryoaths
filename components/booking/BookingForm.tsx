@@ -839,7 +839,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                       </div>
                     )}
                     <div className="flex justify-between text-charcoal">
-                      <span>Convenience fee</span>
+                      <span>Convenience fee <span className="text-[10px] text-mid-grey">(platform)</span></span>
                       <span>${(convFee / 100).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-charcoal">

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       // Fetch booking + commissioner to check auto-accept
       const { data: preBooking } = await supabaseAdmin.from('co_bookings').select('commissioner_id').eq('id', bookingId).single();
       const { data: commissioner } = preBooking
-        ? await supabaseAdmin.from('co_commissioners').select('name, email, address, phone, auto_accept_all').eq('id', preBooking.commissioner_id).single()
+        ? await supabaseAdmin.from('co_commissioners').select('name, email, address, phone, auto_accept_all, free_cancel_hours, request_cancel_hours').eq('id', preBooking.commissioner_id).single()
         : { data: null };
 
       const autoConfirm = commissioner?.auto_accept_all === true;
@@ -170,14 +170,45 @@ export async function POST(req: NextRequest) {
                   </ol>
                 </div>
 
-                <div style="margin-top:16px;padding:16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;">
-                  <p style="margin:0;font-size:14px;"><strong>Need to cancel?</strong></p>
-                  <p style="margin:8px 0 0;font-size:13px;">Cancellations made more than 12 hours before your appointment are eligible for a full refund. Cancellations within 12 hours are treated as a no-show and no refund will be issued.</p>
-                  <p style="margin:8px 0 0;"><a href="${cancelUrl}" style="color:#C8922A;font-weight:bold;text-decoration:underline;font-size:14px;">Cancel this booking</a></p>
-                  <p style="margin:8px 0 0;font-size:12px;color:#6B6B68;">By booking, you agree to our <a href="${siteUrl}/terms-and-conditions" style="color:#C8922A;">Terms & Conditions</a>.</p>
+                <div style="margin-top:24px;padding:16px;background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;">
+                  <h3 style="margin:0 0 8px;font-size:15px;color:#92400e;">⚠ Cancellation Policy</h3>
+                  <ul style="margin:0;padding-left:20px;font-size:13px;color:#92400e;">
+                    <li style="margin-bottom:4px;"><strong>More than ${commissioner?.free_cancel_hours ?? 12} hours before appointment:</strong> Full refund — cancel at no charge.</li>
+                    <li style="margin-bottom:4px;"><strong>Within ${commissioner?.free_cancel_hours ?? 12} hours of appointment:</strong> No refund — treated as a no-show.</li>
+                    <li style="margin-bottom:4px;">No-shows without prior notice are not eligible for a refund.</li>
+                  </ul>
+                  <p style="margin:10px 0 0;"><a href="${cancelUrl}" style="color:#C8922A;font-weight:bold;text-decoration:underline;font-size:14px;">Cancel this booking</a></p>
                 </div>
 
-                <p style="margin-top:20px;font-size:13px;color:#6B6B68;">Questions? <a href="mailto:info@calgaryoaths.com">info@calgaryoaths.com</a> or <a href="tel:5876000746">(587) 600-0746</a></p>
+                <div style="margin-top:16px;padding:16px;background:#fef2f2;border:2px solid #fca5a5;border-radius:8px;">
+                  <h3 style="margin:0 0 8px;font-size:15px;color:#991b1b;">📋 Terms & Conditions — Please Read</h3>
+                  <ul style="margin:0;padding-left:20px;font-size:13px;color:#991b1b;">
+                    <li style="margin-bottom:4px;"><strong>Valid ID required:</strong> You must present a valid, government-issued photo ID (passport, driver's licence, PR card). Expired or invalid ID will result in cancellation without refund.</li>
+                    <li style="margin-bottom:4px;"><strong>Do NOT sign your documents before the appointment.</strong> Documents must be signed in the presence of the commissioner.</li>
+                    <li style="margin-bottom:4px;"><strong>Arrive on time.</strong> If you are more than 15 minutes late, the appointment may be cancelled as a no-show.</li>
+                    <li style="margin-bottom:4px;"><strong>Truthfulness:</strong> All information in your documents must be accurate. You are swearing under oath — providing false information is a criminal offence.</li>
+                    ${signersRequired > 1 ? `<li style="margin-bottom:4px;"><strong>${signersRequired} people must be present,</strong> each with valid government-issued photo ID.</li>` : ''}
+                    <li style="margin-bottom:4px;">Additional documents or complex services beyond the booking scope may incur extra charges, communicated before the appointment begins.</li>
+                  </ul>
+                  <p style="margin:10px 0 0;font-size:12px;color:#6B6B68;">By booking, you agree to our full <a href="${siteUrl}/terms-and-conditions" style="color:#C8922A;font-weight:bold;">Terms & Conditions</a>.</p>
+                </div>
+
+                ${!isMobile && locationLabel ? `
+                <div style="margin-top:16px;padding:16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;">
+                  <h3 style="margin:0 0 6px;font-size:14px;color:#1B3A5C;">📍 Appointment Location</h3>
+                  <p style="margin:0;font-size:13px;">${locationText}</p>
+                </div>
+                ` : ''}
+
+                <div style="margin-top:16px;padding:16px;background:#f8f7f4;border:1px solid #e2e0da;border-radius:8px;text-align:center;">
+                  <p style="margin:0;font-size:14px;font-weight:bold;color:#1B3A5C;">Calgary Oaths — Customer Care</p>
+                  <p style="margin:6px 0 0;font-size:14px;">
+                    <a href="tel:5876000746" style="color:#C8922A;font-weight:bold;text-decoration:none;">(587) 600-0746</a>
+                    &nbsp;·&nbsp;
+                    <a href="mailto:info@calgaryoaths.com" style="color:#C8922A;font-weight:bold;text-decoration:none;">info@calgaryoaths.com</a>
+                  </p>
+                  <p style="margin:4px 0 0;font-size:11px;color:#6B6B68;">Mon–Fri 9 AM – 9 PM · Sat 10 AM – 5 PM</p>
+                </div>
               </div>
             </div>
           `,
