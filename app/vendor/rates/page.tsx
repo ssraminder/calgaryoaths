@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Trash2, Plus, Search, Pencil } from 'lucide-react';
 import { PushToggle } from '@/components/vendor/PushNotificationPrompt';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
+import { createBrowserClient } from '@supabase/ssr';
 
 type AvailableService = {
   slug: string;
@@ -87,6 +88,30 @@ export default function VendorRatesPage() {
   const [savedSettings, setSavedSettings] = useState(false);
   const [error, setError] = useState('');
   const [editingAddress, setEditingAddress] = useState(false);
+  const [resetSending, setResetSending] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState('');
+
+  async function handleResetPassword() {
+    if (!settings.email) return;
+    setResetSending(true);
+    setResetSent(false);
+    setResetError('');
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { error: err } = await supabase.auth.resetPasswordForEmail(settings.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (err) {
+      setResetError(err.message);
+    } else {
+      setResetSent(true);
+      setTimeout(() => setResetSent(false), 5000);
+    }
+    setResetSending(false);
+  }
 
   useEffect(() => {
     Promise.all([
@@ -281,6 +306,25 @@ export default function VendorRatesPage() {
         {settings.languages && settings.languages.length > 0 && (
           <p className="text-xs text-gray-500">Languages: {settings.languages.join(', ')}</p>
         )}
+      </div>
+
+      {/* Security */}
+      <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-3">
+        <h2 className="text-lg font-medium text-gray-900">Security</h2>
+        <p className="text-sm text-gray-500">
+          A password reset link will be sent to <span className="font-medium text-gray-700">{settings.email || 'your email'}</span>.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleResetPassword}
+            disabled={resetSending || !settings.email}
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {resetSending ? 'Sending…' : 'Send password reset email'}
+          </button>
+          {resetSent && <span className="text-sm text-green-600">Reset link sent — check your inbox.</span>}
+          {resetError && <span className="text-sm text-red-600">{resetError}</span>}
+        </div>
       </div>
 
       {/* Notification Settings */}
