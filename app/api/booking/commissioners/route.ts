@@ -10,7 +10,10 @@ function calgaryOffset(): number {
 }
 
 export async function GET(req: NextRequest) {
-  const serviceSlug = new URL(req.url).searchParams.get('serviceSlug');
+  const params = new URL(req.url).searchParams;
+  const serviceSlug = params.get('serviceSlug');
+  const preferredDate = params.get('preferredDate'); // 'today' | 'tomorrow' | 'YYYY-MM-DD' | null
+  const timeOfDay = params.get('timeOfDay'); // 'morning' | 'afternoon' | 'evening' | null
   if (!serviceSlug) {
     return NextResponse.json({ error: 'Missing serviceSlug' }, { status: 400 });
   }
@@ -131,7 +134,34 @@ export async function GET(req: NextRequest) {
       let soonestSlot: string | null = null;
       if (rules?.length) {
         const calgaryNow = new Date(now.getTime() + offset * 3_600_000);
-        for (let i = 0; i < 7 && !soonestSlot; i++) {
+
+        // Date filter: determine which days to scan
+        let startDay = 0;
+        let endDay = 7;
+        if (preferredDate === 'today') {
+          endDay = 1;
+        } else if (preferredDate === 'tomorrow') {
+          startDay = 1; endDay = 2;
+        } else if (preferredDate && /^\d{4}-\d{2}-\d{2}$/.test(preferredDate)) {
+          const todayMs = Date.UTC(
+            Number(calgaryToday.slice(0, 4)), Number(calgaryToday.slice(5, 7)) - 1, Number(calgaryToday.slice(8, 10))
+          );
+          const targetMs = Date.UTC(
+            Number(preferredDate.slice(0, 4)), Number(preferredDate.slice(5, 7)) - 1, Number(preferredDate.slice(8, 10))
+          );
+          const diff = Math.round((targetMs - todayMs) / 86_400_000);
+          if (diff >= 0 && diff < 14) { startDay = diff; endDay = diff + 1; }
+          else { startDay = 14; endDay = 14; } // out of range
+        }
+
+        // Time-of-day filter: constrain slot minutes (Calgary local)
+        let minMinute = 0;
+        let maxMinute = 1440;
+        if (timeOfDay === 'morning') { maxMinute = 720; }           // before 12 PM
+        else if (timeOfDay === 'afternoon') { minMinute = 720; maxMinute = 1020; } // 12–5 PM
+        else if (timeOfDay === 'evening') { minMinute = 1020; }     // after 5 PM
+
+        for (let i = startDay; i < endDay && !soonestSlot; i++) {
           const d = new Date(calgaryNow);
           d.setUTCDate(calgaryNow.getUTCDate() + i);
           const dateStr = d.toISOString().slice(0, 10);
@@ -145,6 +175,7 @@ export async function GET(req: NextRequest) {
             const [sH, sM] = rule.start_time.split(':').map(Number);
             const [eH, eM] = rule.end_time.split(':').map(Number);
             for (let m = sH * 60 + sM; m + 30 <= eH * 60 + eM; m += 30) {
+              if (m < minMinute || m >= maxMinute) continue; // time-of-day filter
               const slotDate = new Date(Date.UTC(year, month - 1, day, Math.floor(m / 60) - offset, m % 60, 0));
               if (slotDate > cutoff && !bookedSet.has(slotDate.toISOString())) {
                 // Check time-window blocks

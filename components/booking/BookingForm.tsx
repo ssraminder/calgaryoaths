@@ -253,6 +253,9 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   const [commFilter, setCommFilter] = useState<'all' | 'soonest' | 'price'>('soonest');
   const [areaFilter, setAreaFilter] = useState<string>('');
   const [deliveryTab, setDeliveryTab] = useState<'in_office' | 'mobile' | 'virtual'>('in_office');
+  const [dateFilter, setDateFilter] = useState<string>(''); // '' | 'today' | 'tomorrow' | 'YYYY-MM-DD'
+  const [timeFilter, setTimeFilter] = useState<string>(''); // '' | 'morning' | 'afternoon' | 'evening'
+  const [showDatePicker, setShowDatePicker] = useState(false);
   // Pricing config
   const [pricing, setPricing] = useState<PricingConfig>({ convenienceFeeCents: 499, tax: { total_rate: 0.05, gst_rate: 0.05, pst_rate: 0, hst_rate: 0 } });
 
@@ -269,16 +272,27 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   }, []);
 
   // Fetch commissioners when service is selected and user advances to step 2
-  async function loadOptions(serviceSlug: string) {
+  async function loadOptions(serviceSlug: string, date?: string, time?: string) {
     setOptionsLoading(true);
     try {
-      const res = await fetch(`/api/booking/commissioners?serviceSlug=${serviceSlug}`);
+      const p = new URLSearchParams({ serviceSlug });
+      if (date) p.set('preferredDate', date);
+      if (time) p.set('timeOfDay', time);
+      const res = await fetch(`/api/booking/commissioners?${p}`);
       const json = await res.json();
       setLocationOptions(json.options ?? []);
     } finally {
       setOptionsLoading(false);
     }
   }
+
+  // Re-fetch when date/time filters change (only on step 2)
+  useEffect(() => {
+    if (step === 2 && selectedService) {
+      loadOptions(selectedService.slug, dateFilter || undefined, timeFilter || undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFilter, timeFilter]);
 
   const totalSteps = selectedService?.requiresReview ? 2 : 4;
 
@@ -545,11 +559,47 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             </p>
           )}
 
-          {/* Sort tabs + area search */}
-          <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+          {/* Sort tabs */}
+          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
             {([['soonest', 'Soonest'], ['price', 'Lowest price'], ['all', 'All']] as const).map(([key, label]) => (
               <button key={key} type="button" onClick={() => setCommFilter(key)}
                 className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${commFilter === key ? 'bg-navy text-white' : 'bg-bg text-mid-grey hover:bg-border'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Date filter */}
+          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+            {([['', 'Any day'], ['today', 'Today'], ['tomorrow', 'Tomorrow']] as const).map(([key, label]) => (
+              <button key={key || 'any'} type="button" onClick={() => { setDateFilter(key); setShowDatePicker(false); }}
+                className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${dateFilter === key && !showDatePicker ? 'bg-navy text-white' : 'bg-bg text-mid-grey hover:bg-border'}`}>
+                {label}
+              </button>
+            ))}
+            <button type="button" onClick={() => setShowDatePicker(!showDatePicker)}
+              className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors flex items-center gap-1 ${showDatePicker || (dateFilter && dateFilter !== 'today' && dateFilter !== 'tomorrow') ? 'bg-navy text-white' : 'bg-bg text-mid-grey hover:bg-border'}`}>
+              <Calendar size={11} />
+              {dateFilter && dateFilter !== 'today' && dateFilter !== 'tomorrow'
+                ? new Date(dateFilter + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
+                : 'Pick date'}
+            </button>
+            {showDatePicker && (
+              <input type="date" autoFocus
+                min={new Date().toLocaleDateString('en-CA', { timeZone: 'America/Edmonton' }).replace(/\//g, '-')}
+                max={(() => { const d = new Date(); d.setDate(d.getDate() + 13); return d.toISOString().slice(0, 10); })()}
+                value={dateFilter && dateFilter !== 'today' && dateFilter !== 'tomorrow' ? dateFilter : ''}
+                onChange={(e) => { setDateFilter(e.target.value); setShowDatePicker(false); }}
+                className="border border-border rounded-btn px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-gold/40"
+              />
+            )}
+          </div>
+
+          {/* Time-of-day filter */}
+          <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+            {([['', 'Any time'], ['morning', 'Morning'], ['afternoon', 'Afternoon'], ['evening', 'Evening']] as const).map(([key, label]) => (
+              <button key={key || 'anytime'} type="button" onClick={() => setTimeFilter(key)}
+                className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${timeFilter === key ? 'bg-navy text-white' : 'bg-bg text-mid-grey hover:bg-border'}`}>
                 {label}
               </button>
             ))}
@@ -789,7 +839,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                       </div>
                     )}
                     <div className="flex justify-between text-charcoal">
-                      <span>Convenience fee</span>
+                      <span>Convenience fee <span className="text-[10px] text-mid-grey">(platform)</span></span>
                       <span>${(convFee / 100).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-charcoal">

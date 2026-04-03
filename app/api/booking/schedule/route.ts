@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
         price_data: {
           currency: 'cad',
           unit_amount: convenienceFeeCents,
-          product_data: { name: 'Convenience fee' },
+          product_data: { name: 'Convenience fee (platform)' },
         },
         quantity: 1,
       },

@@ -401,7 +401,7 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
                 <p className="text-xs font-medium text-mid-grey uppercase tracking-wide mb-2">Charged now</p>
                 <div className="flex justify-between"><span>Service fee</span><span>${(bookingFee / 100).toFixed(2)}</span></div>
                 {isMobile && travelFee > 0 && <div className="flex justify-between"><span>Travel fee</span><span>${(travelFee / 100).toFixed(2)}</span></div>}
-                <div className="flex justify-between"><span>Convenience fee</span><span>${(convFee / 100).toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Convenience fee <span style={{fontSize:'10px',color:'#888'}}>(platform)</span></span><span>${(convFee / 100).toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Tax ({(pricing.tax.total_rate * 100).toFixed(0)}%)</span><span>${(taxAmount / 100).toFixed(2)}</span></div>
                 <div className="flex justify-between font-semibold text-charcoal border-t border-border pt-2"><span>Total</span><span>${(totalCharged / 100).toFixed(2)}</span></div>
               </div>

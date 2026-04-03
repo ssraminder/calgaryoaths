@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       // Fetch booking + commissioner to check auto-accept
       const { data: preBooking } = await supabaseAdmin.from('co_bookings').select('commissioner_id').eq('id', bookingId).single();
       const { data: commissioner } = preBooking
-        ? await supabaseAdmin.from('co_commissioners').select('name, email, address, phone, auto_accept_all').eq('id', preBooking.commissioner_id).single()
+        ? await supabaseAdmin.from('co_commissioners').select('name, email, address, phone, auto_accept_all, free_cancel_hours, request_cancel_hours').eq('id', preBooking.commissioner_id).single()
         : { data: null };
 
       const autoConfirm = commissioner?.auto_accept_all === true;
@@ -170,14 +170,45 @@ export async function POST(req: NextRequest) {
                   </ol>
                 </div>
 
-                <div style="margin-top:16px;padding:16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;">
-                  <p style="margin:0;font-size:14px;"><strong>Need to cancel?</strong></p>
-                  <p style="margin:8px 0 0;font-size:13px;">Cancellations made more than 12 hours before your appointment are eligible for a full refund. Cancellations within 12 hours are treated as a no-show and no refund will be issued.</p>
-                  <p style="margin:8px 0 0;"><a href="${cancelUrl}" style="color:#C8922A;font-weight:bold;text-decoration:underline;font-size:14px;">Cancel this booking</a></p>
-                  <p style="margin:8px 0 0;font-size:12px;color:#6B6B68;">By booking, you agree to our <a href="${siteUrl}/terms-and-conditions" style="color:#C8922A;">Terms & Conditions</a>.</p>
+                <div style="margin-top:24px;padding:16px;background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;">
+                  <h3 style="margin:0 0 8px;font-size:15px;color:#92400e;">⚠ Cancellation Policy</h3>
+                  <ul style="margin:0;padding-left:20px;font-size:13px;color:#92400e;">
+                    <li style="margin-bottom:4px;"><strong>More than ${commissioner?.free_cancel_hours ?? 12} hours before appointment:</strong> Full refund — cancel at no charge.</li>
+                    <li style="margin-bottom:4px;"><strong>Within ${commissioner?.free_cancel_hours ?? 12} hours of appointment:</strong> No refund — treated as a no-show.</li>
+                    <li style="margin-bottom:4px;">No-shows without prior notice are not eligible for a refund.</li>
+                  </ul>
+                  <p style="margin:10px 0 0;"><a href="${cancelUrl}" style="color:#C8922A;font-weight:bold;text-decoration:underline;font-size:14px;">Cancel this booking</a></p>
                 </div>
 
-                <p style="margin-top:20px;font-size:13px;color:#6B6B68;">Questions? <a href="mailto:info@calgaryoaths.com">info@calgaryoaths.com</a> or <a href="tel:5876000746">(587) 600-0746</a></p>
+                <div style="margin-top:16px;padding:16px;background:#fef2f2;border:2px solid #fca5a5;border-radius:8px;">
+                  <h3 style="margin:0 0 8px;font-size:15px;color:#991b1b;">📋 Terms & Conditions — Please Read</h3>
+                  <ul style="margin:0;padding-left:20px;font-size:13px;color:#991b1b;">
+                    <li style="margin-bottom:4px;"><strong>Valid ID required:</strong> You must present a valid, government-issued photo ID (passport, driver's licence, PR card). Expired or invalid ID will result in cancellation without refund.</li>
+                    <li style="margin-bottom:4px;"><strong>Do NOT sign your documents before the appointment.</strong> Documents must be signed in the presence of the commissioner.</li>
+                    <li style="margin-bottom:4px;"><strong>Arrive on time.</strong> If you are more than 15 minutes late, the appointment may be cancelled as a no-show.</li>
+                    <li style="margin-bottom:4px;"><strong>Truthfulness:</strong> All information in your documents must be accurate. You are swearing under oath — providing false information is a criminal offence.</li>
+                    ${signersRequired > 1 ? `<li style="margin-bottom:4px;"><strong>${signersRequired} people must be present,</strong> each with valid government-issued photo ID.</li>` : ''}
+                    <li style="margin-bottom:4px;">Additional documents or complex services beyond the booking scope may incur extra charges, communicated before the appointment begins.</li>
+                  </ul>
+                  <p style="margin:10px 0 0;font-size:12px;color:#6B6B68;">By booking, you agree to our full <a href="${siteUrl}/terms-and-conditions" style="color:#C8922A;font-weight:bold;">Terms & Conditions</a>.</p>
+                </div>
+
+                ${!isMobile && locationLabel ? `
+                <div style="margin-top:16px;padding:16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;">
+                  <h3 style="margin:0 0 6px;font-size:14px;color:#1B3A5C;">📍 Appointment Location</h3>
+                  <p style="margin:0;font-size:13px;">${locationText}</p>
+                </div>
+                ` : ''}
+
+                <div style="margin-top:16px;padding:16px;background:#f8f7f4;border:1px solid #e2e0da;border-radius:8px;text-align:center;">
+                  <p style="margin:0;font-size:14px;font-weight:bold;color:#1B3A5C;">Calgary Oaths — Customer Care</p>
+                  <p style="margin:6px 0 0;font-size:14px;">
+                    <a href="tel:5876000746" style="color:#C8922A;font-weight:bold;text-decoration:none;">(587) 600-0746</a>
+                    &nbsp;·&nbsp;
+                    <a href="mailto:info@calgaryoaths.com" style="color:#C8922A;font-weight:bold;text-decoration:none;">info@calgaryoaths.com</a>
+                  </p>
+                  <p style="margin:4px 0 0;font-size:11px;color:#6B6B68;">Mon–Fri 9 AM – 9 PM · Sat 10 AM – 5 PM</p>
+                </div>
               </div>
             </div>
           `,
@@ -186,6 +217,18 @@ export async function POST(req: NextRequest) {
 
       // ──────── 2. VENDOR EMAIL ────────
       if (vendorEmail) {
+        const vendorCalendarHtml = booking.appointment_datetime
+          ? calendarLinksHtml({
+              title: `${booking.service_name} — ${booking.name}`,
+              description: `Customer: ${booking.name}\nPhone: ${booking.phone}\nEmail: ${booking.email}${booking.notes ? `\nNotes: ${booking.notes}` : ''}`,
+              location: isMobile
+                ? booking.customer_address || 'Mobile service'
+                : location?.address || commissioner?.address || 'Calgary, AB',
+              startTime: booking.appointment_datetime,
+              durationMinutes: 30,
+            })
+          : '';
+
         try {
           await sendEmail({
             to: vendorEmail,
@@ -198,21 +241,68 @@ export async function POST(req: NextRequest) {
                 <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
                   <p>A customer has booked and paid. Please confirm or suggest a different time.</p>
 
-                  ${bookingDetailsTable}
-
-                  ${calendarHtml}
-
-                  ${signersNote}
-
-                  <h3 style="color:#1B3A5C;">Service includes:</h3>
-                  <ul style="padding-left:20px;">${includedHtml || '<li>Standard commissioning</li>'}</ul>
-
                   <div style="margin:24px 0;text-align:center;">
-                    <a href="${acceptUrl}" style="display:inline-block;padding:14px 32px;background:#1B3A5C;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;margin-right:12px;">✓ Confirm This Time</a>
+                    <a href="${acceptUrl}" style="display:inline-block;padding:14px 32px;background:#1D9E75;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;margin-right:12px;">✓ Confirm This Time</a>
                     <a href="${actionUrl}" style="display:inline-block;padding:14px 32px;background:#C8922A;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">⏰ Suggest Another Time</a>
                   </div>
 
-                  <p style="color:#888;font-size:13px;text-align:center;">Or manage from your <a href="${siteUrl}/vendor/bookings">Partner Portal</a></p>
+                  ${bookingDetailsTable}
+
+                  ${vendorCalendarHtml}
+
+                  <h3 style="color:#1B3A5C;margin-top:24px;border-bottom:2px solid #C8922A;padding-bottom:8px;">👤 Customer Information</h3>
+                  <table style="border-collapse:collapse;width:100%;font-size:14px;margin:8px 0;">
+                    <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4;width:35%">Name</td><td style="padding:8px;border:1px solid #e2e0da">${booking.name}</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Phone</td><td style="padding:8px;border:1px solid #e2e0da"><a href="tel:${booking.phone}" style="color:#C8922A;">${booking.phone}</a></td></tr>
+                    <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Email</td><td style="padding:8px;border:1px solid #e2e0da"><a href="mailto:${booking.email}" style="color:#C8922A;">${booking.email}</a></td></tr>
+                    <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Delivery Mode</td><td style="padding:8px;border:1px solid #e2e0da">${isMobile ? '🚗 Mobile — at customer location' : booking.delivery_mode === 'virtual' ? '💻 Virtual' : '🏢 In-Office'}</td></tr>
+                    ${isMobile && booking.customer_address ? `<tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Customer Address</td><td style="padding:8px;border:1px solid #e2e0da"><a href="${mapsUrl}" style="color:#C8922A;">${booking.customer_address} ↗</a></td></tr>` : ''}
+                    <tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Documents</td><td style="padding:8px;border:1px solid #e2e0da">${booking.num_documents}</td></tr>
+                    ${booking.notes ? `<tr><td style="padding:8px;border:1px solid #e2e0da;font-weight:bold;background:#f8f7f4">Customer Notes</td><td style="padding:8px;border:1px solid #e2e0da;background:#fef3c7;"><strong>${booking.notes}</strong></td></tr>` : ''}
+                  </table>
+
+                  ${signersNote}
+
+                  <h3 style="color:#1B3A5C;margin-top:24px;border-bottom:2px solid #C8922A;padding-bottom:8px;">📋 Service Details</h3>
+                  <p style="font-size:14px;"><strong>Service:</strong> ${booking.service_name}</p>
+                  ${includedHtml ? `<p style="font-size:14px;margin-top:8px;"><strong>What's included:</strong></p><ul style="padding-left:20px;font-size:14px;">${includedHtml}</ul>` : ''}
+                  <p style="font-size:14px;margin-top:8px;"><strong>Customer should bring:</strong></p>
+                  <ul style="padding-left:20px;font-size:14px;">${bringListHtml}</ul>
+
+                  <div style="margin-top:20px;padding:16px;background:#f0fdf4;border:2px solid #16a34a;border-radius:8px;">
+                    <h3 style="margin:0 0 8px;font-size:15px;color:#166534;">✅ Do's — Before the Appointment</h3>
+                    <ul style="margin:0;padding-left:20px;font-size:13px;color:#166534;">
+                      <li style="margin-bottom:4px;">Verify the customer's government-issued photo ID (must be valid, not expired)</li>
+                      <li style="margin-bottom:4px;">Confirm documents are <strong>unsigned</strong> — signing must happen in your presence</li>
+                      <li style="margin-bottom:4px;">Ensure all required parties are present${signersRequired > 1 ? ` (${signersRequired} people required for this service)` : ''}</li>
+                      <li style="margin-bottom:4px;">Confirm the customer understands they are swearing/affirming under oath</li>
+                      ${isMobile ? '<li style="margin-bottom:4px;">Confirm the meeting location is accessible and suitable</li>' : ''}
+                    </ul>
+                  </div>
+
+                  <div style="margin-top:12px;padding:16px;background:#fef2f2;border:2px solid #fca5a5;border-radius:8px;">
+                    <h3 style="margin:0 0 8px;font-size:15px;color:#991b1b;">❌ Don'ts — Grounds for Cancellation (No Refund)</h3>
+                    <ul style="margin:0;padding-left:20px;font-size:13px;color:#991b1b;">
+                      <li style="margin-bottom:4px;">Do not proceed if ID is expired, invalid, damaged, or doesn't match the person</li>
+                      <li style="margin-bottom:4px;">Do not commission if documents are already signed</li>
+                      <li style="margin-bottom:4px;">Do not proceed if you suspect misrepresentation, fraud, or false information</li>
+                      <li style="margin-bottom:4px;">Do not proceed if the person appears intoxicated or unable to understand the oath</li>
+                      <li style="margin-bottom:4px;">Do not proceed if the person refuses to swear or affirm</li>
+                      <li style="margin-bottom:4px;">Do not proceed if the person is abusive or threatening</li>
+                    </ul>
+                  </div>
+
+                  <div style="margin-top:16px;padding:16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;">
+                    <h3 style="margin:0 0 6px;font-size:14px;color:#92400e;">⚠ Cancellation Policy Reminder</h3>
+                    <p style="margin:0;font-size:13px;color:#92400e;">Free cancellation for the customer is available up to <strong>${commissioner?.free_cancel_hours ?? 12} hours</strong> before the appointment. After that, no refund is issued. If you need to cancel, please contact Calgary Oaths at <a href="tel:5876000746" style="color:#C8922A;">(587) 600-0746</a>.</p>
+                  </div>
+
+                  <div style="margin:24px 0;text-align:center;">
+                    <a href="${acceptUrl}" style="display:inline-block;padding:14px 32px;background:#1D9E75;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;margin-right:12px;">✓ Confirm This Time</a>
+                    <a href="${actionUrl}" style="display:inline-block;padding:14px 32px;background:#C8922A;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">⏰ Suggest Another Time</a>
+                  </div>
+
+                  <p style="color:#888;font-size:13px;text-align:center;">Or manage from your <a href="${siteUrl}/vendor/bookings" style="color:#C8922A;">Partner Portal</a></p>
                 </div>
               </div>
             `,
