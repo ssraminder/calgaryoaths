@@ -25,12 +25,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Check slot is still available (race condition guard)
+    // Exclude current booking + stale pending_payment (abandoned checkout > 30 min)
+    const staleThreshold = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const { count } = await supabaseAdmin
       .from('co_bookings')
       .select('id', { count: 'exact', head: true })
       .eq('commissioner_id', booking.commissioner_id)
       .eq('appointment_datetime', appointmentDatetime)
-      .in('status', ['pending_payment', 'paid', 'confirmed']);
+      .neq('id', bookingId)
+      .or(`status.in.(paid,confirmed),and(status.eq.pending_payment,updated_at.gt.${staleThreshold})`);
 
     if ((count ?? 0) > 0) {
       return NextResponse.json({ error: 'This slot was just taken. Please choose another time.' }, { status: 409 });
