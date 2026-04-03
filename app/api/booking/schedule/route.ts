@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { getBookingFee } from '@/lib/data/booking';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -15,7 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const { data: booking, error } = await supabase
+    const { data: booking, error } = await supabaseAdmin
       .from('co_bookings')
       .select('*')
       .eq('id', bookingId)
@@ -26,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check slot is still available (race condition guard)
-    const { count } = await supabase
+    const { count } = await supabaseAdmin
       .from('co_bookings')
       .select('id', { count: 'exact', head: true })
       .eq('commissioner_id', booking.commissioner_id)
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // If payment was already transferred from a rebooked booking, skip Stripe
     if (booking.status === 'paid' && booking.transferred_from_booking_id) {
-      await supabase
+      await supabaseAdmin
         .from('co_bookings')
         .update({
           appointment_datetime: appointmentDatetime,
@@ -51,14 +50,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch commissioner for commission rate + mode + travel fee
-    const { data: commissioner } = await supabase
+    const { data: commissioner } = await supabaseAdmin
       .from('co_commissioners')
       .select('booking_fee_cents, commission_rate, is_partner, commission_mode, mobile_travel_fee_cents, gst_registered')
       .eq('id', booking.commissioner_id)
       .single();
 
     // Price resolution: vendor rate → suggested rate → error
-    const { data: vendorRate } = await supabase
+    const { data: vendorRate } = await supabaseAdmin
       .from('co_vendor_rates')
       .select('first_page_cents')
       .eq('commissioner_id', booking.commissioner_id)
@@ -67,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     let baseServiceFee = vendorRate?.first_page_cents ?? null;
     if (!baseServiceFee) {
-      const { data: service } = await supabase
+      const { data: service } = await supabaseAdmin
         .from('co_services')
         .select('price')
         .eq('slug', booking.service_slug)
@@ -105,7 +104,7 @@ export async function POST(req: NextRequest) {
     const vendorTotalPayoutCents = vendorPayoutCents + vendorGstCents;
 
     // Convenience fee + tax
-    const { data: settingsData } = await supabase
+    const { data: settingsData } = await supabaseAdmin
       .from('co_settings')
       .select('key, value')
       .in('key', ['convenience_fee_cents', 'default_province']);
@@ -113,7 +112,7 @@ export async function POST(req: NextRequest) {
     const convenienceFeeCents = parseInt(settingsMap.convenience_fee_cents || '499', 10);
     const province = settingsMap.default_province || 'AB';
 
-    const { data: taxData } = await supabase
+    const { data: taxData } = await supabaseAdmin
       .from('co_tax_rates')
       .select('total_rate')
       .eq('province_code', province)
@@ -128,7 +127,7 @@ export async function POST(req: NextRequest) {
     const totalChargedCents = subtotal + taxCents;
 
     // Save appointment datetime + all fee info
-    await supabase
+    await supabaseAdmin
       .from('co_bookings')
       .update({
         appointment_datetime: appointmentDatetime,
@@ -212,7 +211,7 @@ export async function POST(req: NextRequest) {
       cancel_url: `${siteUrl}/?booking_cancelled=1`,
     });
 
-    await supabase
+    await supabaseAdmin
       .from('co_bookings')
       .update({ stripe_session_id: session.id })
       .eq('id', bookingId);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { serviceSlug, commissionerId, name, email, phone, notes, numDocuments, rebookToken, deliveryMode, customerAddress, facilityName, customerUnit, travelFeeCents, travelDistanceKm, locationId } = body;
 
-    const { data: service, error: serviceError } = await supabase
+    const { data: service, error: serviceError } = await supabaseAdmin
       .from('co_services')
       .select('slug, name, requires_review, review_reason')
       .eq('slug', serviceSlug)
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid service' }, { status: 400 });
     }
 
-    const { data: booking, error: dbError } = await supabase
+    const { data: booking, error: dbError } = await supabaseAdmin
       .from('co_bookings')
       .insert({
         service_slug: serviceSlug,
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     // If rebooking from a previous cancelled booking, transfer the payment
     if (rebookToken) {
-      const { data: originalBooking } = await supabase
+      const { data: originalBooking } = await supabaseAdmin
         .from('co_bookings')
         .select('id, amount_paid, stripe_payment_intent_id, stripe_session_id')
         .eq('confirmation_token', rebookToken)
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
       if (originalBooking) {
         // Transfer payment to new booking
-        await supabase
+        await supabaseAdmin
           .from('co_bookings')
           .update({
             amount_paid: originalBooking.amount_paid,
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
           .eq('id', booking.id);
 
         // Link original booking to new one
-        await supabase
+        await supabaseAdmin
           .from('co_bookings')
           .update({
             transferred_to_booking_id: booking.id,

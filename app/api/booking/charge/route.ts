@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { BOOKING_FEES } from '@/lib/data/booking';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   try {
     const { bookingId, calendlyEventUri } = await req.json();
 
-    const { data: booking, error } = await supabase
+    const { data: booking, error } = await supabaseAdmin
       .from('co_bookings')
       .select('*')
       .eq('id', bookingId)
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Save Calendly event URI
-    await supabase
+    await supabaseAdmin
       .from('co_bookings')
       .update({ calendly_event_uri: calendlyEventUri, status: 'pending_payment' })
       .eq('id', bookingId);
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       cancel_url: `${siteUrl}/?booking_cancelled=1`,
     });
 
-    await supabase
+    await supabaseAdmin
       .from('co_bookings')
       .update({ stripe_session_id: session.id })
       .eq('id', bookingId);

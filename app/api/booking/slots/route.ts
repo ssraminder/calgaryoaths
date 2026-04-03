@@ -2,7 +2,7 @@
 // applies date overrides (add extra time or block time windows), filters blocked dates,
 // booked slots, and buffer hours. Future-ready for calendar integration (Google/M365).
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 
 const SLOT_MINUTES = 30;
 const DAYS_AHEAD = 14;
@@ -72,14 +72,14 @@ export async function GET(req: NextRequest) {
   }
 
   // Get buffer hours: vendor-specific → global setting → default
-  const { data: commData } = await supabase
+  const { data: commData } = await supabaseAdmin
     .from('co_commissioners')
     .select('min_booking_buffer_hours')
     .eq('id', commissionerId)
     .single();
   let bufferHours = commData?.min_booking_buffer_hours;
   if (bufferHours == null) {
-    const { data: bufferSetting } = await supabase
+    const { data: bufferSetting } = await supabaseAdmin
       .from('co_settings')
       .select('value')
       .eq('key', 'min_booking_buffer_hours')
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch availability rules — filter by location if provided
-  let rulesQuery = supabase
+  let rulesQuery = supabaseAdmin
     .from('co_availability_rules')
     .select('day_of_week, start_time, end_time')
     .eq('commissioner_id', commissionerId)
@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
   const availRules = (rules ?? []) as AvailabilityRule[];
 
   // Blocked dates (full-day blocks)
-  const { data: blockedDatesData } = await supabase
+  const { data: blockedDatesData } = await supabaseAdmin
     .from('co_blocked_dates')
     .select('blocked_date')
     .eq('commissioner_id', commissionerId)
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
   // Date overrides (table may not exist yet if migration hasn't run)
   let customTimesData: { custom_date: string; start_time: string; end_time: string; mode: string }[] = [];
   try {
-    const { data: ctData, error: ctError } = await supabase
+    const { data: ctData, error: ctError } = await supabaseAdmin
       .from('co_custom_times')
       .select('custom_date, start_time, end_time, mode')
       .eq('commissioner_id', commissionerId)
@@ -189,7 +189,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Filter out booked slots from DB (across ALL locations for this commissioner)
-  const { data: booked } = await supabase
+  const { data: booked } = await supabaseAdmin
     .from('co_bookings')
     .select('appointment_datetime')
     .eq('commissioner_id', commissionerId)
