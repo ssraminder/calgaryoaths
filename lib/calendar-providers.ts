@@ -1,16 +1,10 @@
 /**
  * Calendar provider integrations: Google Calendar, Microsoft Outlook, Apple (CalDAV).
  *
- * Provides a unified interface for:
- *  - OAuth URL generation (Google, Microsoft)
- *  - Token exchange and refresh
- *  - Fetching busy/free times (pull)
- *  - Creating/deleting calendar events (push)
- *  - Apple CalDAV via tsdav
+ * Uses direct REST calls for Google and Microsoft (no heavy SDK dependencies).
+ * Uses tsdav for Apple CalDAV.
  */
 
-import { google, calendar_v3 } from 'googleapis';
-import { Client } from '@microsoft/microsoft-graph-client';
 import { createDAVClient } from 'tsdav';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -43,51 +37,81 @@ function siteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 }
 
-// ─── Google Calendar ─────────────────────────────────────────────────────────
+// ─── Google Calendar (direct REST) ───────────────────────────────────────────
 
-function googleOAuth2() {
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    `${siteUrl()}/api/calendar/callback/google`
-  );
-}
+const GOOGLE_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GCAL_API = 'https://www.googleapis.com/calendar/v3';
 
 export function googleAuthUrl(commissionerId: string): string {
-  const oauth2 = googleOAuth2();
-  return oauth2.generateAuthUrl({
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID!,
+    redirect_uri: `${siteUrl()}/api/calendar/callback/google`,
+    response_type: 'code',
+    scope: 'https://www.googleapis.com/auth/calendar',
     access_type: 'offline',
     prompt: 'consent',
-    scope: ['https://www.googleapis.com/auth/calendar'],
     state: commissionerId,
   });
+  return `${GOOGLE_AUTH_BASE}?${params}`;
 }
 
 export async function googleExchangeCode(code: string): Promise<TokenSet> {
-  const oauth2 = googleOAuth2();
-  const { tokens } = await oauth2.getToken(code);
+  const res = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      code,
+      redirect_uri: `${siteUrl()}/api/calendar/callback/google`,
+      grant_type: 'authorization_code',
+    }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(`Google token error: ${data.error_description || data.error}`);
   return {
-    access_token: tokens.access_token!,
-    refresh_token: tokens.refresh_token!,
-    token_expires_at: new Date(tokens.expiry_date!).toISOString(),
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    token_expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
   };
 }
 
 export async function googleRefreshToken(refreshToken: string): Promise<TokenSet> {
-  const oauth2 = googleOAuth2();
-  oauth2.setCredentials({ refresh_token: refreshToken });
-  const { credentials } = await oauth2.refreshAccessToken();
+  const res = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(`Google refresh error: ${data.error_description || data.error}`);
   return {
-    access_token: credentials.access_token!,
-    refresh_token: credentials.refresh_token || refreshToken,
-    token_expires_at: new Date(credentials.expiry_date!).toISOString(),
+    access_token: data.access_token,
+    refresh_token: data.refresh_token || refreshToken,
+    token_expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
   };
 }
 
-function googleCalendarClient(accessToken: string): calendar_v3.Calendar {
-  const oauth2 = googleOAuth2();
-  oauth2.setCredentials({ access_token: accessToken });
-  return google.calendar({ version: 'v3', auth: oauth2 });
+async function googleFetch(accessToken: string, path: string, options?: RequestInit) {
+  const res = await fetch(`${GCAL_API}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Google Calendar API error (${res.status}): ${err}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
 }
 
 export async function googleGetBusyTimes(
@@ -96,17 +120,17 @@ export async function googleGetBusyTimes(
   timeMin: string,
   timeMax: string
 ): Promise<BusyPeriod[]> {
-  const cal = googleCalendarClient(accessToken);
-  const res = await cal.freebusy.query({
-    requestBody: {
+  const data = await googleFetch(accessToken, '/freeBusy', {
+    method: 'POST',
+    body: JSON.stringify({
       timeMin,
       timeMax,
       timeZone: 'America/Edmonton',
       items: [{ id: calendarId }],
-    },
+    }),
   });
-  const busy = res.data.calendars?.[calendarId]?.busy || [];
-  return busy.map((b) => ({ start: b.start!, end: b.end! }));
+  const busy = data?.calendars?.[calendarId]?.busy || [];
+  return busy.map((b: { start: string; end: string }) => ({ start: b.start, end: b.end }));
 }
 
 export async function googleCreateEvent(
@@ -114,18 +138,17 @@ export async function googleCreateEvent(
   calendarId: string,
   event: CalendarEvent
 ): Promise<string> {
-  const cal = googleCalendarClient(accessToken);
-  const res = await cal.events.insert({
-    calendarId,
-    requestBody: {
+  const data = await googleFetch(accessToken, `/calendars/${encodeURIComponent(calendarId)}/events`, {
+    method: 'POST',
+    body: JSON.stringify({
       summary: event.title,
       description: event.description,
       location: event.location,
       start: { dateTime: event.startTime, timeZone: 'America/Edmonton' },
       end: { dateTime: event.endTime, timeZone: 'America/Edmonton' },
-    },
+    }),
   });
-  return res.data.id!;
+  return data.id;
 }
 
 export async function googleDeleteEvent(
@@ -133,25 +156,26 @@ export async function googleDeleteEvent(
   calendarId: string,
   eventId: string
 ): Promise<void> {
-  const cal = googleCalendarClient(accessToken);
-  await cal.events.delete({ calendarId, eventId });
+  await googleFetch(accessToken, `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function googleListCalendars(
   accessToken: string
 ): Promise<{ id: string; name: string; primary: boolean }[]> {
-  const cal = googleCalendarClient(accessToken);
-  const res = await cal.calendarList.list();
-  return (res.data.items || []).map((c) => ({
-    id: c.id!,
-    name: c.summary || c.id!,
+  const data = await googleFetch(accessToken, '/users/me/calendarList');
+  return (data?.items || []).map((c: { id: string; summary?: string; primary?: boolean }) => ({
+    id: c.id,
+    name: c.summary || c.id,
     primary: c.primary === true,
   }));
 }
 
-// ─── Microsoft / Outlook ─────────────────────────────────────────────────────
+// ─── Microsoft / Outlook (direct REST) ───────────────────────────────────────
 
 const MS_AUTH_BASE = 'https://login.microsoftonline.com/common/oauth2/v2.0';
+const MS_GRAPH = 'https://graph.microsoft.com/v1.0';
 
 export function microsoftAuthUrl(commissionerId: string): string {
   const params = new URLSearchParams({
@@ -206,10 +230,21 @@ export async function microsoftRefreshToken(refreshToken: string): Promise<Token
   };
 }
 
-function msGraphClient(accessToken: string): Client {
-  return Client.init({
-    authProvider: (done) => done(null, accessToken),
+async function msGraphFetch(accessToken: string, path: string, options?: RequestInit) {
+  const res = await fetch(`${MS_GRAPH}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
   });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Microsoft Graph API error (${res.status}): ${err}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
 }
 
 export async function microsoftGetBusyTimes(
@@ -217,14 +252,16 @@ export async function microsoftGetBusyTimes(
   timeMin: string,
   timeMax: string
 ): Promise<BusyPeriod[]> {
-  const client = msGraphClient(accessToken);
-  const res = await client.api('/me/calendar/getSchedule').post({
-    schedules: ['me'],
-    startTime: { dateTime: timeMin, timeZone: 'America/Edmonton' },
-    endTime: { dateTime: timeMax, timeZone: 'America/Edmonton' },
-    availabilityViewInterval: 30,
+  const data = await msGraphFetch(accessToken, '/me/calendar/getSchedule', {
+    method: 'POST',
+    body: JSON.stringify({
+      schedules: ['me'],
+      startTime: { dateTime: timeMin, timeZone: 'America/Edmonton' },
+      endTime: { dateTime: timeMax, timeZone: 'America/Edmonton' },
+      availabilityViewInterval: 30,
+    }),
   });
-  const items = res.value?.[0]?.scheduleItems || [];
+  const items = data?.value?.[0]?.scheduleItems || [];
   return items
     .filter((item: { status: string }) => item.status !== 'free')
     .map((item: { start: { dateTime: string }; end: { dateTime: string } }) => ({
@@ -237,31 +274,31 @@ export async function microsoftCreateEvent(
   accessToken: string,
   event: CalendarEvent
 ): Promise<string> {
-  const client = msGraphClient(accessToken);
-  const res = await client.api('/me/events').post({
-    subject: event.title,
-    body: { contentType: 'text', content: event.description },
-    location: { displayName: event.location },
-    start: { dateTime: event.startTime, timeZone: 'America/Edmonton' },
-    end: { dateTime: event.endTime, timeZone: 'America/Edmonton' },
+  const data = await msGraphFetch(accessToken, '/me/events', {
+    method: 'POST',
+    body: JSON.stringify({
+      subject: event.title,
+      body: { contentType: 'text', content: event.description },
+      location: { displayName: event.location },
+      start: { dateTime: event.startTime, timeZone: 'America/Edmonton' },
+      end: { dateTime: event.endTime, timeZone: 'America/Edmonton' },
+    }),
   });
-  return res.id;
+  return data.id;
 }
 
 export async function microsoftDeleteEvent(
   accessToken: string,
   eventId: string
 ): Promise<void> {
-  const client = msGraphClient(accessToken);
-  await client.api(`/me/events/${eventId}`).delete();
+  await msGraphFetch(accessToken, `/me/events/${eventId}`, { method: 'DELETE' });
 }
 
 export async function microsoftListCalendars(
   accessToken: string
 ): Promise<{ id: string; name: string; primary: boolean }[]> {
-  const client = msGraphClient(accessToken);
-  const res = await client.api('/me/calendars').get();
-  return (res.value || []).map((c: { id: string; name: string; isDefaultCalendar: boolean }) => ({
+  const data = await msGraphFetch(accessToken, '/me/calendars');
+  return (data?.value || []).map((c: { id: string; name: string; isDefaultCalendar: boolean }) => ({
     id: c.id,
     name: c.name,
     primary: c.isDefaultCalendar === true,
@@ -412,7 +449,6 @@ function extractIcsField(ics: string, field: string): string | null {
 }
 
 function parseIcsDate(value: string): string {
-  // Handle format: 20260406T143000Z or 20260406T143000
   const clean = value.replace(/[^0-9TZ]/g, '');
   if (clean.length >= 15) {
     const y = clean.slice(0, 4);
@@ -447,11 +483,11 @@ export type CalendarConnection = {
 
 /** Ensure the access token is fresh, refreshing if needed. Returns updated tokens or null if no refresh needed. */
 export async function ensureFreshToken(conn: CalendarConnection): Promise<TokenSet | null> {
-  if (conn.provider === 'apple') return null; // CalDAV uses basic auth
+  if (conn.provider === 'apple') return null;
 
   if (!conn.token_expires_at || !conn.refresh_token) return null;
   const expiresAt = new Date(conn.token_expires_at).getTime();
-  const buffer = 5 * 60 * 1000; // refresh 5 min before expiry
+  const buffer = 5 * 60 * 1000;
   if (Date.now() < expiresAt - buffer) return null;
 
   if (conn.provider === 'google') {
@@ -472,7 +508,6 @@ export async function getBusyTimes(
   if (conn.provider === 'microsoft') {
     return microsoftGetBusyTimes(conn.access_token!, timeMin, timeMax);
   }
-  // Apple CalDAV — access_token holds username, refresh_token holds app password
   return appleGetBusyTimes(
     conn.access_token!,
     conn.refresh_token!,
