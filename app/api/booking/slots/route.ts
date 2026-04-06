@@ -203,12 +203,54 @@ export async function GET(req: NextRequest) {
   const bookedSet = new Set((booked ?? []).map((b) => b.appointment_datetime));
   available = available.filter((s) => !bookedSet.has(s));
 
-  // TODO: Calendar integration — when co_calendar_connections exist for this vendor:
-  // 1. Fetch busy times from Google Calendar API / Microsoft Graph API
-  // 2. Convert busy periods to block windows and filter out matching slots
-  // 3. Calendar-sourced blocks are stored in co_custom_times with source='calendar'
-  //    and synced periodically via a background job or webhook
-  // See: co_calendar_connections table for connection metadata
+  // Calendar integration — filter out slots that overlap with external calendar busy times.
+  // Busy times are synced into co_custom_times with source='calendar' by the sync job,
+  // so they're already handled by the blockOverrides logic above.
+  // As a real-time fallback, also query connected calendars directly for fresh busy times.
+  try {
+    const { data: calConns } = await supabaseAdmin
+      .from('co_calendar_connections')
+      .select('*')
+      .eq('commissioner_id', commissionerId)
+      .eq('sync_enabled', true)
+      .eq('pull_busy_times', true);
+
+    if (calConns && calConns.length > 0) {
+      const { getBusyTimes, ensureFreshToken } = await import('@/lib/calendar-providers');
+      type CC = import('@/lib/calendar-providers').CalendarConnection;
+
+      for (const conn of calConns as CC[]) {
+        try {
+          const freshTokens = await ensureFreshToken(conn);
+          if (freshTokens) {
+            await supabaseAdmin
+              .from('co_calendar_connections')
+              .update({
+                access_token: freshTokens.access_token,
+                refresh_token: freshTokens.refresh_token,
+                token_expires_at: freshTokens.token_expires_at,
+              })
+              .eq('id', conn.id);
+            conn.access_token = freshTokens.access_token;
+          }
+
+          const busyPeriods = await getBusyTimes(conn, base.toISOString(), windowEnd.toISOString());
+          available = available.filter((slotIso) => {
+            const slotStart = new Date(slotIso).getTime();
+            const slotEnd = slotStart + SLOT_MINUTES * 60 * 1000;
+            return !busyPeriods.some((busy) => {
+              const busyStart = new Date(busy.start).getTime();
+              const busyEnd = new Date(busy.end).getTime();
+              return slotStart < busyEnd && slotEnd > busyStart;
+            });
+          });
+        } catch (calErr) {
+          console.error(`Calendar busy time fetch failed for ${conn.provider}:`, calErr);
+          // Non-blocking — slots still returned even if calendar fetch fails
+        }
+      }
+    }
+  } catch { /* co_calendar_connections table may not exist yet */ }
 
   return NextResponse.json({ slots: available });
 }

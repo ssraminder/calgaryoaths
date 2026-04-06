@@ -310,6 +310,26 @@ export async function POST(req: NextRequest) {
         } catch (e) { console.error('Vendor email error:', e); }
       }
 
+      // ──────── PUSH BOOKING TO CONNECTED CALENDARS ────────
+      if (booking.commissioner_id && booking.appointment_datetime) {
+        try {
+          const { pushBookingToCalendars } = await import('@/app/api/calendar/sync/route');
+          const apptStart = new Date(booking.appointment_datetime);
+          const apptEnd = new Date(apptStart.getTime() + 30 * 60 * 1000);
+          await pushBookingToCalendars(booking.commissioner_id, {
+            title: `${booking.service_name} — ${booking.name}`,
+            description: `Customer: ${booking.name}\nPhone: ${booking.phone}\nEmail: ${booking.email}${booking.notes ? `\nNotes: ${booking.notes}` : ''}`,
+            location: isMobile
+              ? booking.customer_address || 'Mobile service'
+              : location?.address || commissioner?.address || 'Calgary, AB',
+            startTime: apptStart.toISOString(),
+            endTime: apptEnd.toISOString(),
+          });
+        } catch (calErr) {
+          console.error('Calendar push error (non-blocking):', calErr);
+        }
+      }
+
       // ──────── PUSH NOTIFICATION TO VENDOR ────────
       if (booking.commissioner_id) {
         try {
