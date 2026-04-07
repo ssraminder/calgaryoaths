@@ -3,6 +3,7 @@ import { verifyAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
 import { calendarLinksHtml, locationHtml } from '@/lib/calendar';
+import { pushBookingToCalendars } from '@/lib/calendar-sync';
 
 export async function POST(
   req: NextRequest,
@@ -71,6 +72,25 @@ export async function POST(
       `,
     });
   } catch (e) { console.error('Accept email error:', e); }
+
+  // Push booking to vendor's connected calendars
+  if (booking.commissioner_id && booking.appointment_datetime) {
+    try {
+      const apptStart = new Date(booking.appointment_datetime);
+      const apptEnd = new Date(apptStart.getTime() + 30 * 60 * 1000);
+      await pushBookingToCalendars(booking.commissioner_id, {
+        title: `${booking.service_name} — ${booking.name}`,
+        description: `Customer: ${booking.name}\nPhone: ${booking.phone}\nEmail: ${booking.email}${booking.notes ? `\nNotes: ${booking.notes}` : ''}`,
+        location: isMobile
+          ? booking.customer_address || 'Mobile service'
+          : commDetail?.address || 'Calgary, AB',
+        startTime: apptStart.toISOString(),
+        endTime: apptEnd.toISOString(),
+      });
+    } catch (calErr) {
+      console.error('Calendar push error (non-blocking):', calErr);
+    }
+  }
 
   return NextResponse.json({ success: true });
 }
