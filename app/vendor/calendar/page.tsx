@@ -140,12 +140,15 @@ export default function VendorCalendarPage() {
     setSyncing(true);
     setError('');
     try {
-      const res = await fetch('/api/calendar/sync', { method: 'POST' });
+      const res = await fetch('/api/calendar/sync?push=true', { method: 'POST' });
       const data = await res.json();
       if (data.errors > 0) {
         setError(`Synced with ${data.errors} error(s). ${data.totalBlocks} busy blocks imported.`);
       } else {
-        setSuccess(`Sync complete — ${data.totalBlocks} busy time blocks imported from ${data.synced} calendar(s).`);
+        const parts = [];
+        if (data.totalBlocks > 0) parts.push(`${data.totalBlocks} busy time blocks imported`);
+        if (data.pushedBookings > 0) parts.push(`${data.pushedBookings} upcoming booking(s) pushed to calendar`);
+        setSuccess(parts.length > 0 ? `Sync complete — ${parts.join(', ')}.` : 'Sync complete — everything is up to date.');
       }
       fetchConnections();
     } catch {
