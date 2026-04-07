@@ -313,7 +313,7 @@ export async function POST(req: NextRequest) {
       // ──────── PUSH BOOKING TO CONNECTED CALENDARS ────────
       if (booking.commissioner_id && booking.appointment_datetime) {
         try {
-          const { pushBookingToCalendars } = await import('@/app/api/calendar/sync/route');
+          const { pushBookingToCalendars } = await import('@/lib/calendar-sync');
           const apptStart = new Date(booking.appointment_datetime);
           const apptEnd = new Date(apptStart.getTime() + 30 * 60 * 1000);
           await pushBookingToCalendars(booking.commissioner_id, {
