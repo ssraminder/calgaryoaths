@@ -82,5 +82,23 @@ export async function POST(
     });
   } catch (e) { console.error('Confirm email error:', e); }
 
+  // Push confirmed booking to connected calendars
+  if (booking.appointment_datetime) {
+    try {
+      const { pushBookingToCalendars } = await import('@/lib/calendar-sync');
+      const apptStart = new Date(booking.appointment_datetime);
+      const apptEnd = new Date(apptStart.getTime() + 30 * 60 * 1000);
+      await pushBookingToCalendars(vendor.commissionerId, {
+        title: `${booking.service_name} — ${booking.name}`,
+        description: `Customer: ${booking.name}\nPhone: ${booking.phone}\nEmail: ${booking.email}${booking.notes ? `\nNotes: ${booking.notes}` : ''}`,
+        location: locationText,
+        startTime: apptStart.toISOString(),
+        endTime: apptEnd.toISOString(),
+      });
+    } catch (calErr) {
+      console.error('Calendar push error (non-blocking):', calErr);
+    }
+  }
+
   return NextResponse.json({ success: true });
 }
