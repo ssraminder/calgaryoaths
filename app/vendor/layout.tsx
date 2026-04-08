@@ -26,7 +26,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     async function checkAuth() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) {
-        if (pathname !== '/vendor/login') router.replace('/vendor/login');
+        if (pathname !== '/vendor/login' && pathname !== '/vendor/forgot-password') router.replace('/vendor/login');
         setLoading(false);
         return;
       }
@@ -47,7 +47,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     checkAuth();
   }, [pathname, router]);
 
-  if (pathname === '/vendor/login') return <>{children}</>;
+  if (pathname === '/vendor/login' || pathname === '/vendor/forgot-password') return <>{children}</>;
 
   if (loading) {
     return (
