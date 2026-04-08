@@ -33,8 +33,7 @@ export default function TopBar({
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 md:px-6">
-      {/* Mobile: logo + portal name (sidebar hidden on mobile) */}
-      <Link href={homeHref || '/admin'} className="flex items-center gap-2 md:hidden">
+      <Link href={homeHref || '/admin'} className="flex items-center gap-2">
         <Image
           src={LOGO_URL}
           alt="Calgary Oaths"
@@ -42,9 +41,10 @@ export default function TopBar({
           height={34}
           className="h-8 w-auto object-contain"
         />
+        {portalName && (
+          <span className="hidden text-sm font-medium text-gray-500 sm:block">{portalName}</span>
+        )}
       </Link>
-      {/* Desktop: empty spacer (sidebar shows brand) */}
-      <div className="hidden md:block" />
 
       <div className="flex items-center gap-2 md:gap-4">
         <button

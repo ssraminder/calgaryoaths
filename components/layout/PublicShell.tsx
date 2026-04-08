@@ -22,7 +22,8 @@ export default function PublicShell({
   const isDashboard = pathname.startsWith('/admin') || pathname.startsWith('/vendor');
 
   if (isDashboard) {
-    return <>{children}</>;
+    // Render ONLY children — no navbar, footer, or extras
+    return <div className="flex-1 flex flex-col">{children}</div>;
   }
 
   return (
