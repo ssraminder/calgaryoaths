@@ -98,7 +98,6 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [scheduling, setScheduling] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [pendingReview, setPendingReview] = useState(false);
   const [slotError, setSlotError] = useState<string | null>(null);
@@ -154,56 +153,58 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
     if (!selectedService) return;
     setSubmitting(true);
     setError(null);
-    try {
-      const res = await fetch('/api/booking/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          serviceSlug: selectedService.slug,
-          commissionerId: vendorId,
-          name: data.name, email: data.email, phone: data.phone,
-          notes: data.notes || '',
-          deliveryMode: deliveryTab,
-          customerAddress: data.customerAddress || '',
-          facilityName: isMobile ? (document.querySelector<HTMLInputElement>('[name="facilityName"]')?.value || '') : '',
-          customerUnit: isMobile ? (document.querySelector<HTMLInputElement>('[name="customerUnit"]')?.value || '') : '',
-          travelFeeCents: travelFee,
-          locationId: locationId || null,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error); return; }
-      setBookingId(json.bookingId);
-      trackBookingCreated(selectedService.name, vendorId);
-      if (json.requiresReview) { setPendingReview(true); }
-      else { setStep(3); }
-    } catch { setError('Network error.'); }
-    finally { setSubmitting(false); }
-  }
-
-  async function handleConfirmSlot() {
-    if (!bookingId || !selectedSlot) return;
-    setScheduling(true);
     setSlotError(null);
     try {
-      const res = await fetch('/api/booking/schedule', {
+      // Create booking (or reuse if already created from a previous attempt)
+      let bid = bookingId;
+      if (!bid) {
+        const res = await fetch('/api/booking/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceSlug: selectedService.slug,
+            commissionerId: vendorId,
+            name: data.name, email: data.email, phone: data.phone,
+            notes: data.notes || '',
+            deliveryMode: deliveryTab,
+            customerAddress: data.customerAddress || '',
+            facilityName: isMobile ? (document.querySelector<HTMLInputElement>('[name="facilityName"]')?.value || '') : '',
+            customerUnit: isMobile ? (document.querySelector<HTMLInputElement>('[name="customerUnit"]')?.value || '') : '',
+            travelFeeCents: travelFee,
+            locationId: locationId || null,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) { setError(json.error); return; }
+        bid = json.bookingId;
+        setBookingId(bid);
+        trackBookingCreated(selectedService.name, vendorId);
+        if (json.requiresReview) { setPendingReview(true); return; }
+      }
+
+      // Schedule slot + redirect to payment
+      const schedRes = await fetch('/api/booking/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, appointmentDatetime: selectedSlot }),
+        body: JSON.stringify({ bookingId: bid, appointmentDatetime: selectedSlot }),
       });
-      const json = await res.json();
-      if (!res.ok) { setSlotError(json.error); return; }
-      if (json.paymentTransferred) {
+      const schedJson = await schedRes.json();
+      if (!schedRes.ok) {
+        setSlotError(schedJson.error || 'Could not book this slot. Please try another.');
+        setStep(2);
+        return;
+      }
+      if (schedJson.paymentTransferred) {
         setRedirecting(true);
         window.location.href = '/booking/success?appointment=confirmed';
-      } else if (json.checkoutUrl) {
+      } else if (schedJson.checkoutUrl) {
         trackSlotConfirmed(bookingFee ?? 0);
         trackConversion(bookingFee ?? 0);
         setRedirecting(true);
-        window.location.href = json.checkoutUrl;
+        window.location.href = schedJson.checkoutUrl;
       }
-    } catch { setSlotError('Network error.'); }
-    finally { setScheduling(false); }
+    } catch { setError('Network error.'); }
+    finally { setSubmitting(false); }
   }
 
   if (loading) {
@@ -302,12 +303,12 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
         </div>
       )}
 
-      {/* Step 2 — Details */}
-      {step === 2 && (
+      {/* Step 3 — Details & Pay (or Step 2 for requires_review services) */}
+      {((step === 3 && !selectedService?.requiresReview) || (step === 2 && selectedService?.requiresReview)) && (
         <form onSubmit={handleSubmit(onSubmit)}>
-          <StepDots step={2} total={totalSteps} />
+          <StepDots step={selectedService?.requiresReview ? 2 : 3} total={totalSteps} />
           <div className="flex items-center gap-2 mb-4">
-            <button type="button" onClick={() => setStep(1)} className="text-mid-grey hover:text-charcoal"><ChevronLeft size={18} /></button>
+            <button type="button" onClick={() => setStep(selectedService?.requiresReview ? 1 : 2)} className="text-mid-grey hover:text-charcoal"><ChevronLeft size={18} /></button>
             <div>
               <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">Your details</h3>
               <p className="text-xs text-mid-grey">{selectedService?.name}</p>
@@ -409,20 +410,26 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
 
             {error && <p className="text-red-500 text-sm">{error}</p>}
 
-            <button type="submit" disabled={submitting}
+            <p className="text-xs text-mid-grey text-center">
+              By proceeding, you agree to our{' '}
+              <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">Terms &amp; Conditions</a>
+              {' '}including the cancellation policy.
+            </p>
+
+            <button type="submit" disabled={submitting || (!selectedService?.requiresReview && !selectedSlot)}
               className="btn-primary w-full justify-center disabled:opacity-40">
-              {submitting ? 'Submitting...' : 'Continue'} <ChevronRight size={16} />
+              {submitting ? 'Booking...' : selectedService?.requiresReview ? 'Submit request' : 'Confirm & Pay'} <ChevronRight size={16} />
             </button>
           </div>
         </form>
       )}
 
-      {/* Step 3 — Pick Time */}
-      {step === 3 && (
+      {/* Step 2 — Pick Time (normal services only) */}
+      {step === 2 && !selectedService?.requiresReview && (
         <div>
-          <StepDots step={3} total={totalSteps} />
+          <StepDots step={2} total={totalSteps} />
           <div className="flex items-center gap-2 mb-4">
-            <button type="button" onClick={() => setStep(2)} className="text-mid-grey hover:text-charcoal"><ChevronLeft size={18} /></button>
+            <button type="button" onClick={() => setStep(1)} className="text-mid-grey hover:text-charcoal"><ChevronLeft size={18} /></button>
             <div>
               <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">Pick a time</h3>
               <p className="text-xs text-mid-grey">{selectedService?.name} · {vendor?.name}</p>
@@ -449,16 +456,10 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
 
           {slotError && <p className="text-red-500 text-sm mt-3">{slotError}</p>}
 
-          <p className="text-xs text-mid-grey mt-4 text-center">
-            By proceeding, you agree to our{' '}
-            <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">Terms & Conditions</a>
-            {' '}including the cancellation policy.
-          </p>
-
-          <button type="button" disabled={!selectedSlot || scheduling}
-            onClick={handleConfirmSlot}
+          <button type="button" disabled={!selectedSlot}
+            onClick={() => setStep(3)}
             className="btn-primary w-full justify-center mt-3 disabled:opacity-40">
-            {scheduling ? 'Booking...' : 'Confirm & Pay'} <ChevronRight size={16} />
+            Continue <ChevronRight size={16} />
           </button>
         </div>
       )}

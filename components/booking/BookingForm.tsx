@@ -243,7 +243,6 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   const [selectedCommIdForSlots, setSelectedCommIdForSlots] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
-  const [scheduling, setScheduling] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [pendingReview, setPendingReview] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -294,7 +293,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFilter, timeFilter]);
 
-  const totalSteps = selectedService?.requiresReview ? 2 : 4;
+  const totalSteps = selectedService?.requiresReview ? 3 : 4;
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<DetailsForm>({
     resolver: zodResolver(detailsSchema),
@@ -335,90 +334,79 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
   const taxAmount = Math.round(subtotal * pricing.tax.total_rate);
   const totalCharged = subtotal + taxAmount;
 
-  /* ── Step 2 submit: save booking ──────────────────────────────────── */
+  /* ── Final submit: create booking + schedule slot + redirect to Stripe ── */
   async function onSubmit(data: DetailsForm) {
     if (!selectedService) return;
     setSubmitting(true);
     setError(null);
+    setSlotError(null);
 
     try {
-      const res = await fetch('/api/booking/create', {
+      // Create booking (or reuse if already created from a previous attempt)
+      let bid = bookingId;
+      if (!bid) {
+        const res = await fetch('/api/booking/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceSlug: selectedService.slug,
+            commissionerId: data.commissionerId,
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            notes: data.notes || '',
+            deliveryMode: data.deliveryMode || 'in_office',
+            customerAddress: data.customerAddress || '',
+            facilityName: isMobile ? (document.querySelector<HTMLInputElement>('[name="facilityName"]')?.value || '') : '',
+            customerUnit: isMobile ? (document.querySelector<HTMLInputElement>('[name="customerUnit"]')?.value || '') : '',
+            travelFeeCents: isMobile ? travelFee : 0,
+            travelDistanceKm: travelFeeData?.distanceKm ?? null,
+            locationId: selectedOption?.locationId || null,
+            ...(rebookToken ? { rebookToken } : {}),
+          }),
+        });
+
+        const json = await res.json();
+        if (!res.ok) { setError(json.error || 'Something went wrong.'); return; }
+
+        bid = json.bookingId;
+        setBookingId(bid);
+        trackBookingCreated(selectedService.name, data.commissionerId);
+
+        if (json.requiresReview) {
+          setPendingReview(true);
+          return;
+        }
+      }
+
+      // Schedule slot + redirect to payment
+      const schedRes = await fetch('/api/booking/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          serviceSlug: selectedService.slug,
-          commissionerId: data.commissionerId,
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          notes: data.notes || '',
-          deliveryMode: data.deliveryMode || 'in_office',
-          customerAddress: data.customerAddress || '',
-          facilityName: isMobile ? (document.querySelector<HTMLInputElement>('[name="facilityName"]')?.value || '') : '',
-          customerUnit: isMobile ? (document.querySelector<HTMLInputElement>('[name="customerUnit"]')?.value || '') : '',
-          travelFeeCents: isMobile ? travelFee : 0,
-          travelDistanceKm: travelFeeData?.distanceKm ?? null,
-          locationId: selectedOption?.locationId || null,
-          ...(rebookToken ? { rebookToken } : {}),
-        }),
+        body: JSON.stringify({ bookingId: bid, appointmentDatetime: selectedSlot }),
       });
+      const schedJson = await schedRes.json();
 
-      const json = await res.json();
-      if (!res.ok) { setError(json.error || 'Something went wrong.'); return; }
+      if (!schedRes.ok) {
+        setSlotError(schedJson.error || 'Could not book this slot. Please try another.');
+        setStep(3); // go back to slot picker
+        return;
+      }
 
-      setBookingId(json.bookingId);
-      trackBookingCreated(selectedService.name, data.commissionerId);
-
-      if (json.requiresReview) {
-        setPendingReview(true);
-      } else if (json.paymentTransferred) {
-        setSelectedCommIdForSlots(data.commissionerId);
-        setStep(4);
-      } else {
-        setSelectedCommIdForSlots(data.commissionerId);
-        setStep(4);
+      if (schedJson.paymentTransferred) {
+        setRedirecting(true);
+        window.location.href = `${window.location.origin}/booking/success?appointment=confirmed`;
+      } else if (schedJson.checkoutUrl) {
+        const fee = BOOKING_FEES[selectedCommIdForSlots] ?? 0;
+        trackSlotConfirmed(fee);
+        trackConversion(fee);
+        setRedirecting(true);
+        window.location.href = schedJson.checkoutUrl;
       }
     } catch {
       setError('Network error. Please check your connection.');
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  /* ── Step 3: Confirm slot → Stripe deposit ────────────────────────── */
-  async function handleConfirmSlot() {
-    if (!bookingId || !selectedSlot) return;
-    setScheduling(true);
-    setSlotError(null);
-
-    try {
-      const res = await fetch('/api/booking/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, appointmentDatetime: selectedSlot }),
-      });
-      const json = await res.json();
-
-      if (!res.ok) {
-        setSlotError(json.error || 'Could not book this slot. Please try another.');
-        return;
-      }
-
-      if (json.paymentTransferred) {
-        // Payment was already made — go straight to success
-        setRedirecting(true);
-        window.location.href = `${window.location.origin}/booking/success?appointment=confirmed`;
-      } else if (json.checkoutUrl) {
-        const fee = BOOKING_FEES[selectedCommIdForSlots] ?? 0;
-        trackSlotConfirmed(fee);
-        trackConversion(fee);
-        setRedirecting(true);
-        window.location.href = json.checkoutUrl;
-      }
-    } catch {
-      setSlotError('Network error. Please try again.');
-    } finally {
-      setScheduling(false);
     }
   }
 
@@ -725,6 +713,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             onClick={() => {
               setValue('commissionerId', selectedOption!.commissionerId);
               setValue('deliveryMode', deliveryTab);
+              setSelectedCommIdForSlots(selectedOption!.commissionerId);
               setStep(3);
             }}
             className="btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -733,13 +722,13 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
         </div>
       )}
 
-      {/* ── Step 3: Details ────────────────────────────────────────── */}
-      {step === 3 && (
+      {/* ── Step 4: Details & Pay (or Step 3 for requires_review) ── */}
+      {((step === 4 && !selectedService?.requiresReview) || (step === 3 && selectedService?.requiresReview)) && (
         <div className="p-4 sm:p-6">
-          <StepDots step={3} total={totalSteps} />
+          <StepDots step={selectedService?.requiresReview ? 3 : 4} total={totalSteps} />
 
           <div className="flex items-center gap-2 mb-4">
-            <button type="button" onClick={() => setStep(selectedService?.requiresReview ? 1 : 2)} className="text-mid-grey hover:text-charcoal transition-colors" aria-label="Back">
+            <button type="button" onClick={() => setStep(selectedService?.requiresReview ? 2 : 3)} className="text-mid-grey hover:text-charcoal transition-colors" aria-label="Back">
               <ChevronLeft size={18} />
             </button>
             <div>
@@ -904,36 +893,36 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || (!selectedService?.requiresReview && !selectedSlot)}
               className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? (
-                <><Loader2 size={16} className="animate-spin" /> Saving…</>
+                <><Loader2 size={16} className="animate-spin" /> Booking…</>
               ) : selectedService?.requiresReview ? (
                 'Submit request'
               ) : (
-                <><Calendar size={16} /> Book time</>
+                <><Calendar size={16} /> Confirm &amp; pay — {totalCharged ? `$${(totalCharged / 100).toFixed(2)}` : '…'}</>
               )}
             </button>
 
             {selectedService && !selectedService.requiresReview && (
               <p className="text-center text-xs text-mid-grey">
-                Total of <strong>${(totalCharged / 100).toFixed(2)}</strong> (incl. convenience fee + tax) will be charged after scheduling. Additional documents charged at appointment.
+                Additional documents charged at your appointment.
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* ── Step 4: Pick a time slot ───────────────────────────────── */}
-      {step === 4 && (
+      {/* ── Step 3: Pick a time slot (normal services only) ─────────── */}
+      {step === 3 && !selectedService?.requiresReview && (
         <div className="p-4 sm:p-6">
-          <StepDots step={4} total={4} />
+          <StepDots step={3} total={totalSteps} />
 
           <div className="flex items-center gap-2 mb-4">
             <button
               type="button"
-              onClick={() => { setStep(3); setSelectedSlot(''); setSlotError(null); }}
+              onClick={() => { setStep(2); setSelectedSlot(''); setSlotError(null); }}
               className="text-mid-grey hover:text-charcoal transition-colors"
               aria-label="Back"
             >
@@ -941,9 +930,9 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             </button>
             <div>
               <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">
-                Pick a date & time
+                Pick a date &amp; time
               </h3>
-              <p className="text-xs text-mid-grey">{selectedService?.name}</p>
+              <p className="text-xs text-mid-grey">{selectedService?.name} · {selectedOption?.commissionerName}</p>
             </div>
           </div>
 
@@ -962,20 +951,12 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
           <button
             type="button"
-            disabled={!selectedSlot || scheduling}
-            onClick={handleConfirmSlot}
+            disabled={!selectedSlot}
+            onClick={() => setStep(4)}
             className="btn-primary w-full justify-center mt-4 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {scheduling ? (
-              <><Loader2 size={16} className="animate-spin" /> Confirming…</>
-            ) : (
-              <><Calendar size={16} /> Confirm & pay — {totalCharged ? `$${(totalCharged / 100).toFixed(2)}` : '…'}</>
-            )}
+            Continue <ChevronRight size={16} />
           </button>
-
-          <p className="text-center text-xs text-mid-grey mt-2">
-            Additional documents charged at your appointment.
-          </p>
         </div>
       )}
     </form>
