@@ -4,17 +4,22 @@ import { createServerClient } from '@supabase/ssr';
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Only protect /admin and /vendor routes (except login pages)
-  if (
-    (!pathname.startsWith('/admin') && !pathname.startsWith('/vendor')) ||
-    pathname === '/admin/login' ||
-    pathname === '/vendor/login' ||
-    pathname === '/vendor/forgot-password'
-  ) {
-    return NextResponse.next();
-  }
+  // Set pathname header so the root layout can detect dashboard routes server-side
+  const res = NextResponse.next({
+    request: { headers: new Headers(req.headers) },
+  });
+  res.headers.set('x-pathname', pathname);
 
-  const res = NextResponse.next();
+  // Only protect /admin and /vendor routes (except login/forgot-password pages)
+  const isProtectedRoute =
+    (pathname.startsWith('/admin') || pathname.startsWith('/vendor')) &&
+    pathname !== '/admin/login' &&
+    pathname !== '/vendor/login' &&
+    pathname !== '/vendor/forgot-password';
+
+  if (!isProtectedRoute) {
+    return res;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,5 +52,11 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/vendor/:path*'],
+  matcher: [
+    /*
+     * Match all routes except static files and Next.js internals.
+     * This lets us set x-pathname for the root layout on every request.
+     */
+    '/((?!_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.json|icons/).*)',
+  ],
 };

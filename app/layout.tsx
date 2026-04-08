@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Playfair_Display, Inter } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import Script from 'next/script';
+import { headers } from 'next/headers';
 import './globals.css';
 import { BookingModalProvider } from '@/lib/context/BookingModalContext';
 import Navbar from '@/components/layout/Navbar';
@@ -9,7 +10,6 @@ import Footer from '@/components/layout/Footer';
 import BookingModal from '@/components/layout/BookingModal';
 import WhatsAppButton from '@/components/layout/WhatsAppButton';
 import AuthRedirect from '@/components/shared/AuthRedirect';
-import PublicShell from '@/components/layout/PublicShell';
 import { GTMHead, GTMNoScript } from '@/components/shared/GoogleTagManager';
 import { getAnalyticsSettings, getSettings } from '@/lib/data/db';
 
@@ -68,11 +68,19 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [analytics, settings] = await Promise.all([getAnalyticsSettings(), getSettings()]);
+  const [analytics, settings, hdrs] = await Promise.all([
+    getAnalyticsSettings(),
+    getSettings(),
+    headers(),
+  ]);
   const ga4Id = analytics.ga4Id || process.env.NEXT_PUBLIC_GA4_ID;
   const gtmId = analytics.gtmId || process.env.NEXT_PUBLIC_GTM_ID;
   const gadsId = analytics.googleAdsId || process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
   const whatsappNumber = settings.whatsapp_number || null;
+
+  // Detect dashboard routes server-side so Navbar/Footer are never rendered
+  const pathname = hdrs.get('x-pathname') || '';
+  const isDashboard = pathname.startsWith('/admin') || pathname.startsWith('/vendor');
 
   return (
     <html
@@ -87,18 +95,17 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-bg text-charcoal font-body" suppressHydrationWarning>
         {gtmId && <GTMNoScript gtmId={gtmId} />}
         <BookingModalProvider>
-          <PublicShell
-            navbar={<Navbar />}
-            footer={<Footer />}
-            publicExtras={
-              <>
-                <BookingModal />
-                {whatsappNumber && <WhatsAppButton number={whatsappNumber} />}
-              </>
-            }
-          >
-            {children}
-          </PublicShell>
+          {isDashboard ? (
+            <>{children}</>
+          ) : (
+            <>
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Footer />
+              <BookingModal />
+              {whatsappNumber && <WhatsAppButton number={whatsappNumber} />}
+            </>
+          )}
           <AuthRedirect />
         </BookingModalProvider>
         {ga4Id && <GoogleAnalytics gaId={ga4Id} />}
