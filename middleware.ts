@@ -8,7 +8,8 @@ export async function middleware(req: NextRequest) {
   if (
     (!pathname.startsWith('/admin') && !pathname.startsWith('/vendor')) ||
     pathname === '/admin/login' ||
-    pathname === '/vendor/login'
+    pathname === '/vendor/login' ||
+    pathname === '/vendor/forgot-password'
   ) {
     return NextResponse.next();
   }
