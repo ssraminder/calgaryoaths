@@ -200,8 +200,10 @@ export async function GET(req: NextRequest) {
     .gte('appointment_datetime', base.toISOString())
     .lte('appointment_datetime', windowEnd.toISOString());
 
-  const bookedSet = new Set((booked ?? []).map((b) => b.appointment_datetime));
-  available = available.filter((s) => !bookedSet.has(s));
+  const bookedSet = new Set(
+    (booked ?? []).map((b) => new Date(b.appointment_datetime).getTime())
+  );
+  available = available.filter((s) => !bookedSet.has(new Date(s).getTime()));
 
   // Calendar integration — filter out slots that overlap with external calendar busy times.
   // Busy times are synced into co_custom_times with source='calendar' by the sync job,
