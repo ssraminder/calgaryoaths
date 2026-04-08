@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
-const supabase = createClient(
+const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
@@ -17,13 +17,35 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Supabase puts the recovery token in the URL hash — the client library
-    // picks it up automatically and sets the session
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+    let settled = false;
+
+    // 1. Check if session already exists (set by /auth/callback)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && !settled) {
+        settled = true;
         setReady(true);
       }
     });
+
+    // 2. Listen for PASSWORD_RECOVERY event (legacy hash-based flow)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY' && !settled) {
+        settled = true;
+        setReady(true);
+      }
+    });
+
+    // 3. Handle code in query params (direct link without callback)
+    const code = new URLSearchParams(window.location.search).get('code');
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error: codeErr }) => {
+        if (!codeErr && !settled) {
+          settled = true;
+          setReady(true);
+        }
+      });
+    }
+
     return () => subscription.unsubscribe();
   }, []);
 
