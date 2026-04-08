@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, CalendarCheck, Clock, Settings, HelpCircle, Phone, MessageSquare, X } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, DollarSign, Clock, Settings, HelpCircle, Phone, MessageSquare, X } from 'lucide-react';
 
 const navItems = [
   { label: 'Dashboard', href: '/vendor', icon: LayoutDashboard },
   { label: 'Bookings', href: '/vendor/bookings', icon: CalendarCheck },
-  { label: 'Availability', href: '/vendor/availability', icon: Clock },
+  { label: 'Earnings', href: '/vendor/earnings', icon: DollarSign },
   { label: 'Settings', href: '/vendor/rates', icon: Settings },
 ];
 

@@ -4,11 +4,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, CalendarCheck, Clock, Calendar, Settings } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, Clock, Calendar, DollarSign, Settings } from 'lucide-react';
 
 const navItems = [
   { label: 'Dashboard', href: '/vendor', icon: LayoutDashboard },
   { label: 'Bookings', href: '/vendor/bookings', icon: CalendarCheck },
+  { label: 'Earnings', href: '/vendor/earnings', icon: DollarSign },
   { label: 'Availability', href: '/vendor/availability', icon: Clock },
   { label: 'Calendar', href: '/vendor/calendar', icon: Calendar },
   { label: 'Settings', href: '/vendor/rates', icon: Settings },
