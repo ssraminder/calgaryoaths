@@ -75,14 +75,13 @@ export async function sendPushToCommissioner(commissionerId: string, payload: Pu
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
 
   // Look up the user_id for this commissioner
-  const { data: profile } = await supabaseAdmin
-    .from('co_profiles')
-    .select('id')
-    .eq('commissioner_id', commissionerId)
-    .eq('role', 'vendor')
+  const { data: commissioner } = await supabaseAdmin
+    .from('co_commissioners')
+    .select('user_id')
+    .eq('id', commissionerId)
     .single();
 
-  if (!profile) return;
+  if (!commissioner?.user_id) return;
 
-  return sendPushToUser(profile.id, payload);
+  return sendPushToUser(commissioner.user_id, payload);
 }
