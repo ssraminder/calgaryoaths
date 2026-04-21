@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, Search } from 'lucide-react';
+import { Download, Plus, Search } from 'lucide-react';
 import DataTable, { type Column } from '@/components/admin/DataTable';
 import StatusBadge from '@/components/admin/StatusBadge';
 import Pagination from '@/components/admin/Pagination';
@@ -121,7 +121,7 @@ export default function BookingsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Bookings</h1>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">{total} total</span>
           <button
             onClick={handleExport}
@@ -129,6 +129,13 @@ export default function BookingsPage() {
           >
             <Download className="h-4 w-4" />
             CSV
+          </button>
+          <button
+            onClick={() => router.push('/admin/bookings/new')}
+            className="inline-flex items-center gap-1.5 rounded-md bg-navy px-3 py-1.5 text-sm font-medium text-white hover:bg-navy/90"
+          >
+            <Plus className="h-4 w-4" />
+            New Booking
           </button>
         </div>
       </div>

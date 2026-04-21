@@ -48,7 +48,15 @@ function VendorBookingsContent() {
   return (
     <PullToRefresh onRefresh={fetchBookings}>
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">Bookings</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">Bookings</h1>
+          <button
+            onClick={() => router.push('/vendor/bookings/new')}
+            className="inline-flex items-center gap-1.5 rounded-md bg-navy px-3 py-2 text-sm font-medium text-white hover:bg-navy/90 min-h-[40px]"
+          >
+            + New
+          </button>
+        </div>
 
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setFilter('')} className={`rounded-full px-3 py-1.5 text-xs font-medium min-h-[36px] ${!filter ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>All</button>
