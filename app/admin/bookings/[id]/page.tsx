@@ -14,6 +14,7 @@ type Booking = {
   service_name: string;
   commissioner_id: string;
   appointment_datetime: string | null;
+  proposed_datetime: string | null;
   status: string;
   amount_paid: number | null;
   notes: string | null;
@@ -47,6 +48,11 @@ export default function BookingDetailPage() {
   const [proposeDate, setProposeDate] = useState('');
   const [proposeTime, setProposeTime] = useState('');
   const [proposeReason, setProposeReason] = useState('');
+
+  // Set confirmed time modal
+  const [showSetTimeModal, setShowSetTimeModal] = useState(false);
+  const [setTimeDate, setSetTimeDate] = useState('');
+  const [setTimeTime, setSetTimeTime] = useState('');
 
   // Cancel modal
   const [showCancel, setShowCancel] = useState(false);
@@ -216,6 +222,39 @@ export default function BookingDetailPage() {
             </div>
           )}
 
+          {/* Set confirmed time — for paid, pending_scheduling, and confirmed */}
+          {['paid', 'pending_scheduling', 'confirmed'].includes(booking.status) && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 space-y-3">
+              <h2 className="font-medium text-gray-900">Set Confirmed Time</h2>
+              <p className="text-sm text-gray-600">
+                {booking.status === 'pending_scheduling'
+                  ? 'Replace the pending proposal with a time you and the customer have already agreed on. This retracts the outstanding proposal and confirms the booking immediately.'
+                  : booking.status === 'confirmed'
+                  ? 'Reschedule this confirmed booking to a new time. A rescheduled confirmation email will be sent.'
+                  : 'Confirm the booking at a time you and the customer have already agreed on. A confirmation email will be sent.'}
+              </p>
+              <button
+                onClick={() => {
+                  const base = booking.proposed_datetime || booking.appointment_datetime;
+                  if (base) {
+                    const d = new Date(base);
+                    const pad = (n: number) => String(n).padStart(2, '0');
+                    setSetTimeDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+                    setSetTimeTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                  } else {
+                    setSetTimeDate('');
+                    setSetTimeTime('');
+                  }
+                  setShowSetTimeModal(true);
+                }}
+                disabled={saving}
+                className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                Set Confirmed Time
+              </button>
+            </div>
+          )}
+
           {/* Status change */}
           <div className="rounded-lg border border-gray-200 bg-white p-5">
             <h2 className="mb-3 font-medium text-gray-900">Update Status</h2>
@@ -344,6 +383,51 @@ export default function BookingDetailPage() {
                 className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
               >
                 {saving ? 'Sending...' : 'Send Proposal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set confirmed time modal */}
+      {showSetTimeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+            <h3 className="text-lg font-medium text-gray-900">Set Confirmed Time</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              The booking will be confirmed at this time and a confirmation email will be sent to the customer. Any pending proposal will be retracted.
+            </p>
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Date</label>
+                  <input type="date" value={setTimeDate} onChange={(e) => setSetTimeDate(e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Time</label>
+                  <input type="time" value={setTimeTime} onChange={(e) => setSetTimeTime(e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setShowSetTimeModal(false)} className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button
+                disabled={saving || !setTimeDate || !setTimeTime}
+                onClick={async () => {
+                  setSaving(true);
+                  const res = await fetch(`/api/admin/bookings/${id}/set-time`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ appointment_datetime: new Date(`${setTimeDate}T${setTimeTime}:00`).toISOString() }),
+                  });
+                  if (res.ok) {
+                    const d = await fetch(`/api/admin/bookings/${id}`).then(r => r.json());
+                    setBooking(d); setNewStatus(d.status); setShowSetTimeModal(false);
+                  }
+                  setSaving(false);
+                }}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? 'Confirming...' : 'Confirm & Send Email'}
               </button>
             </div>
           </div>

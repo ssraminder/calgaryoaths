@@ -47,6 +47,11 @@ export default function VendorBookingDetailPage() {
   const [proposeTime, setProposeTime] = useState('');
   const [proposeReason, setProposeReason] = useState('');
 
+  // Set confirmed time state
+  const [showSetTime, setShowSetTime] = useState(false);
+  const [setTimeDate, setSetTimeDate] = useState('');
+  const [setTimeTime, setSetTimeTime] = useState('');
+
   // Documents & completion
   const [documents, setDocuments] = useState<Doc[]>([]);
   const [completionNotes, setCompletionNotes] = useState('');
@@ -89,6 +94,41 @@ export default function VendorBookingDetailPage() {
     });
     setBooking((prev) => prev ? { ...prev, status: 'pending_scheduling', proposed_datetime } : null);
     setShowPropose(false);
+    setActing(false);
+  }
+
+  function openSetTime() {
+    const base = booking?.proposed_datetime || booking?.appointment_datetime;
+    if (base) {
+      const d = new Date(base);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      setSetTimeDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      setSetTimeTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    } else {
+      setSetTimeDate('');
+      setSetTimeTime('');
+    }
+    setShowSetTime(true);
+  }
+
+  async function handleSetTime() {
+    if (!setTimeDate || !setTimeTime) return;
+    setActing(true);
+    const appointment_datetime = new Date(`${setTimeDate}T${setTimeTime}:00`).toISOString();
+    const res = await fetch(`/api/vendor/bookings/${id}/set-time`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appointment_datetime }),
+    });
+    if (res.ok) {
+      setBooking((prev) => prev ? {
+        ...prev,
+        status: 'confirmed',
+        appointment_datetime,
+        proposed_datetime: null,
+      } : null);
+      setShowSetTime(false);
+    }
     setActing(false);
   }
 
@@ -178,6 +218,25 @@ export default function VendorBookingDetailPage() {
             className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-orange-300 px-4 py-3 text-sm font-medium text-orange-600 hover:bg-orange-50 disabled:opacity-50 min-h-[44px]">
             <Clock className="h-4 w-4" />
             Propose Different Time
+          </button>
+        </div>
+      )}
+
+      {/* Set confirmed time — for paid, pending_scheduling, and confirmed */}
+      {['paid', 'pending_scheduling', 'confirmed'].includes(booking.status) && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
+          <h2 className="font-medium text-gray-900">Set Confirmed Time</h2>
+          <p className="text-sm text-gray-600">
+            {booking.status === 'pending_scheduling'
+              ? 'Already agreed on a time with the customer? Set it here — this retracts the pending proposal and sends a confirmation email.'
+              : booking.status === 'confirmed'
+              ? 'Reschedule this confirmed booking. A rescheduled confirmation email will be sent to the customer.'
+              : 'Confirm at a time you\u2019ve already agreed on with the customer. Sends a confirmation email.'}
+          </p>
+          <button onClick={openSetTime} disabled={acting}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 min-h-[44px]">
+            <Clock className="h-4 w-4" />
+            Set Confirmed Time
           </button>
         </div>
       )}
@@ -283,6 +342,37 @@ export default function VendorBookingDetailPage() {
               <button onClick={handlePropose} disabled={acting || !proposeDate || !proposeTime}
                 className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50">
                 {acting ? 'Sending...' : 'Send Proposal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set confirmed time modal */}
+      {showSetTime && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-t-xl sm:rounded-lg bg-white p-5 sm:p-6 shadow-lg mx-0 sm:mx-4">
+            <h3 className="text-lg font-medium text-gray-900">Set Confirmed Time</h3>
+            <p className="mt-1 text-sm text-gray-500">The booking will be confirmed at this time and a confirmation email will be sent. Any pending proposal will be retracted.</p>
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Date</label>
+                  <input type="date" value={setTimeDate} onChange={(e) => setSetTimeDate(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-base" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Time</label>
+                  <input type="time" value={setTimeTime} onChange={(e) => setSetTimeTime(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-base" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setShowSetTime(false)} className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={handleSetTime} disabled={acting || !setTimeDate || !setTimeTime}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                {acting ? 'Confirming...' : 'Confirm & Send Email'}
               </button>
             </div>
           </div>
