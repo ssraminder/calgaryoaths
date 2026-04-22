@@ -38,12 +38,13 @@ export async function POST(req: NextRequest) {
       const cancelToken = crypto.randomBytes(32).toString('hex');
 
       // Fetch booking + commissioner to check auto-accept
-      const { data: preBooking } = await supabaseAdmin.from('co_bookings').select('commissioner_id').eq('id', bookingId).single();
+      const { data: preBooking } = await supabaseAdmin.from('co_bookings').select('commissioner_id, admin_notes').eq('id', bookingId).single();
       const { data: commissioner } = preBooking
         ? await supabaseAdmin.from('co_commissioners').select('name, email, address, phone, auto_accept_all, free_cancel_hours, request_cancel_hours').eq('id', preBooking.commissioner_id).single()
         : { data: null };
 
-      const autoConfirm = commissioner?.auto_accept_all === true;
+      const createdByStaff = !!preBooking?.admin_notes?.startsWith('Created on behalf of customer by');
+      const autoConfirm = commissioner?.auto_accept_all === true || createdByStaff;
 
       await supabaseAdmin
         .from('co_bookings')
@@ -134,15 +135,15 @@ export async function POST(req: NextRequest) {
       try {
         await sendEmail({
           to: booking.email,
-          subject: `Booking received — ${booking.service_name} — Calgary Oaths`,
+          subject: `Booking ${autoConfirm ? 'confirmed' : 'received'} — ${booking.service_name} — Calgary Oaths`,
           html: `
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
               <div style="background:#1B3A5C;padding:24px;border-radius:8px 8px 0 0;">
-                <h1 style="color:white;margin:0;font-size:22px;">Booking Received</h1>
+                <h1 style="color:white;margin:0;font-size:22px;">Booking ${autoConfirm ? 'Confirmed' : 'Received'}</h1>
               </div>
               <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
                 <p style="font-size:16px;">Hi ${booking.name},</p>
-                <p>Thank you for your booking. Your payment of <strong>$${((booking.amount_paid || 0) / 100).toFixed(2)}</strong> has been received.</p>
+                <p>Thank you for your booking. Your payment of <strong>$${((booking.amount_paid || 0) / 100).toFixed(2)}</strong> has been received.${autoConfirm ? ' <strong>Your appointment is confirmed.</strong>' : ''}</p>
 
                 ${bookingDetailsTable}
 
@@ -162,12 +163,16 @@ export async function POST(req: NextRequest) {
                 ${includedHtml ? `<h3 style="color:#1B3A5C;margin-top:20px;">✓ What's Included</h3><ul style="padding-left:20px;">${includedHtml}</ul>` : ''}
 
                 <div style="margin-top:24px;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
+                  ${autoConfirm ? `
+                  <p style="margin:0;font-size:14px;"><strong>Your appointment is confirmed.</strong> Please arrive on time with the items listed above.</p>
+                  ` : `
                   <p style="margin:0;font-size:14px;"><strong>What happens next?</strong></p>
                   <ol style="margin:8px 0 0;padding-left:20px;font-size:14px;">
                     <li>Your commissioner will review your request and respond shortly with a confirmation. <strong>This appointment is not final unless it is confirmed by the commissioner.</strong></li>
                     <li>You'll receive a confirmation email with final details.</li>
                     <li>If the time doesn't work, you'll be offered alternatives or a refund.</li>
                   </ol>
+                  `}
                 </div>
 
                 <div style="margin-top:24px;padding:16px;background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;">
@@ -232,19 +237,21 @@ export async function POST(req: NextRequest) {
         try {
           await sendEmail({
             to: vendorEmail,
-            subject: `New booking — ${booking.name} — ${booking.service_name}`,
+            subject: `${autoConfirm ? 'Booking confirmed' : 'New booking — Action Required'} — ${booking.name} — ${booking.service_name}`,
             html: `
               <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
                 <div style="background:#1B3A5C;padding:24px;border-radius:8px 8px 0 0;">
-                  <h1 style="color:white;margin:0;font-size:22px;">New Booking — Action Required</h1>
+                  <h1 style="color:white;margin:0;font-size:22px;">${autoConfirm ? 'Booking Confirmed' : 'New Booking — Action Required'}</h1>
                 </div>
                 <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
-                  <p>A customer has booked and paid. Please confirm or suggest a different time.</p>
+                  ${autoConfirm
+                    ? '<p>A customer has paid and the booking has been automatically confirmed.</p>'
+                    : `<p>A customer has booked and paid. Please confirm or suggest a different time.</p>
 
                   <div style="margin:24px 0;text-align:center;">
                     <a href="${acceptUrl}" style="display:inline-block;padding:14px 32px;background:#1D9E75;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;margin-right:12px;">✓ Confirm This Time</a>
                     <a href="${actionUrl}" style="display:inline-block;padding:14px 32px;background:#C8922A;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">⏰ Suggest Another Time</a>
-                  </div>
+                  </div>`}
 
                   ${bookingDetailsTable}
 
@@ -297,12 +304,14 @@ export async function POST(req: NextRequest) {
                     <p style="margin:0;font-size:13px;color:#92400e;">Free cancellation for the customer is available up to <strong>${commissioner?.free_cancel_hours ?? 12} hours</strong> before the appointment. After that, no refund is issued. If you need to cancel, please contact Calgary Oaths at <a href="tel:5876000746" style="color:#C8922A;">(587) 600-0746</a>.</p>
                   </div>
 
+                  ${autoConfirm ? '' : `
                   <div style="margin:24px 0;text-align:center;">
                     <a href="${acceptUrl}" style="display:inline-block;padding:14px 32px;background:#1D9E75;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;margin-right:12px;">✓ Confirm This Time</a>
                     <a href="${actionUrl}" style="display:inline-block;padding:14px 32px;background:#C8922A;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">⏰ Suggest Another Time</a>
                   </div>
+                  `}
 
-                  <p style="color:#888;font-size:13px;text-align:center;">Or manage from your <a href="${siteUrl}/vendor/bookings" style="color:#C8922A;">Partner Portal</a></p>
+                  <p style="color:#888;font-size:13px;text-align:center;">Manage from your <a href="${siteUrl}/vendor/bookings" style="color:#C8922A;">Partner Portal</a></p>
                 </div>
               </div>
             `,
@@ -346,14 +355,14 @@ export async function POST(req: NextRequest) {
       try {
         await sendEmail({
           to: 'info@calgaryoaths.com',
-          subject: `[Admin] Paid booking — ${booking.name} — ${booking.service_name} — ${commissioner?.name || booking.commissioner_id}`,
+          subject: `[Admin] ${autoConfirm ? 'Confirmed' : 'Paid'} booking — ${booking.name} — ${booking.service_name} — ${commissioner?.name || booking.commissioner_id}`,
           html: `
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
               <div style="background:#2C2C2A;padding:24px;border-radius:8px 8px 0 0;">
-                <h1 style="color:white;margin:0;font-size:22px;">New Paid Booking</h1>
+                <h1 style="color:white;margin:0;font-size:22px;">${autoConfirm ? 'Booking Confirmed' : 'New Paid Booking'}</h1>
               </div>
               <div style="padding:24px;background:white;border:1px solid #e2e0da;border-top:none;border-radius:0 0 8px 8px;">
-                <p>A booking has been paid and is awaiting commissioner confirmation.</p>
+                <p>${autoConfirm ? 'A booking has been paid and automatically confirmed.' : 'A booking has been paid and is awaiting commissioner confirmation.'}</p>
 
                 ${bookingDetailsTable}
 
