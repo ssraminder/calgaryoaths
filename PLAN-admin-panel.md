@@ -1,426 +1,324 @@
-# Admin Panel Plan — Calgary Oaths
+# Admin Panel — Implementation Plan
 
-## Current State Summary
+## Context
 
-**Tech Stack:** Next.js 14 (App Router), Supabase (PostgreSQL), Stripe, Calendly, Brevo email, Tailwind CSS, deployed on Netlify.
+Calgary Oaths is a production Next.js 14 booking site for commissioner of oaths services in Calgary. Currently there is **no admin UI** — all administrative work (reviewing bookings, managing commissioners, checking payments) is done via the Supabase dashboard or email notifications to `info@calgaryoaths.com`. This plan adds a full admin panel to manage bookings, manual reviews, vendors (commissioners/notaries), services, locations, analytics, and site settings.
 
-**Database Tables (Supabase `co_` prefix):**
-| Table | Purpose |
-|---|---|
-| `co_bookings` | Booking records with status workflow: `pending_review → pending_scheduling → pending_payment → paid → confirmed` |
-| `co_services` | 6 services (affidavit, statutory-declaration, travel-consent-letter, invitation-letter, apostille-legalization, mobile-service) with `requires_review` flag |
-| `co_commissioners` | Commissioner profiles (currently 2: Raminder Shah, Amrita Shah) |
-| `co_locations` | Physical locations tied to commissioners |
-| `co_commissioner_services` | Junction table: which commissioner offers which service |
-| `co_settings` | Key-value config (GA4 ID, GTM ID, starting_price) |
+## Environment Variables Required
 
-**What exists today:** Public booking site only. No auth, no admin UI. Manual review bookings trigger an email to `info@calgaryoaths.com`. Everything admin-related is done directly in the Supabase dashboard.
+Add to **Netlify Environment Variables** (Settings > Environment Variables):
 
----
+| Variable | Purpose | Where to get it |
+|---|---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side admin DB operations (bypasses RLS) | Supabase Dashboard > Project Settings > API > service_role key |
 
-## Admin Panel Architecture
-
-### Route Structure
-
-All admin pages live under `/app/admin/` with a shared layout providing sidebar navigation, auth gate, and consistent styling.
-
-```
-/app/admin/
-├── layout.tsx                    # Auth gate + sidebar + top bar
-├── page.tsx                      # Dashboard (overview/analytics)
-├── login/page.tsx                # Admin login (outside auth gate)
-├── bookings/
-│   ├── page.tsx                  # Booking list with filters
-│   └── [id]/page.tsx             # Single booking detail + actions
-├── reviews/
-│   └── page.tsx                  # Manual review queue (pending_review bookings)
-├── vendors/
-│   ├── page.tsx                  # Commissioner/notary list
-│   ├── new/page.tsx              # Add new commissioner
-│   └── [id]/page.tsx             # Edit commissioner profile
-├── services/
-│   ├── page.tsx                  # Service list + toggle active
-│   └── [id]/page.tsx             # Edit service details
-├── locations/
-│   ├── page.tsx                  # Location list
-│   └── [id]/page.tsx             # Edit location
-├── analytics/
-│   └── page.tsx                  # Analytics dashboard
-└── settings/
-    └── page.tsx                  # Site settings (GA IDs, pricing, etc.)
-```
+Already configured (no changes needed):
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Public anon key
+- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — Stripe
+- `BREVO_API_KEY` — Email
 
 ---
 
-## Phase 1: Foundation (Auth + Layout + Dashboard)
+## Phase 1: Database Migrations
 
-### 1A. Authentication via Supabase Auth
+Run via **Supabase MCP** (next session) or in the Supabase SQL Editor.
 
-- Use **Supabase Auth with email/password** (no social logins needed for admin).
-- Create a new `co_admin_users` table or use Supabase Auth's built-in `auth.users` with a role check.
-- Recommended approach: Use Supabase Auth + an `admin_role` column in a `co_profiles` table linked to `auth.users.id`.
-- Middleware at `/app/admin/layout.tsx` checks session; redirects to `/admin/login` if unauthenticated.
+### New Tables
 
-**New database objects:**
 ```sql
--- Profiles table linked to Supabase Auth
+-- Admin profiles linked to Supabase Auth
 CREATE TABLE co_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   full_name TEXT,
-  role TEXT NOT NULL DEFAULT 'viewer',  -- 'owner', 'admin', 'viewer'
+  role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('owner','admin','viewer')),
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
--- RLS policies: only authenticated admins can access co_ tables via admin API
 ALTER TABLE co_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Admins can read profiles" ON co_profiles
+CREATE POLICY "Users can read own profile" ON co_profiles
   FOR SELECT USING (auth.uid() = id);
-```
 
-**Files to create:**
-- `/lib/supabase-admin.ts` — Server-side Supabase client using service role key (for admin operations)
-- `/lib/supabase-browser.ts` — Browser-side client for auth session management
-- `/app/admin/login/page.tsx` — Login form (email + password)
-- `/app/admin/layout.tsx` — Auth-gated layout with sidebar
-- `/middleware.ts` — Next.js middleware to protect `/admin/*` routes
-
-### 1B. Admin Layout & Navigation
-
-**Sidebar navigation items:**
-1. Dashboard (overview)
-2. Bookings (with badge count for pending)
-3. Manual Reviews (with badge count)
-4. Vendors (commissioners/notaries)
-5. Services
-6. Locations
-7. Analytics
-8. Settings
-
-**Top bar:** Current admin name, logout button.
-
-**Responsive:** Collapsible sidebar on mobile, hamburger menu.
-
-### 1C. Dashboard Page (`/admin`)
-
-**KPI cards (top row):**
-- Today's bookings count
-- Pending reviews count (badge, highlighted)
-- Revenue this month (sum of `amount_paid` from `co_bookings`)
-- Total bookings this month
-
-**Recent activity feed:**
-- Last 10 bookings with status, service name, customer name, timestamp
-- Quick-action buttons: View, Approve (if pending_review)
-
-**Charts (stretch goal):**
-- Bookings per day (last 30 days) — bar chart
-- Revenue per week (last 12 weeks) — line chart
-- Bookings by service — pie/donut chart
-
----
-
-## Phase 2: Booking Management
-
-### 2A. Bookings List (`/admin/bookings`)
-
-**Table columns:**
-| Column | Source |
-|---|---|
-| Booking ID | `co_bookings.id` (truncated UUID) |
-| Customer | `name`, `email`, `phone` |
-| Service | `service_name` |
-| Commissioner | `commissioner_id` → join to `co_commissioners.name` |
-| Appointment | `appointment_datetime` (formatted Calgary time) |
-| Status | Badge: `pending_review` / `pending_scheduling` / `pending_payment` / `paid` / `confirmed` / `cancelled` / `no_show` |
-| Amount | `amount_paid` (formatted as CAD) |
-| Created | `created_at` |
-
-**Filters & search:**
-- Status dropdown (multi-select)
-- Date range picker (created_at or appointment_datetime)
-- Commissioner filter
-- Service filter
-- Free-text search (name, email, phone)
-
-**Bulk actions:**
-- Export to CSV
-- Bulk status update (e.g., mark multiple as confirmed)
-
-### 2B. Booking Detail (`/admin/bookings/[id]`)
-
-**Display:** All booking fields, linked commissioner/service info, Stripe payment details.
-
-**Actions:**
-- **Change status** — dropdown to transition between statuses
-- **Reschedule** — update `appointment_datetime`
-- **Cancel** — set status to `cancelled`, optionally trigger refund via Stripe API
-- **Send reminder email** — trigger email to customer via Brevo
-- **Add internal notes** — new `admin_notes` field on `co_bookings`
-- **View Stripe payment** — link to Stripe dashboard
-
-**New columns needed on `co_bookings`:**
-```sql
-ALTER TABLE co_bookings ADD COLUMN admin_notes TEXT;
-ALTER TABLE co_bookings ADD COLUMN cancelled_at TIMESTAMPTZ;
-ALTER TABLE co_bookings ADD COLUMN cancelled_reason TEXT;
-```
-
-**New statuses to add:** `cancelled`, `no_show`, `completed`
-
----
-
-## Phase 3: Manual Review Queue
-
-### 3A. Review Queue (`/admin/reviews`)
-
-Filtered view of `co_bookings WHERE status = 'pending_review'`, sorted by `created_at ASC` (oldest first).
-
-**Each review card shows:**
-- Customer name, email, phone
-- Service requested + `review_reason` from `co_services`
-- Notes from customer
-- Number of documents
-- Time since submission
-
-**Actions per review:**
-- **Approve** → status changes to `pending_scheduling`, email sent to customer with booking link/instructions
-- **Reject** → status changes to `rejected`, email sent with reason
-- **Request more info** → email sent to customer, status stays `pending_review`, note added
-
-**New status:** `rejected`
-
-**New table for review audit trail:**
-```sql
+-- Audit trail for manual review actions
 CREATE TABLE co_review_actions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id UUID REFERENCES co_bookings(id),
-  action TEXT NOT NULL,          -- 'approved', 'rejected', 'info_requested'
+  booking_id UUID NOT NULL REFERENCES co_bookings(id),
+  action TEXT NOT NULL CHECK (action IN ('approved','rejected','info_requested')),
   admin_user_id UUID REFERENCES co_profiles(id),
   reason TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-```
 
----
-
-## Phase 4: Vendor Management (Commissioners & Notaries)
-
-### 4A. Vendor List (`/admin/vendors`)
-
-**Table columns:** Name, title, location, languages, credentials, active status, sort order.
-
-**Actions:** Edit, toggle active, reorder (drag-and-drop or sort_order input).
-
-### 4B. Add/Edit Vendor (`/admin/vendors/new` & `/admin/vendors/[id]`)
-
-**Form fields (maps to `co_commissioners`):**
-- Name, title, bio
-- Location name, location slug, address
-- Phone, email
-- Calendly URL
-- Languages (multi-select/tag input)
-- Credentials (multi-select: Commissioner of Oaths, Notary Public, etc.)
-- Hours: weekdays, saturday, sunday
-- Google Maps embed URL, map URL
-- Areas served (tag input)
-- Nearby neighbourhoods (tag input)
-- Active toggle
-- Sort order
-- **Services offered** — checkboxes from `co_services`, writes to `co_commissioner_services`
-
-**Booking fee config:**
-- Currently hardcoded in `/lib/data/booking.ts` as `BOOKING_FEES`
-- Migrate to database: add `booking_fee_cents` column to `co_commissioners`
-
-```sql
-ALTER TABLE co_commissioners ADD COLUMN booking_fee_cents INTEGER DEFAULT 4000;
-```
-
-### 4C. Partner Applications
-
-- The `/join` page sends applications via email to `info@calgaryoaths.com`
-- Add a new table to capture these in the database:
-
-```sql
+-- Partner/vendor applications (replaces email-only flow)
 CREATE TABLE co_partner_applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
+  full_name TEXT NOT NULL,
   email TEXT NOT NULL,
   phone TEXT,
-  credentials TEXT,
-  location TEXT,
-  message TEXT,
-  status TEXT DEFAULT 'new',   -- 'new', 'contacted', 'approved', 'declined'
+  city TEXT,
+  credential_types TEXT,
+  year_credentialed TEXT,
+  credentials_active TEXT,
+  insurance TEXT,
+  services_offered TEXT,
+  mobile_available TEXT,
+  languages TEXT,
+  postal_code TEXT,
+  service_radius TEXT,
+  availability TEXT,
+  status TEXT DEFAULT 'new' CHECK (status IN ('new','contacted','approved','declined')),
   admin_notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-- Admin view at `/admin/vendors` with a tab for "Applications"
-
----
-
-## Phase 5: Service & Location Management
-
-### 5A. Services (`/admin/services`)
-
-**Editable fields from `co_services`:**
-- Name, slug, short description
-- Price (cents), price label
-- `requires_review` toggle + review reason
-- Slot duration (minutes)
-- Display order
-- Active toggle
-
-### 5B. Locations (`/admin/locations`)
-
-**Editable fields from `co_locations`:**
-- Name, address, phone
-- Commissioner assignment (dropdown from `co_commissioners`)
-- Parking notes
-- Nearby neighbourhoods
-- Google Maps embed, map URL
-- Calendly URL
-- Hours (weekdays, saturday, sunday)
-- Geo coordinates (lat/lng)
-- Active toggle, sort order
-
----
-
-## Phase 6: Analytics & Reporting
-
-### 6A. Analytics Dashboard (`/admin/analytics`)
-
-**Metrics (queried from `co_bookings`):**
-- **Bookings over time** — daily/weekly/monthly bar chart
-- **Revenue over time** — line chart (sum of `amount_paid`)
-- **Bookings by service** — pie chart
-- **Bookings by commissioner** — pie chart
-- **Conversion funnel** — bookings created vs. paid vs. confirmed
-- **Average booking value** — `AVG(amount_paid)`
-- **Cancellation/no-show rate**
-
-**Filters:**
-- Date range
-- Commissioner
-- Service
-
-**GA4/GTM Integration:**
-- Display current GA4 and GTM IDs (from `co_settings`)
-- Edit them from Settings page
-- Link to Google Analytics dashboard (external)
-
-### 6B. Export
-
-- CSV export for bookings data (filtered)
-- Date range selection for reports
-
----
-
-## Phase 7: Settings
-
-### 7A. Site Settings (`/admin/settings`)
-
-**Manage `co_settings` key-value pairs:**
-- GA4 Measurement ID (`ga4_id`)
-- GTM Container ID (`gtm_id`)
-- Starting price display (`starting_price`)
-- Contact email
-- WhatsApp number
-
-**Future settings:**
-- Slot duration default
-- Days ahead for booking window
-- Business hours defaults
-- Email notification preferences
-
----
-
-## New API Routes
-
-```
-/app/api/admin/
-├── auth/
-│   └── route.ts              # Login/logout/session check
-├── bookings/
-│   ├── route.ts              # GET (list + filters), PATCH (bulk update)
-│   └── [id]/
-│       ├── route.ts          # GET (detail), PATCH (update status/notes)
-│       └── cancel/route.ts   # POST (cancel + optional Stripe refund)
-├── reviews/
-│   └── [id]/
-│       └── action/route.ts   # POST (approve/reject/request-info)
-├── vendors/
-│   ├── route.ts              # GET (list), POST (create)
-│   └── [id]/route.ts         # GET, PATCH, DELETE
-├── services/
-│   ├── route.ts              # GET, POST
-│   └── [id]/route.ts         # GET, PATCH
-├── locations/
-│   ├── route.ts              # GET, POST
-│   └── [id]/route.ts         # GET, PATCH
-├── analytics/
-│   └── route.ts              # GET (aggregated stats with date range)
-├── settings/
-│   └── route.ts              # GET, PATCH
-└── export/
-    └── route.ts              # GET (CSV export)
-```
-
----
-
-## Database Schema Changes Summary
-
-### New Tables
-| Table | Purpose |
-|---|---|
-| `co_profiles` | Admin user profiles linked to Supabase Auth |
-| `co_review_actions` | Audit trail for manual review decisions |
-| `co_partner_applications` | Vendor/partner applications from `/join` page |
-
 ### Altered Tables
-| Table | Change |
-|---|---|
-| `co_bookings` | Add: `admin_notes`, `cancelled_at`, `cancelled_reason` columns |
-| `co_bookings` | New statuses: `cancelled`, `no_show`, `completed`, `rejected` |
-| `co_commissioners` | Add: `booking_fee_cents` column (migrate from hardcoded `BOOKING_FEES`) |
+
+```sql
+-- Add admin fields to bookings
+ALTER TABLE co_bookings ADD COLUMN IF NOT EXISTS admin_notes TEXT;
+ALTER TABLE co_bookings ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+ALTER TABLE co_bookings ADD COLUMN IF NOT EXISTS cancelled_reason TEXT;
+
+-- New valid statuses: pending_review, pending_scheduling, pending_payment,
+-- paid, confirmed, cancelled, no_show, completed, rejected
+
+-- Move booking fees from hardcoded to DB
+ALTER TABLE co_commissioners ADD COLUMN IF NOT EXISTS booking_fee_cents INTEGER DEFAULT 4000;
+
+-- Set current values
+UPDATE co_commissioners SET booking_fee_cents = 4000 WHERE id = 'raminder-shah';
+UPDATE co_commissioners SET booking_fee_cents = 3000 WHERE id = 'amrita-shah';
+```
 
 ---
 
-## Implementation Priority & Phasing
+## Phase 2: Auth Foundation + Admin Layout
 
-| Phase | Scope | Effort |
-|---|---|---|
-| **Phase 1** | Auth + Layout + Dashboard | Foundation — must be first |
-| **Phase 2** | Booking Management | Highest operational value |
-| **Phase 3** | Manual Review Queue | Eliminates email-based workflow |
-| **Phase 4** | Vendor Management | Enables scaling to more commissioners |
-| **Phase 5** | Service & Location Management | Removes hardcoded data dependency |
-| **Phase 6** | Analytics & Reporting | Business intelligence |
-| **Phase 7** | Settings | Quality of life |
+### Files to Create
+
+**Supabase admin client:**
+- `lib/supabase-server.ts` — Server-side client using `SUPABASE_SERVICE_ROLE_KEY` for admin operations
+
+**Middleware:**
+- `middleware.ts` — Protects `/admin/*` routes (except `/admin/login`), redirects unauthenticated users to `/admin/login`
+
+**Admin layout (isolated from public site):**
+- `app/admin/layout.tsx` — No Navbar/Footer/BookingModal. Own sidebar + topbar. Auth gate.
+- `app/admin/login/page.tsx` — Email/password login form using Supabase Auth `signInWithPassword`
+
+**Admin components:**
+- `components/admin/Sidebar.tsx` — Navigation: Dashboard, Bookings, Reviews, Vendors, Services, Locations, Analytics, Settings. Badge counts for pending items.
+- `components/admin/TopBar.tsx` — Current user name, logout button
+- `components/admin/StatCard.tsx` — Reusable KPI card
+- `components/admin/DataTable.tsx` — Reusable sortable/filterable table component
+- `components/admin/StatusBadge.tsx` — Color-coded booking status badge
+- `components/admin/Pagination.tsx` — Pagination controls
+
+### Files to Modify
+- `lib/data/booking.ts` — Update `BOOKING_FEES` lookup to fall back to DB value from `co_commissioners.booking_fee_cents`
+- `app/api/booking/schedule/route.ts` — Read `booking_fee_cents` from commissioner record instead of hardcoded map
 
 ---
 
-## Technical Decisions
+## Phase 3: Dashboard
+
+### Files to Create
+- `app/admin/page.tsx` — Dashboard page
+
+**Dashboard content:**
+- **KPI row:** Today's bookings, pending reviews (highlighted), monthly revenue (sum `amount_paid`), monthly total bookings
+- **Recent activity:** Last 10 bookings table with status, service, customer, timestamp, quick-view link
+- **Pending reviews alert:** If count > 0, prominent CTA to review queue
+
+### API Routes
+- `app/api/admin/stats/route.ts` — GET: returns KPI data (counts, sums) with date range params
+
+---
+
+## Phase 4: Booking Management
+
+### Files to Create
+- `app/admin/bookings/page.tsx` — Booking list with filters
+- `app/admin/bookings/[id]/page.tsx` — Booking detail + actions
+
+**List features:**
+- Table: ID (truncated), customer name/email, service, commissioner, appointment datetime, status badge, amount, created_at
+- Filters: status (multi-select), date range, commissioner, service, free-text search
+- CSV export button
+- Pagination (20 per page)
+
+**Detail features:**
+- All booking fields displayed
+- Status change dropdown (with valid transitions)
+- Cancel button (sets `cancelled` status + `cancelled_at` + reason, optionally triggers Stripe refund)
+- Internal notes editor (`admin_notes` field)
+- Send reminder email button
+- Link to Stripe payment (if exists)
+
+### API Routes
+- `app/api/admin/bookings/route.ts` — GET: list with filters/pagination/search
+- `app/api/admin/bookings/[id]/route.ts` — GET: detail, PATCH: update status/notes
+- `app/api/admin/bookings/[id]/cancel/route.ts` — POST: cancel + optional Stripe refund
+- `app/api/admin/bookings/export/route.ts` — GET: CSV download
+
+---
+
+## Phase 5: Manual Review Queue
+
+### Files to Create
+- `app/admin/reviews/page.tsx` — Filtered view of `status = 'pending_review'` bookings
+
+**Per review card:**
+- Customer info (name, email, phone)
+- Service + review reason (from `co_services.review_reason`)
+- Customer notes, num_documents
+- Time since submission
+- Actions: Approve, Reject, Request Info
+
+**Actions detail:**
+- **Approve** → status changes to `pending_scheduling`, email sent to customer
+- **Reject** → status changes to `rejected`, email sent with reason
+- **Request Info** → email sent to customer, status stays `pending_review`
+
+### API Routes
+- `app/api/admin/reviews/[id]/action/route.ts` — POST: approve/reject/request-info, creates `co_review_actions` audit record, sends email via `lib/email.ts`
+
+---
+
+## Phase 6: Vendor Management
+
+### Files to Create
+- `app/admin/vendors/page.tsx` — Commissioner list + partner applications tab
+- `app/admin/vendors/new/page.tsx` — Add new commissioner form
+- `app/admin/vendors/[id]/page.tsx` — Edit commissioner
+
+**Commissioner form fields (maps to `co_commissioners`):**
+- name, title, bio, location, location_slug, address, phone, email
+- calendly_url, languages (tag input), credentials (tag input)
+- hours_weekdays, hours_saturday, hours_sunday
+- google_maps_embed, map_url, areas_served (tag input), nearby_neighbourhoods (tag input)
+- booking_fee_cents (number input, displayed as dollars)
+- Services offered (checkboxes from `co_services` → writes to `co_commissioner_services`)
+- active toggle, sort_order
+
+**Partner applications tab:**
+- Table of `co_partner_applications` with status filter
+- Detail view with approve/decline/contact actions
+
+### API Routes
+- `app/api/admin/vendors/route.ts` — GET: list, POST: create
+- `app/api/admin/vendors/[id]/route.ts` — GET, PATCH, DELETE (soft: set active=false)
+- `app/api/admin/applications/route.ts` — GET: list
+- `app/api/admin/applications/[id]/route.ts` — PATCH: update status/notes
+
+### Files to Modify
+- `app/actions/join.ts` — Also insert into `co_partner_applications` table (in addition to sending email)
+
+---
+
+## Phase 7: Service & Location Management
+
+### Files to Create
+- `app/admin/services/page.tsx` — Service list with active toggles
+- `app/admin/services/[slug]/page.tsx` — Edit service
+- `app/admin/locations/page.tsx` — Location list
+- `app/admin/locations/[id]/page.tsx` — Edit location
+
+**Service form fields:** name, slug, short_description, price (cents), price_label, requires_review, review_reason, slot_duration_minutes, display_order, active
+
+**Location form fields:** name, commissioner_id (dropdown), address, phone, parking_notes, nearby_neighbourhoods, google_maps_embed, map_url, calendly_url, hours, geo_lat, geo_lng, active, sort_order
+
+### API Routes
+- `app/api/admin/services/route.ts` — GET, POST
+- `app/api/admin/services/[slug]/route.ts` — GET, PATCH
+- `app/api/admin/locations/route.ts` — GET, POST
+- `app/api/admin/locations/[id]/route.ts` — GET, PATCH
+
+---
+
+## Phase 8: Analytics & Settings
+
+### Files to Create
+- `app/admin/analytics/page.tsx` — Analytics dashboard
+- `app/admin/settings/page.tsx` — Site settings editor
+
+**Analytics (all queried from `co_bookings`):**
+- Bookings over time (daily/weekly/monthly) — bar chart
+- Revenue over time — line chart
+- Bookings by service — donut chart
+- Bookings by commissioner — donut chart
+- Conversion funnel: created → paid → confirmed
+- Date range filter, commissioner filter, service filter
+
+**Charts library:** `recharts` (add as dependency)
+
+**Settings page:** Edit `co_settings` key-value pairs:
+- ga4_id, gtm_id, starting_price
+- Future: contact email, WhatsApp number, default slot duration, days ahead
+
+### API Routes
+- `app/api/admin/analytics/route.ts` — GET: aggregated stats with date range
+- `app/api/admin/settings/route.ts` — GET, PATCH
+
+---
+
+## New NPM Packages
+
+```bash
+npm install @supabase/ssr recharts
+```
+
+- `@supabase/ssr` — Server-side Supabase auth helpers for Next.js App Router (cookie-based sessions)
+- `recharts` — Charts for analytics dashboard
+
+---
+
+## Architecture Decisions
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Auth provider | Supabase Auth (email/password) | Already using Supabase; no extra dependency |
-| UI components | Tailwind + custom components | Consistent with existing site; no new UI library needed |
-| Charts | `recharts` or `chart.js` | Lightweight, React-native charting |
-| Data tables | Custom with Tailwind or `@tanstack/react-table` | Flexible filtering/sorting/pagination |
-| State management | React Server Components + client forms | Matches Next.js 14 App Router patterns |
-| CSV export | Server-side generation, streamed response | No client-side dependency needed |
-| Admin route protection | Next.js middleware + Supabase session | Standard pattern for App Router |
+| Auth | Supabase Auth (email/password) + `co_profiles` role | Already using Supabase; no new provider |
+| Admin route isolation | `app/admin/` with own `layout.tsx` | Avoids public Navbar/Footer; clean separation |
+| Server client | Service role key in `lib/supabase-server.ts` | Bypasses RLS for admin operations |
+| Data tables | Custom Tailwind components | Keeps bundle light; matches existing patterns |
+| Charts | `recharts` | React-native, tree-shakeable, well-maintained |
+| API auth | All `/api/admin/*` routes verify Supabase session + admin role | Consistent security gate |
+| Booking fees | Migrate to `co_commissioners.booking_fee_cents` | Eliminates hardcoded values; scales to N commissioners |
 
 ---
 
-## Security Considerations
+## File Summary
 
-- All `/api/admin/*` routes validate Supabase auth session + admin role
-- Supabase RLS policies on all `co_` tables restrict writes to authenticated admin users
-- Service role key used only server-side, never exposed to client
-- CSRF protection via Next.js built-in mechanisms
-- Rate limiting on login endpoint
-- Audit logging for sensitive actions (status changes, cancellations, refunds)
+### New Files (~35)
+- `middleware.ts`
+- `lib/supabase-server.ts`
+- `app/admin/layout.tsx`, `login/page.tsx`, `page.tsx` (dashboard)
+- `app/admin/bookings/page.tsx`, `[id]/page.tsx`
+- `app/admin/reviews/page.tsx`
+- `app/admin/vendors/page.tsx`, `new/page.tsx`, `[id]/page.tsx`
+- `app/admin/services/page.tsx`, `[slug]/page.tsx`
+- `app/admin/locations/page.tsx`, `[id]/page.tsx`
+- `app/admin/analytics/page.tsx`
+- `app/admin/settings/page.tsx`
+- `components/admin/` (Sidebar, TopBar, StatCard, DataTable, StatusBadge, Pagination)
+- `app/api/admin/` (~14 route files)
+
+### Modified Files (~3)
+- `lib/data/booking.ts` — Fallback to DB for fees
+- `app/api/booking/schedule/route.ts` — Read fee from DB
+- `app/actions/join.ts` — Also write to `co_partner_applications`
+
+---
+
+## Verification Plan
+
+1. **Auth:** Create admin user in Supabase Auth dashboard → login at `/admin/login` → verify redirect to dashboard
+2. **Dashboard:** Verify KPI cards show correct counts from `co_bookings`
+3. **Bookings:** Filter by status/date/commissioner → view detail → change status → verify DB update
+4. **Reviews:** Create a booking with `requires_review` service → appears in queue → approve → status changes + email sent
+5. **Vendors:** Create new commissioner → assign services → verify appears in public booking flow
+6. **Booking fees:** After migrating to DB, verify Stripe checkout uses commissioner's `booking_fee_cents`
+7. **Analytics:** Verify chart data matches raw booking counts
+8. **Settings:** Change GA4 ID → verify updated in page source
+9. **Netlify deployment:** Build succeeds, middleware runs correctly, env vars accessible
