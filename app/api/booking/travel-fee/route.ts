@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       .in('key', ['mobile_rate_per_km_cents', 'mobile_minimum_fee_cents']);
     const config = Object.fromEntries((settings ?? []).map((r) => [r.key, r.value]));
     ratePerKmCents = ratePerKmCents ?? parseInt(config.mobile_rate_per_km_cents || '300', 10);
-    minimumFeeCents = minimumFeeCents ?? parseInt(config.mobile_minimum_fee_cents || '3000', 10);
+    minimumFeeCents = minimumFeeCents ?? parseInt(config.mobile_minimum_fee_cents || '7500', 10);
   }
 
   // Call Google Maps Distance Matrix API
