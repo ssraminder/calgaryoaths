@@ -1,0 +1,65 @@
+{
+  "name": "Calgary Oaths Orders",
+  "short_name": "CO Orders",
+  "description": "In-store tablet kiosk for taking apostille and notarization orders.",
+  "id": "/tablet",
+  "start_url": "/tablet",
+  "scope": "/tablet",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f9fafb",
+  "theme_color": "#1B3A5C",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Apostille Order",
+      "short_name": "Apostille",
+      "description": "Start an apostille / authentication order",
+      "url": "/tablet/orders/new?type=apostille"
+    },
+    {
+      "name": "New Notarization Order",
+      "short_name": "Notary",
+      "description": "Start a notarization / oath commissioner order",
+      "url": "/tablet/orders/new?type=notarization"
+    },
+    {
+      "name": "Open Orders",
+      "short_name": "Orders",
+      "description": "View recent and in-progress orders",
+      "url": "/tablet/orders"
+    }
+  ]
+}

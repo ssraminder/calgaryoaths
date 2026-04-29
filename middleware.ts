@@ -12,12 +12,13 @@ export async function middleware(req: NextRequest) {
     request: { headers: requestHeaders },
   });
 
-  // Only protect /admin and /vendor routes (except login/forgot-password pages)
+  // Only protect /admin, /vendor, and /tablet routes (except login/forgot-password pages)
   const isProtectedRoute =
-    (pathname.startsWith('/admin') || pathname.startsWith('/vendor')) &&
+    (pathname.startsWith('/admin') || pathname.startsWith('/vendor') || pathname.startsWith('/tablet')) &&
     pathname !== '/admin/login' &&
     pathname !== '/vendor/login' &&
-    pathname !== '/vendor/forgot-password';
+    pathname !== '/vendor/forgot-password' &&
+    pathname !== '/tablet/login';
 
   if (!isProtectedRoute) {
     return res;
@@ -45,7 +46,9 @@ export async function middleware(req: NextRequest) {
 
   if (!user) {
     const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = pathname.startsWith('/vendor') ? '/vendor/login' : '/admin/login';
+    if (pathname.startsWith('/tablet')) loginUrl.pathname = '/tablet/login';
+    else if (pathname.startsWith('/vendor')) loginUrl.pathname = '/vendor/login';
+    else loginUrl.pathname = '/admin/login';
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
   }

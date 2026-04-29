@@ -78,9 +78,16 @@ export default async function RootLayout({
   const gadsId = analytics.googleAdsId || process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
   const whatsappNumber = settings.whatsapp_number || null;
 
-  // Detect dashboard routes server-side so Navbar/Footer are never rendered
+  // Detect dashboard routes server-side so Navbar/Footer are never rendered.
+  // /orders/c/* is the customer-handoff route (public token-based) and should also
+  // render full-screen without the public site chrome.
+  // /tablet/* is the in-store tablet kiosk PWA — runs full-screen, own manifest.
   const pathname = hdrs.get('x-pathname') || '';
-  const isDashboard = pathname.startsWith('/admin') || pathname.startsWith('/vendor');
+  const isDashboard =
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/vendor') ||
+    pathname.startsWith('/tablet') ||
+    pathname.startsWith('/orders/c/');
 
   return (
     <html

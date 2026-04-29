@@ -11,11 +11,13 @@ import {
   MapPin,
   BarChart3,
   Settings,
+  FileText,
 } from 'lucide-react';
 
 const navItems = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'Bookings', href: '/admin/bookings', icon: CalendarCheck },
+  { label: 'Orders', href: '/admin/orders', icon: FileText },
   { label: 'Reviews', href: '/admin/reviews', icon: ClipboardCheck },
   { label: 'Vendors', href: '/admin/vendors', icon: Users },
   { label: 'Services', href: '/admin/services', icon: Wrench },

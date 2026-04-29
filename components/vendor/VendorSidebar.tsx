@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { LayoutDashboard, CalendarCheck, Clock, Calendar, DollarSign, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, Clock, Calendar, DollarSign, Settings, LogOut, FileText } from 'lucide-react';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,6 +15,7 @@ const supabase = createBrowserClient(
 const navItems = [
   { label: 'Dashboard', href: '/vendor', icon: LayoutDashboard },
   { label: 'Bookings', href: '/vendor/bookings', icon: CalendarCheck },
+  { label: 'Orders', href: '/vendor/orders', icon: FileText },
   { label: 'Earnings', href: '/vendor/earnings', icon: DollarSign },
   { label: 'Availability', href: '/vendor/availability', icon: Clock },
   { label: 'Calendar', href: '/vendor/calendar', icon: Calendar },
