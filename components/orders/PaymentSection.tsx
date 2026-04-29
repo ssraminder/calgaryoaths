@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { formatCents } from '@/lib/orders/pricing';
+import { DecimalInput } from './NumericInput';
 import type { PaymentMethod } from '@/lib/orders/types';
 
 interface Props {
@@ -32,7 +33,7 @@ export default function PaymentSection({
 }: Props) {
   const [method, setMethod] = useState<PaymentMethod>(initialMethod || 'cash');
   const [reference, setReference] = useState(initialReference || '');
-  const [amount, setAmount] = useState(((initialAmountCents ?? totalCents) / 100).toFixed(2));
+  const [amountCents, setAmountCents] = useState<number>(initialAmountCents ?? totalCents);
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -42,7 +43,7 @@ export default function PaymentSection({
       await onRecord({
         payment_method: method,
         payment_reference: reference || null,
-        amount_paid_cents: Math.round(parseFloat(amount || '0') * 100),
+        amount_paid_cents: amountCents,
       });
     } finally {
       setSaving(false);
@@ -87,14 +88,7 @@ export default function PaymentSection({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">Amount paid</label>
-          <input
-            type="number"
-            step="0.01"
-            min={0}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
+          <DecimalInput cents={amountCents} onChange={setAmountCents} />
         </div>
       </div>
       <button

@@ -10,7 +10,8 @@ import IdPhotosSection from './IdPhotosSection';
 import PaymentSection from './PaymentSection';
 import HandoffModal from './HandoffModal';
 import OrderRealtime from './OrderRealtime';
-import { computeTotals, formatCents } from '@/lib/orders/pricing';
+import TaxProvinceSelect from './TaxProvinceSelect';
+import { computeTotals, formatCents, type TaxRateRow } from '@/lib/orders/pricing';
 import type { Order, OrderItem, OrderIdPhoto, PaymentMethod } from '@/lib/orders/types';
 
 interface Props {
@@ -44,6 +45,23 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
   const [apostilleFields, setApostilleFields] = useState(() => apostileInitialFromOrder(order));
   const [notarizationFields, setNotarizationFields] = useState(() => notarizationInitialFromOrder(order));
 
+  // Tax province + rate (defaults to AB / 5% GST if order has no value yet)
+  const [taxProvinceCode, setTaxProvinceCode] = useState<string>(order.tax_province_code || 'AB');
+  const [taxRates, setTaxRates] = useState<TaxRateRow[]>([]);
+  const selectedTaxRate = useMemo<TaxRateRow | null>(
+    () => taxRates.find((r) => r.province_code === taxProvinceCode) || null,
+    [taxRates, taxProvinceCode]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/orders/tax-rates')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (!cancelled && d?.taxRates) setTaxRates(d.taxRates); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const totals = useMemo(() => {
     const travelFee = order.order_type === 'notarization' && notarizationFields.delivery_mode === 'mobile'
       ? notarizationFields.travel_fee_cents
@@ -52,8 +70,9 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
       items,
       travelFeeCents: travelFee,
       discountCents: order.discount_cents ?? 0,
+      taxRate: selectedTaxRate,
     });
-  }, [items, notarizationFields.delivery_mode, notarizationFields.travel_fee_cents, order.discount_cents, order.order_type]);
+  }, [items, notarizationFields.delivery_mode, notarizationFields.travel_fee_cents, order.discount_cents, order.order_type, selectedTaxRate]);
 
   const reload = useCallback(async () => {
     const res = await fetch(`/api/orders/${order.id}`);
@@ -80,6 +99,7 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
           gov_fee_cents: it.gov_fee_cents ?? 0,
           notes: it.notes,
         })),
+        tax_province_code: taxProvinceCode,
       };
       if (order.order_type === 'apostille') {
         Object.assign(payload, {
@@ -208,11 +228,16 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
 
           <LineItemsEditor orderType={order.order_type} items={items} onChange={setItems} />
 
-          <div className="flex items-center justify-between border-t border-gray-200 pt-3 text-sm">
-            <span className="text-gray-500">Live total</span>
-            <div className="space-y-0.5 text-right">
-              <div className="text-xs text-gray-500">Subtotal {formatCents(totals.subtotalCents)} · GST {formatCents(totals.taxCents)}</div>
-              <div className="text-base font-semibold text-gray-900">{formatCents(totals.totalCents)}</div>
+          <div className="border-t border-gray-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <TaxProvinceSelect
+              value={taxProvinceCode}
+              onChange={(code) => setTaxProvinceCode(code)}
+              rates={taxRates}
+            />
+            <div className="space-y-0.5 md:text-right">
+              <div className="text-xs text-gray-500">Subtotal {formatCents(totals.subtotalCents)}</div>
+              <div className="text-xs text-gray-500">{totals.tax.label} — {formatCents(totals.taxCents)}</div>
+              <div className="text-base font-semibold text-gray-900">Total {formatCents(totals.totalCents)}</div>
             </div>
           </div>
 
@@ -263,7 +288,6 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
               <div><span className="text-gray-500">Name:</span> <span className="font-medium">{order.customer_name || '—'}</span></div>
               <div><span className="text-gray-500">Email:</span> <span className="font-medium">{order.customer_email || '—'}</span></div>
               <div><span className="text-gray-500">Phone:</span> <span className="font-medium">{order.customer_phone || '—'}</span></div>
-              <div><span className="text-gray-500">DOB:</span> <span className="font-medium">{order.customer_dob || '—'}</span></div>
               <div className="md:col-span-2">
                 <span className="text-gray-500">Address:</span>{' '}
                 <span className="font-medium">

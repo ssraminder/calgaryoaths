@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Order } from '@/lib/orders/types';
+import { IntegerInput, DecimalInput } from './NumericInput';
 
 const SUBTYPES = [
   'Affidavit',
@@ -151,12 +152,10 @@ export default function NotarizationServiceFields({ values, onChange }: Props) {
         </div>
         <div>
           <label className={labelClass}>Estimated turnaround (days)</label>
-          <input
-            type="number"
+          <IntegerInput
+            value={values.estimated_turnaround_days === '' ? null : values.estimated_turnaround_days}
             min={0}
-            value={values.estimated_turnaround_days === '' ? '' : values.estimated_turnaround_days}
-            onChange={(e) => set('estimated_turnaround_days', e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10)))}
-            className={inputClass}
+            onChange={(n) => set('estimated_turnaround_days', n)}
           />
         </div>
       </div>
@@ -175,13 +174,9 @@ export default function NotarizationServiceFields({ values, onChange }: Props) {
           </div>
           <div>
             <label className={labelClass}>Travel fee ($)</label>
-            <input
-              type="number"
-              step="0.01"
-              min={0}
-              value={(values.travel_fee_cents / 100).toFixed(2)}
-              onChange={(e) => set('travel_fee_cents', Math.round(parseFloat(e.target.value || '0') * 100))}
-              className={inputClass}
+            <DecimalInput
+              cents={values.travel_fee_cents}
+              onChange={(c) => set('travel_fee_cents', c)}
             />
           </div>
         </div>

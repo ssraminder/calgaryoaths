@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       service_subtypes, service_role, performed_by_commissioner_id, delivery_mode, mobile_address, travel_fee_cents,
       subtotal_cents, tax_cents, total_cents,
       handoff_token, handoff_token_expires_at, handoff_used_at,
-      customer_name, customer_email, customer_phone, customer_dob,
+      customer_name, customer_email, customer_phone,
       customer_address_street, customer_address_unit, customer_address_city, customer_address_province, customer_address_postal, customer_address_country,
       customer_notes, terms_accepted_at, signed_at
     `)

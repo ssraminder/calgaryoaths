@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { lineTotalCents, formatCents } from '@/lib/orders/pricing';
 import type { OrderItem, OrderType } from '@/lib/orders/types';
+import { IntegerInput, DecimalInput } from './NumericInput';
 
 interface Props {
   orderType: OrderType;
@@ -126,35 +127,25 @@ export default function LineItemsEditor({ orderType, items, onChange }: Props) {
                 </div>
                 <div className="md:col-span-1">
                   <label className="block text-xs text-gray-500 mb-1">Qty</label>
-                  <input
-                    type="number"
-                    min={1}
+                  <IntegerInput
                     value={item.quantity}
-                    onChange={(e) => update(idx, { quantity: Math.max(1, parseInt(e.target.value || '1', 10)) })}
-                    className="w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
+                    min={1}
+                    onChange={(n) => update(idx, { quantity: Math.max(1, n) })}
                   />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs text-gray-500 mb-1">Unit price ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={(item.unit_price_cents / 100).toFixed(2)}
-                    onChange={(e) => update(idx, { unit_price_cents: Math.round(parseFloat(e.target.value || '0') * 100) })}
-                    className="w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
+                  <DecimalInput
+                    cents={item.unit_price_cents}
+                    onChange={(c) => update(idx, { unit_price_cents: c })}
                   />
                 </div>
                 {showGovFee && (
                   <div className="md:col-span-1">
                     <label className="block text-xs text-gray-500 mb-1">Gov fee</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      value={((item.gov_fee_cents || 0) / 100).toFixed(2)}
-                      onChange={(e) => update(idx, { gov_fee_cents: Math.round(parseFloat(e.target.value || '0') * 100) })}
-                      className="w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
+                    <DecimalInput
+                      cents={item.gov_fee_cents || 0}
+                      onChange={(c) => update(idx, { gov_fee_cents: c })}
                     />
                   </div>
                 )}

@@ -1,6 +1,7 @@
 'use client';
 
 import type { Order } from '@/lib/orders/types';
+import { IntegerInput } from './NumericInput';
 
 export interface ApostilleFieldsValues {
   destination_country: string;
@@ -81,12 +82,10 @@ export default function ApostilleServiceFields({ values, onChange }: Props) {
         </div>
         <div>
           <label className={labelClass}>Estimated turnaround (days)</label>
-          <input
-            type="number"
+          <IntegerInput
+            value={values.estimated_turnaround_days === '' ? null : values.estimated_turnaround_days}
             min={0}
-            value={values.estimated_turnaround_days === '' ? '' : values.estimated_turnaround_days}
-            onChange={(e) => set('estimated_turnaround_days', e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10)))}
-            className={inputClass}
+            onChange={(n) => set('estimated_turnaround_days', n)}
           />
         </div>
       </div>

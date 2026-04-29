@@ -6,7 +6,6 @@ export interface CustomerFormValues {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
-  customer_dob: string;
   customer_address_street: string;
   customer_address_unit: string;
   customer_address_city: string;
@@ -26,7 +25,6 @@ const FIELDS: Array<{ key: keyof CustomerFormValues; label: string; type?: strin
   { key: 'customer_name', label: 'Full legal name (as on ID)', placeholder: 'First Middle Last', full: true },
   { key: 'customer_email', label: 'Email', type: 'email', placeholder: 'you@example.com' },
   { key: 'customer_phone', label: 'Phone', type: 'tel', placeholder: '(587) 555-0100' },
-  { key: 'customer_dob', label: 'Date of birth', type: 'date' },
 ];
 
 const ADDRESS_FIELDS: Array<{ key: keyof CustomerFormValues; label: string; full?: boolean; placeholder?: string }> = [
@@ -42,7 +40,6 @@ const EMPTY: CustomerFormValues = {
   customer_name: '',
   customer_email: '',
   customer_phone: '',
-  customer_dob: '',
   customer_address_street: '',
   customer_address_unit: '',
   customer_address_city: '',

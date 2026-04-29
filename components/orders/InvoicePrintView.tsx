@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { formatCents, lineTotalCents } from '@/lib/orders/pricing';
+import { useEffect, useState } from 'react';
+import { formatCents, lineTotalCents, computeTaxBreakdown, type TaxRateRow } from '@/lib/orders/pricing';
 import type { Order, OrderItem } from '@/lib/orders/types';
 
 interface Props {
@@ -11,16 +11,36 @@ interface Props {
 }
 
 export default function InvoicePrintView({ order, items, autoPrint }: Props) {
+  const [taxRate, setTaxRate] = useState<TaxRateRow | null>(null);
+  const [taxRatesLoaded, setTaxRatesLoaded] = useState(false);
+
   useEffect(() => {
-    if (autoPrint) {
-      const t = setTimeout(() => window.print(), 350);
+    let cancelled = false;
+    fetch('/api/orders/tax-rates')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (cancelled) return;
+        const rates: TaxRateRow[] = d?.taxRates || [];
+        const rate = rates.find((r) => r.province_code === (order.tax_province_code || 'AB'));
+        setTaxRate(rate || null);
+        setTaxRatesLoaded(true);
+      })
+      .catch(() => { if (!cancelled) setTaxRatesLoaded(true); });
+    return () => { cancelled = true; };
+  }, [order.tax_province_code]);
+
+  useEffect(() => {
+    // Wait for tax rate to load before printing so GST/PST/HST breakdown renders
+    if (autoPrint && taxRatesLoaded) {
+      const t = setTimeout(() => window.print(), 400);
       return () => clearTimeout(t);
     }
-  }, [autoPrint]);
+  }, [autoPrint, taxRatesLoaded]);
 
   const isApostille = order.order_type === 'apostille';
   const fullAddress = [order.customer_address_unit, order.customer_address_street, order.customer_address_city, order.customer_address_province, order.customer_address_postal, order.customer_address_country].filter(Boolean).join(', ');
   const travelFee = order.travel_fee_cents || 0;
+  const taxBreakdown = computeTaxBreakdown(order.subtotal_cents, taxRate);
 
   return (
     <div className="invoice-page mx-auto bg-white text-gray-900 print:p-0">
@@ -107,10 +127,30 @@ export default function InvoicePrintView({ order, items, autoPrint }: Props) {
                 <td colSpan={isApostille ? 4 : 3} className="pt-3 pr-2 text-right text-sm">Subtotal</td>
                 <td className="pt-3 pl-2 text-right">{formatCents(order.subtotal_cents)}</td>
               </tr>
-              <tr>
-                <td colSpan={isApostille ? 4 : 3} className="pr-2 text-right text-sm">GST (5%)</td>
-                <td className="pl-2 text-right">{formatCents(order.tax_cents)}</td>
-              </tr>
+              {taxBreakdown.hst_cents > 0 && (
+                <tr>
+                  <td colSpan={isApostille ? 4 : 3} className="pr-2 text-right text-sm">HST ({(taxBreakdown.hst_rate * 100).toFixed(taxBreakdown.hst_rate * 100 % 1 === 0 ? 0 : 2)}%)</td>
+                  <td className="pl-2 text-right">{formatCents(taxBreakdown.hst_cents)}</td>
+                </tr>
+              )}
+              {taxBreakdown.gst_cents > 0 && (
+                <tr>
+                  <td colSpan={isApostille ? 4 : 3} className="pr-2 text-right text-sm">GST ({(taxBreakdown.gst_rate * 100).toFixed(taxBreakdown.gst_rate * 100 % 1 === 0 ? 0 : 2)}%)</td>
+                  <td className="pl-2 text-right">{formatCents(taxBreakdown.gst_cents)}</td>
+                </tr>
+              )}
+              {taxBreakdown.pst_cents > 0 && (
+                <tr>
+                  <td colSpan={isApostille ? 4 : 3} className="pr-2 text-right text-sm">PST ({(taxBreakdown.pst_rate * 100).toFixed(taxBreakdown.pst_rate * 100 % 1 === 0 ? 0 : 2)}%)</td>
+                  <td className="pl-2 text-right">{formatCents(taxBreakdown.pst_cents)}</td>
+                </tr>
+              )}
+              {taxBreakdown.total_cents === 0 && (
+                <tr>
+                  <td colSpan={isApostille ? 4 : 3} className="pr-2 text-right text-sm text-gray-500">No tax</td>
+                  <td className="pl-2 text-right">{formatCents(0)}</td>
+                </tr>
+              )}
               {(order.discount_cents || 0) > 0 && (
                 <tr>
                   <td colSpan={isApostille ? 4 : 3} className="pr-2 text-right text-sm">Discount</td>

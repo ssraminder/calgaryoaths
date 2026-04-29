@@ -36,6 +36,7 @@ export const staffSectionSchema = z.object({
   expedited: z.boolean().optional(),
   notes_internal: z.string().nullable().optional(),
   estimated_turnaround_days: z.number().int().min(0).nullable().optional(),
+  tax_province_code: z.string().min(2).max(8).nullable().optional(),
   items: z.array(orderItemSchema).optional(),
 }).merge(apostilleFields).merge(notarizationFields);
 
@@ -43,7 +44,6 @@ export const customerSectionSchema = z.object({
   customer_name: z.string().min(1, 'Full name is required'),
   customer_email: z.string().email('Valid email required'),
   customer_phone: z.string().min(1, 'Phone is required'),
-  customer_dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of birth required'),
   customer_address_street: z.string().min(1, 'Street address required'),
   customer_address_unit: z.string().nullable().optional(),
   customer_address_city: z.string().min(1, 'City required'),

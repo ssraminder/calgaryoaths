@@ -16,7 +16,6 @@ interface OrderSummary {
   customer_name?: string | null;
   customer_email?: string | null;
   customer_phone?: string | null;
-  customer_dob?: string | null;
   customer_address_street?: string | null;
   customer_address_unit?: string | null;
   customer_address_city?: string | null;
@@ -52,7 +51,6 @@ export default function CustomerOrderForm({ token, order, items, terms, returnUr
     customer_name: order.customer_name || '',
     customer_email: order.customer_email || '',
     customer_phone: order.customer_phone || '',
-    customer_dob: order.customer_dob || '',
     customer_address_street: order.customer_address_street || '',
     customer_address_unit: order.customer_address_unit || '',
     customer_address_city: order.customer_address_city || '',
@@ -72,7 +70,6 @@ export default function CustomerOrderForm({ token, order, items, terms, returnUr
       customer.customer_name.trim().length > 1 &&
       /\S+@\S+\.\S+/.test(customer.customer_email) &&
       customer.customer_phone.trim().length > 0 &&
-      customer.customer_dob.length === 10 &&
       customer.customer_address_street.trim().length > 0 &&
       customer.customer_address_city.trim().length > 0 &&
       customer.customer_address_province.trim().length > 0 &&

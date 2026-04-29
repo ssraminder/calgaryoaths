@@ -67,11 +67,10 @@ export interface Order {
   mobile_address: string | null;
   travel_fee_cents: number | null;
 
-  // Customer (typed ID fields removed; ID captured via uploaded photos)
+  // Customer (typed ID fields and DOB removed; ID captured via uploaded photos)
   customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;
-  customer_dob: string | null;
   customer_address_street: string | null;
   customer_address_unit: string | null;
   customer_address_city: string | null;
@@ -94,6 +93,7 @@ export interface Order {
   total_cents: number;
   discount_cents: number | null;
   discount_reason: string | null;
+  tax_province_code: string | null;
 
   // Payment
   payment_method: PaymentMethod | null;

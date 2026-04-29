@@ -12,7 +12,6 @@ interface OrderPayload {
     customer_name?: string | null;
     customer_email?: string | null;
     customer_phone?: string | null;
-    customer_dob?: string | null;
     customer_address_street?: string | null;
     customer_address_unit?: string | null;
     customer_address_city?: string | null;
