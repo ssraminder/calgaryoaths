@@ -4,11 +4,13 @@ import { createServerClient } from '@supabase/ssr';
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Set pathname header so the root layout can detect dashboard routes server-side
+  // Set pathname header so the root layout can detect dashboard routes server-side.
+  // Must be on request headers (not response) so server components reading headers() see it.
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-pathname', pathname);
   const res = NextResponse.next({
-    request: { headers: new Headers(req.headers) },
+    request: { headers: requestHeaders },
   });
-  res.headers.set('x-pathname', pathname);
 
   // Only protect /admin and /vendor routes (except login/forgot-password pages)
   const isProtectedRoute =

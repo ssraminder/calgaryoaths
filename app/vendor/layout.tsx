@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import VendorSidebar from '@/components/vendor/VendorSidebar';
-import TopBar from '@/components/admin/TopBar';
 import BottomNav from '@/components/vendor/BottomNav';
 import OfflineBanner from '@/components/vendor/OfflineBanner';
 import InstallPrompt from '@/components/vendor/InstallPrompt';
@@ -61,16 +60,15 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     <div className="flex h-screen bg-gray-50">
       <VendorViewportMeta />
       <OfflineBanner />
-      <VendorSidebar />
+      <VendorSidebar userName={user?.fullName || ''} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar userName={user?.fullName || ''} logoutRedirect="/vendor/login" portalName="Partner Portal" homeHref="/vendor" />
         <main className="vendor-main-content flex-1 overflow-y-auto p-4 md:p-6">
           <VendorPageTransition>
             {children}
           </VendorPageTransition>
         </main>
       </div>
-      <BottomNav />
+      <BottomNav userName={user?.fullName || ''} />
       <InstallPrompt />
     </div>
   );

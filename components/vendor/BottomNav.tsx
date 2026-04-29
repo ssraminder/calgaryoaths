@@ -2,8 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LayoutDashboard, CalendarCheck, DollarSign, Clock, Settings, HelpCircle, Phone, MessageSquare, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
+import { LayoutDashboard, CalendarCheck, DollarSign, Settings, HelpCircle, Phone, MessageSquare, X, LogOut } from 'lucide-react';
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const navItems = [
   { label: 'Dashboard', href: '/vendor', icon: LayoutDashboard },
@@ -16,9 +22,15 @@ const ADMIN_PHONE = 'tel:5876000746';
 const ADMIN_SMS = 'sms:5876000746?body=Hi%2C%20I%20need%20help%20with%20the%20Partner%20Portal.';
 const ADMIN_EMAIL = 'mailto:info@calgaryoaths.com?subject=Partner%20Portal%20Help';
 
-export default function BottomNav() {
+export default function BottomNav({ userName }: { userName?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [helpOpen, setHelpOpen] = useState(false);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.replace('/vendor/login');
+  }
 
   return (
     <>
@@ -31,7 +43,10 @@ export default function BottomNav() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-gray-900">Need Help?</h3>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Need Help?</h3>
+                {userName && <p className="text-xs text-gray-500 mt-0.5">{userName}</p>}
+              </div>
               <button
                 onClick={() => setHelpOpen(false)}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100"
@@ -78,6 +93,18 @@ export default function BottomNav() {
                   <p className="text-xs text-gray-500">info@calgaryoaths.com</p>
                 </div>
               </a>
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-3 rounded-xl border border-gray-200 p-4 active:bg-gray-50"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <LogOut className="h-5 w-5 text-gray-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">Logout</p>
+                  <p className="text-xs text-gray-500">Sign out of the portal</p>
+                </div>
+              </button>
             </div>
           </div>
         </div>

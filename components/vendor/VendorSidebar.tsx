@@ -3,8 +3,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { LayoutDashboard, CalendarCheck, Clock, Calendar, DollarSign, Settings } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
+import { LayoutDashboard, CalendarCheck, Clock, Calendar, DollarSign, Settings, LogOut } from 'lucide-react';
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const navItems = [
   { label: 'Dashboard', href: '/vendor', icon: LayoutDashboard },
@@ -15,8 +21,9 @@ const navItems = [
   { label: 'Settings', href: '/vendor/rates', icon: Settings },
 ];
 
-export default function VendorSidebar() {
+export default function VendorSidebar({ userName }: { userName?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,6 +32,11 @@ export default function VendorSidebar() {
       .then((data) => { if (data?.logoUrl) setLogoUrl(data.logoUrl); })
       .catch(() => {});
   }, []);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.replace('/vendor/login');
+  }
 
   return (
     <aside className="hidden md:flex w-60 flex-col border-r border-gray-200 bg-white">
@@ -53,8 +65,18 @@ export default function VendorSidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-gray-200 px-4 py-3">
-        <Link href="/" className="text-xs text-gray-400 hover:text-gray-600">&larr; Back to site</Link>
+      <div className="border-t border-gray-200 px-3 py-3">
+        {userName && (
+          <div className="px-2 pb-2 text-xs text-gray-500 truncate">{userName}</div>
+        )}
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </button>
+        <Link href="/" className="mt-2 block px-2 text-xs text-gray-400 hover:text-gray-600">&larr; Back to site</Link>
       </div>
     </aside>
   );
