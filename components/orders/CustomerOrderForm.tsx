@@ -65,21 +65,22 @@ export default function CustomerOrderForm({ token, order, items, terms, returnUr
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = useMemo(() => {
-    return (
-      customer.customer_name.trim().length > 1 &&
-      /\S+@\S+\.\S+/.test(customer.customer_email) &&
-      customer.customer_phone.trim().length > 0 &&
-      customer.customer_address_street.trim().length > 0 &&
-      customer.customer_address_city.trim().length > 0 &&
-      customer.customer_address_province.trim().length > 0 &&
-      customer.customer_address_postal.trim().length > 0 &&
-      customer.customer_address_country.trim().length > 0 &&
-      accepted &&
-      !!termsId &&
-      !!signature
-    );
+  const missingFields = useMemo(() => {
+    const missing: string[] = [];
+    if (customer.customer_name.trim().length <= 1) missing.push('Full legal name');
+    if (!/\S+@\S+\.\S+/.test(customer.customer_email)) missing.push('Email');
+    if (customer.customer_phone.trim().length === 0) missing.push('Phone');
+    if (customer.customer_address_street.trim().length === 0) missing.push('Street address');
+    if (customer.customer_address_city.trim().length === 0) missing.push('City');
+    if (customer.customer_address_province.trim().length === 0) missing.push('Province / State');
+    if (customer.customer_address_postal.trim().length === 0) missing.push('Postal / ZIP code');
+    if (customer.customer_address_country.trim().length === 0) missing.push('Country');
+    if (!accepted || !termsId) missing.push('Terms acceptance');
+    if (!signature) missing.push('Signature');
+    return missing;
   }, [customer, accepted, termsId, signature]);
+
+  const canSubmit = missingFields.length === 0;
 
   async function submit() {
     if (!canSubmit || !signature || !termsId) return;
@@ -152,6 +153,12 @@ export default function CustomerOrderForm({ token, order, items, terms, returnUr
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>
+      )}
+
+      {!canSubmit && (
+        <p className="text-center text-sm text-gray-600">
+          Please complete: <span className="font-medium text-gray-800">{missingFields.join(', ')}</span>
+        </p>
       )}
 
       <button
