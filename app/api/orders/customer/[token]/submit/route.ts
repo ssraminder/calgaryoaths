@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
     return NextResponse.json({ error: 'Invalid payload', issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { signature_data_url, terms_version_id, ...customerFields } = parsed.data;
+  const { signature_data_url, signature_name, terms_version_id, ...customerFields } = parsed.data;
 
   const { data: order, error: findErr } = await supabaseAdmin
     .from('co_orders')
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
       terms_version_id,
       terms_accepted_at: now,
       signature_url,
+      signed_name: signature_name,
       signed_at: now,
       signed_ip: ip,
       signed_user_agent: ua,

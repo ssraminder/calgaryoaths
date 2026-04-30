@@ -56,6 +56,7 @@ export const customerSectionSchema = z.object({
 export const customerSubmitSchema = customerSectionSchema.extend({
   terms_version_id: z.string().uuid(),
   signature_data_url: z.string().startsWith('data:image/'),
+  signature_name: z.string().min(1, 'Printed name is required'),
 });
 
 export const paymentSchema = z.object({
