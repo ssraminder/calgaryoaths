@@ -62,6 +62,7 @@ export default function CustomerOrderForm({ token, order, items, terms, returnUr
   const [accepted, setAccepted] = useState(false);
   const [termsId, setTermsId] = useState<string | null>(terms.id);
   const [signature, setSignature] = useState<string | null>(null);
+  const [signatureName, setSignatureName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,9 +77,10 @@ export default function CustomerOrderForm({ token, order, items, terms, returnUr
     if (customer.customer_address_postal.trim().length === 0) missing.push('Postal / ZIP code');
     if (customer.customer_address_country.trim().length === 0) missing.push('Country');
     if (!accepted || !termsId) missing.push('Terms acceptance');
+    if (signatureName.trim().length === 0) missing.push('Printed name');
     if (!signature) missing.push('Signature');
     return missing;
-  }, [customer, accepted, termsId, signature]);
+  }, [customer, accepted, termsId, signature, signatureName]);
 
   const canSubmit = missingFields.length === 0;
 
@@ -94,6 +96,7 @@ export default function CustomerOrderForm({ token, order, items, terms, returnUr
           ...customer,
           terms_version_id: termsId,
           signature_data_url: signature,
+          signature_name: signatureName.trim(),
         }),
       });
       if (!res.ok) {
@@ -148,6 +151,20 @@ export default function CustomerOrderForm({ token, order, items, terms, returnUr
 
       <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-5 space-y-3">
         <h2 className="text-sm font-semibold text-gray-700">Signature</h2>
+        <div>
+          <label htmlFor="signature_name" className="mb-1 block text-sm font-medium text-gray-700">
+            Printed name
+          </label>
+          <input
+            id="signature_name"
+            type="text"
+            value={signatureName}
+            onChange={(e) => setSignatureName(e.target.value)}
+            placeholder="Type your name as it should appear under your signature"
+            className="w-full rounded-md border border-gray-300 px-4 py-3 text-base focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy"
+            autoComplete="name"
+          />
+        </div>
         <SignaturePad onChange={setSignature} />
       </section>
 
