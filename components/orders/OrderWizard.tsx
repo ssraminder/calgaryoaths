@@ -330,6 +330,45 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
         </>
       )}
 
+      {/* Apostille tracking (visible once paid; staff fill these while shipping) */}
+      {showInvoice && order.order_type === 'apostille' && (
+        <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-gray-700">Apostille tracking</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Tracking # (to government)</label>
+              <input
+                type="text"
+                value={apostilleFields.tracking_to_gov}
+                onChange={(e) => setApostilleFields({ ...apostilleFields, tracking_to_gov: e.target.value })}
+                placeholder="Courier tracking number for shipment to GAC / consulate"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Tracking # (from government)</label>
+              <input
+                type="text"
+                value={apostilleFields.tracking_from_gov}
+                onChange={(e) => setApostilleFields({ ...apostilleFields, tracking_from_gov: e.target.value })}
+                placeholder="Courier tracking number for return shipment"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => saveDraft()}
+              disabled={saving}
+              className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Save className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save tracking'}
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Invoice */}
       {showInvoice && (
         <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-5 space-y-3">
