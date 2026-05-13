@@ -58,6 +58,8 @@ export interface Order {
   translation_required: boolean | null;
   translation_language: string | null;
   delivery_method: DeliveryMethod | null;
+  tracking_to_gov: string | null;
+  tracking_from_gov: string | null;
 
   // Notarization
   service_subtypes: string[] | null;

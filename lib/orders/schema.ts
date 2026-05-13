@@ -20,6 +20,8 @@ const apostilleFields = z.object({
   translation_required: z.boolean().nullable().optional(),
   translation_language: z.string().nullable().optional(),
   delivery_method: z.enum(['pickup', 'courier']).nullable().optional(),
+  tracking_to_gov: z.string().nullable().optional(),
+  tracking_from_gov: z.string().nullable().optional(),
 });
 
 const notarizationFields = z.object({

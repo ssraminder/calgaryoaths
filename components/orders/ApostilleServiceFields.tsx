@@ -12,6 +12,8 @@ export interface ApostilleFieldsValues {
   delivery_method: 'pickup' | 'courier' | '';
   expedited: boolean;
   estimated_turnaround_days: number | '';
+  tracking_to_gov: string;
+  tracking_from_gov: string;
   notes_internal: string;
 }
 
@@ -20,7 +22,7 @@ interface Props {
   onChange: (values: ApostilleFieldsValues) => void;
 }
 
-export function apostileInitialFromOrder(o: Pick<Order, 'destination_country' | 'authentication_type' | 'notarization_required' | 'translation_required' | 'translation_language' | 'delivery_method' | 'expedited' | 'estimated_turnaround_days' | 'notes_internal'>): ApostilleFieldsValues {
+export function apostileInitialFromOrder(o: Pick<Order, 'destination_country' | 'authentication_type' | 'notarization_required' | 'translation_required' | 'translation_language' | 'delivery_method' | 'expedited' | 'estimated_turnaround_days' | 'tracking_to_gov' | 'tracking_from_gov' | 'notes_internal'>): ApostilleFieldsValues {
   return {
     destination_country: o.destination_country || '',
     authentication_type: (o.authentication_type as ApostilleFieldsValues['authentication_type']) || '',
@@ -30,6 +32,8 @@ export function apostileInitialFromOrder(o: Pick<Order, 'destination_country' | 
     delivery_method: (o.delivery_method as ApostilleFieldsValues['delivery_method']) || '',
     expedited: !!o.expedited,
     estimated_turnaround_days: o.estimated_turnaround_days ?? '',
+    tracking_to_gov: o.tracking_to_gov || '',
+    tracking_from_gov: o.tracking_from_gov || '',
     notes_internal: o.notes_internal || '',
   };
 }
@@ -132,6 +136,29 @@ export default function ApostilleServiceFields({ values, onChange }: Props) {
           />
         </div>
       )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>Tracking # (to government)</label>
+          <input
+            type="text"
+            value={values.tracking_to_gov}
+            onChange={(e) => set('tracking_to_gov', e.target.value)}
+            placeholder="Courier tracking number for shipment to GAC / consulate"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Tracking # (from government)</label>
+          <input
+            type="text"
+            value={values.tracking_from_gov}
+            onChange={(e) => set('tracking_from_gov', e.target.value)}
+            placeholder="Courier tracking number for return shipment"
+            className={inputClass}
+          />
+        </div>
+      </div>
 
       <div>
         <label className={labelClass}>Internal notes</label>

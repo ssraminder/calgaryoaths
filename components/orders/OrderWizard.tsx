@@ -111,6 +111,8 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
           delivery_method: apostilleFields.delivery_method || null,
           expedited: apostilleFields.expedited,
           estimated_turnaround_days: apostilleFields.estimated_turnaround_days === '' ? null : apostilleFields.estimated_turnaround_days,
+          tracking_to_gov: apostilleFields.tracking_to_gov || null,
+          tracking_from_gov: apostilleFields.tracking_from_gov || null,
           notes_internal: apostilleFields.notes_internal || null,
         });
       } else {
