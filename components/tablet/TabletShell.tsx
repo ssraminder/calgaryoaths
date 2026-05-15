@@ -69,6 +69,11 @@ export default function TabletShell({ children }: { children: React.ReactNode })
     );
   }
 
+  // Invoice pages render without tablet chrome (print-ready, customer-facing)
+  if (pathname?.endsWith('/invoice')) {
+    return <div className="min-h-screen bg-white">{children}</div>;
+  }
+
   const onHome = pathname === '/tablet';
 
   return (
