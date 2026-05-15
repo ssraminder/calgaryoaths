@@ -4,6 +4,7 @@ import { verifyStaff } from '@/lib/orders/auth';
 import { staffSectionSchema, orderItemSchema } from '@/lib/orders/schema';
 import { computeTotals, lineTotalCents } from '@/lib/orders/pricing';
 import { diffFields, logOrderEvent } from '@/lib/orders/audit';
+import { sendCancellationNotices } from '@/lib/orders/cancel-notice';
 import { z } from 'zod';
 
 const customerEditSchema = z.object({
@@ -168,6 +169,42 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
         : 'Cancelled order',
       changes: { cancelled_reason: orderFields.cancelled_reason ?? null },
     });
+
+    // If the customer had already signed terms, send contract-nullification
+    // emails to the customer and the assigned partner. Email failures are
+    // logged but must not roll back the cancellation.
+    if (beforeOrder.signature_url && beforeOrder.terms_accepted_at) {
+      try {
+        const noticeOrder = {
+          id,
+          order_number: beforeOrder.order_number,
+          order_type: beforeOrder.order_type,
+          customer_name: beforeOrder.customer_name,
+          customer_email: beforeOrder.customer_email,
+          performed_by_commissioner_id: beforeOrder.performed_by_commissioner_id,
+          signature_url: beforeOrder.signature_url,
+          terms_accepted_at: beforeOrder.terms_accepted_at,
+          signed_at: beforeOrder.signed_at,
+          cancelled_at: (updateFields.cancelled_at as string) ?? new Date().toISOString(),
+          cancelled_reason: orderFields.cancelled_reason ?? null,
+        };
+        const result = await sendCancellationNotices(noticeOrder);
+        await logOrderEvent({
+          orderId: id,
+          actor: { id: staff.id, fullName: staff.fullName, email: staff.email, role: staff.role },
+          eventType: 'order.cancel.notice_sent',
+          summary: `Sent contract-nullification notice (customer: ${result.customerSent ? 'sent' : 'skipped'}, partner: ${result.partnerSent ? 'sent' : 'skipped'})`,
+          changes: {
+            customer_email: beforeOrder.customer_email,
+            customer_sent: result.customerSent,
+            partner_email: result.partnerEmail,
+            partner_sent: result.partnerSent,
+          },
+        });
+      } catch (err) {
+        console.error('Cancellation notices failed', err);
+      }
+    }
   } else if (isComplete) {
     await logOrderEvent({
       orderId: id,
