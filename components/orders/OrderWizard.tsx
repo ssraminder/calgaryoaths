@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Smartphone, Tablet, Receipt, Printer, Check, AlertCircle, RefreshCw, FileText } from 'lucide-react';
+import { Save, Smartphone, Tablet, Receipt, Printer, Check, AlertCircle, RefreshCw, FileText, Mail } from 'lucide-react';
 import LineItemsEditor from './LineItemsEditor';
 import ApostilleServiceFields, { apostileInitialFromOrder } from './ApostilleServiceFields';
 import NotarizationServiceFields, { notarizationInitialFromOrder } from './NotarizationServiceFields';
@@ -41,6 +41,7 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [handoffOpen, setHandoffOpen] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
 
   // Service field state (controlled)
   const [apostilleFields, setApostilleFields] = useState(() => apostileInitialFromOrder(order));
@@ -179,6 +180,26 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
     }
     await reload();
     router.push(`${basePath}/${order.id}/invoice`);
+  }
+
+  async function emailCustomer() {
+    if (!order.customer_email) {
+      alert('No customer email on file for this order.');
+      return;
+    }
+    if (!confirm(`Send invoice${order.signature_url ? ' and signed terms' : ''} to ${order.customer_email}?`)) return;
+    setEmailSending(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/send-email`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Failed to send email');
+        return;
+      }
+      alert(`Email sent to ${data.sent_to}.`);
+    } finally {
+      setEmailSending(false);
+    }
   }
 
   const idPhotosRequired = order.order_type === 'notarization';
@@ -410,6 +431,15 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
             >
               <Printer className="h-4 w-4" /> Print invoice
             </a>
+            <button
+              type="button"
+              onClick={emailCustomer}
+              disabled={emailSending || !order.customer_email}
+              className="flex items-center gap-1.5 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              title={order.customer_email ? `Email invoice${order.signature_url ? ' & signed terms' : ''} to ${order.customer_email}` : 'No customer email on file'}
+            >
+              <Mail className="h-4 w-4" /> {emailSending ? 'Sending…' : 'Email to customer'}
+            </button>
           </div>
         </section>
       )}
