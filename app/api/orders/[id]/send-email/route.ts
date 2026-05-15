@@ -4,6 +4,7 @@ import { verifyStaff } from '@/lib/orders/auth';
 import { buildInvoicePdf } from '@/lib/orders/invoice-pdf';
 import { buildSignedTermsPdf } from '@/lib/orders/signed-terms-pdf';
 import { sendEmail } from '@/lib/email';
+import { recordOrderEmail, normalizeMessageId } from '@/lib/orders/email-log';
 import type { TaxRateRow } from '@/lib/orders/pricing';
 
 const ORDERS_BUCKET = 'orders';
@@ -13,6 +14,15 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
   if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = ctx.params;
+
+  // What to include: { invoice: bool, terms: bool }. Default to both for
+  // backward compatibility when older clients call this with no body.
+  const body = await req.json().catch(() => ({})) as { include?: { invoice?: boolean; terms?: boolean } };
+  const includeInvoice = body.include?.invoice !== false;
+  const includeTerms = body.include?.terms !== false;
+  if (!includeInvoice && !includeTerms) {
+    return NextResponse.json({ error: 'Select at least one document to send' }, { status: 400 });
+  }
 
   const { data: order, error: orderErr } = await supabaseAdmin
     .from('co_orders')
@@ -42,18 +52,20 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
     if (rate) taxRate = rate as TaxRateRow;
   }
 
-  // Generate invoice PDF
+  // Generate invoice PDF (only if requested)
   let invoicePdfBytes: Uint8Array | null = null;
-  try {
-    invoicePdfBytes = await buildInvoicePdf({ order, items: items || [], taxRate });
-  } catch (err) {
-    console.error('Invoice PDF generation failed', err);
-    return NextResponse.json({ error: 'Failed to generate invoice PDF' }, { status: 500 });
+  if (includeInvoice) {
+    try {
+      invoicePdfBytes = await buildInvoicePdf({ order, items: items || [], taxRate });
+    } catch (err) {
+      console.error('Invoice PDF generation failed', err);
+      return NextResponse.json({ error: 'Failed to generate invoice PDF' }, { status: 500 });
+    }
   }
 
-  // Generate signed-terms PDF if we have a signature + terms version
+  // Generate signed-terms PDF if requested AND we have a signature + terms version
   let termsPdfBytes: Uint8Array | null = null;
-  if (order.terms_version_id && order.signature_url) {
+  if (includeTerms && order.terms_version_id && order.signature_url) {
     try {
       const { data: terms } = await supabaseAdmin
         .from('co_terms_versions')
@@ -97,31 +109,52 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
 
   const invoiceFilename = `invoice-${order.invoice_number || order.order_number}.pdf`;
   const termsFilename = `signed-terms-${order.order_number}.pdf`;
-  const attachments = [{ name: invoiceFilename, content: Buffer.from(invoicePdfBytes) }];
+  const attachments: { name: string; content: Buffer }[] = [];
+  if (invoicePdfBytes) attachments.push({ name: invoiceFilename, content: Buffer.from(invoicePdfBytes) });
   if (termsPdfBytes) attachments.push({ name: termsFilename, content: Buffer.from(termsPdfBytes) });
 
+  if (attachments.length === 0) {
+    return NextResponse.json({ error: 'Nothing to send — selected documents are not available for this order' }, { status: 400 });
+  }
+
   // Archive the invoice copy to storage (best-effort)
-  await supabaseAdmin.storage
-    .from(ORDERS_BUCKET)
-    .upload(`invoices/${order.id}/${Date.now()}.pdf`, Buffer.from(invoicePdfBytes), {
-      contentType: 'application/pdf',
-      upsert: false,
-    })
-    .catch((err) => console.error('Invoice storage upload failed', err));
+  if (invoicePdfBytes) {
+    await supabaseAdmin.storage
+      .from(ORDERS_BUCKET)
+      .upload(`invoices/${order.id}/${Date.now()}.pdf`, Buffer.from(invoicePdfBytes), {
+        contentType: 'application/pdf',
+        upsert: false,
+      })
+      .catch((err) => console.error('Invoice storage upload failed', err));
+  }
 
   const serviceLabel = order.order_type === 'apostille' ? 'apostille / authentication' : 'notarization / oath commissioner';
   const greetingName = order.customer_name || 'there';
 
+  // Subject + intro adapt to what's actually attached
+  let subject: string;
+  let intro: string;
+  if (invoicePdfBytes && termsPdfBytes) {
+    subject = `Your Calgary Oaths invoice & signed terms (${order.invoice_number || order.order_number})`;
+    intro = `Your invoice is attached, along with a copy of the terms and conditions you accepted.`;
+  } else if (invoicePdfBytes) {
+    subject = `Your Calgary Oaths invoice ${order.invoice_number || order.order_number}`;
+    intro = `Your invoice is attached for your records.`;
+  } else {
+    subject = `Your signed terms & conditions - Calgary Oaths order ${order.order_number}`;
+    intro = `A copy of the terms and conditions you accepted is attached for your records.`;
+  }
+
+  let resp: { messageId?: string } | undefined;
   try {
-    await sendEmail({
+    resp = await sendEmail({
       to: order.customer_email,
-      subject: `Your Calgary Oaths invoice ${order.invoice_number || order.order_number}`,
+      subject,
       replyTo: 'info@calgaryoaths.com',
       html: `
         <p>Hi ${greetingName},</p>
-        <p>Thank you for your ${serviceLabel} order with Calgary Oaths. Your invoice is attached for your records${termsPdfBytes ? ', along with a copy of the terms and conditions you accepted' : ''}.</p>
-        <p>Order #: <strong>${order.order_number}</strong><br/>
-        Invoice #: <strong>${order.invoice_number || order.order_number}</strong></p>
+        <p>Thank you for your ${serviceLabel} order with Calgary Oaths. ${intro}</p>
+        <p>Order #: <strong>${order.order_number}</strong>${invoicePdfBytes ? `<br/>Invoice #: <strong>${order.invoice_number || order.order_number}</strong>` : ''}</p>
         <p>If you have any questions, just reply to this email.</p>
         <p>- Calgary Oaths<br/>(587) 600-0746 . info@calgaryoaths.com</p>
       `,
@@ -131,6 +164,16 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
     console.error('Customer email send failed', err);
     return NextResponse.json({ error: 'Failed to send email' }, { status: 500 });
   }
+
+  await recordOrderEmail({
+    orderId: id,
+    messageId: normalizeMessageId(resp?.messageId),
+    recipient: order.customer_email,
+    subject,
+    kind: 'invoice_terms',
+    attachmentNames: attachments.map((a) => a.name),
+    triggeredBy: { id: staff.id, fullName: staff.fullName, email: staff.email },
+  });
 
   return NextResponse.json({
     ok: true,

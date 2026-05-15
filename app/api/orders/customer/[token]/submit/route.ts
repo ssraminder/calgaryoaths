@@ -4,6 +4,7 @@ import { validateHandoff } from '@/lib/orders/handoff-token';
 import { customerSubmitSchema } from '@/lib/orders/schema';
 import { buildSignedTermsPdf } from '@/lib/orders/signed-terms-pdf';
 import { sendEmail } from '@/lib/email';
+import { recordOrderEmail, normalizeMessageId } from '@/lib/orders/email-log';
 
 const SIGNATURES_BUCKET = 'orders';
 
@@ -118,9 +119,10 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
 
     const filename = `signed-terms-${order.order_number}.pdf`;
     const serviceLabel = order.order_type === 'apostille' ? 'apostille / authentication' : 'notarization / oath commissioner';
-    await sendEmail({
+    const subject = `Your signed terms & conditions - Calgary Oaths order ${order.order_number}`;
+    const resp = await sendEmail({
       to: customerFields.customer_email,
-      subject: `Your signed terms & conditions - Calgary Oaths order ${order.order_number}`,
+      subject,
       html: `
         <p>Hi ${customerFields.customer_name || 'there'},</p>
         <p>Thank you for completing your ${serviceLabel} order with Calgary Oaths.</p>
@@ -131,6 +133,14 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
       `,
       replyTo: 'info@calgaryoaths.com',
       attachments: [{ name: filename, content: pdfBuffer }],
+    });
+    await recordOrderEmail({
+      orderId: order.id,
+      messageId: normalizeMessageId(resp?.messageId),
+      recipient: customerFields.customer_email,
+      subject,
+      kind: 'signed_terms_on_submit',
+      attachmentNames: [filename],
     });
   } catch (err) {
     console.error('Signed terms email failed', err);
