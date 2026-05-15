@@ -56,8 +56,8 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  // Invoice pages render without vendor chrome (print-ready, customer-facing)
-  if (pathname?.endsWith('/invoice')) {
+  // Invoice and signed-terms pages render without vendor chrome (print-ready, customer-facing)
+  if (pathname?.endsWith('/invoice') || pathname?.endsWith('/terms')) {
     return <>{children}</>;
   }
 

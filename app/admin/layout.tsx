@@ -57,8 +57,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // Invoice pages render without admin chrome (print-ready, customer-facing)
-  if (pathname?.endsWith('/invoice')) {
+  // Invoice and signed-terms pages render without admin chrome (print-ready, customer-facing)
+  if (pathname?.endsWith('/invoice') || pathname?.endsWith('/terms')) {
     return <>{children}</>;
   }
 
