@@ -36,6 +36,7 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
   const router = useRouter();
   const [order, setOrder] = useState<Order>(initialOrder);
   const [items, setItems] = useState<OrderItem[]>(initialItems);
+  const [photos, setPhotos] = useState<OrderIdPhoto[]>(initialPhotos);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -308,14 +309,14 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-5">
-            <IdPhotosSection orderId={order.id} required={idPhotosRequired} />
+            <IdPhotosSection orderId={order.id} required={idPhotosRequired} photos={photos} onChange={setPhotos} />
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-5 space-y-3">
             <h2 className="text-sm font-semibold text-gray-700">Payment</h2>
-            {idPhotosRequired && initialPhotos.length === 0 && (
+            {idPhotosRequired && photos.length === 0 && (
               <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
-                ID photos are required for notarization orders. Please upload at least one before recording payment.
+                Reminder: capture ID photos for this notarization. You can record payment now and upload them after.
               </div>
             )}
             <PaymentSection
@@ -324,7 +325,6 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
               initialReference={order.payment_reference}
               initialAmountCents={order.amount_paid_cents}
               onRecord={recordPayment}
-              disabled={idPhotosRequired && initialPhotos.length === 0}
             />
           </section>
         </>
