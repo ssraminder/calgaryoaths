@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Smartphone, Tablet, Receipt, Printer, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { Save, Smartphone, Tablet, Receipt, Printer, Check, AlertCircle, RefreshCw, FileText } from 'lucide-react';
 import LineItemsEditor from './LineItemsEditor';
 import ApostilleServiceFields, { apostileInitialFromOrder } from './ApostilleServiceFields';
 import NotarizationServiceFields, { notarizationInitialFromOrder } from './NotarizationServiceFields';
@@ -304,6 +304,18 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
                 <p className="text-xs text-gray-500 mb-1">Signature ({order.signed_at ? new Date(order.signed_at).toLocaleString() : ''})</p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={order.signature_url} alt="Customer signature" className="h-20 rounded border border-gray-200 bg-white" />
+              </div>
+            )}
+            {order.signature_url && order.terms_accepted_at && (
+              <div>
+                <a
+                  href={`${basePath}/${order.id}/terms`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Download signed terms (PDF)
+                </a>
               </div>
             )}
           </section>
