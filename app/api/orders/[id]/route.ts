@@ -3,14 +3,45 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { verifyStaff } from '@/lib/orders/auth';
 import { staffSectionSchema, orderItemSchema } from '@/lib/orders/schema';
 import { computeTotals, lineTotalCents } from '@/lib/orders/pricing';
+import { diffFields, logOrderEvent } from '@/lib/orders/audit';
 import { z } from 'zod';
 
-const patchSchema = staffSectionSchema.partial().extend({
+const customerEditSchema = z.object({
+  customer_name: z.string().min(1).optional(),
+  customer_email: z.string().email().optional(),
+  customer_phone: z.string().min(1).optional(),
+  customer_address_street: z.string().nullable().optional(),
+  customer_address_unit: z.string().nullable().optional(),
+  customer_address_city: z.string().nullable().optional(),
+  customer_address_province: z.string().nullable().optional(),
+  customer_address_postal: z.string().nullable().optional(),
+  customer_address_country: z.string().nullable().optional(),
+  customer_notes: z.string().nullable().optional(),
+});
+
+const patchSchema = staffSectionSchema.partial().merge(customerEditSchema).extend({
   status: z.enum(['draft', 'awaiting_customer', 'customer_completed', 'awaiting_payment', 'paid', 'completed', 'cancelled']).optional(),
   cancelled_reason: z.string().nullable().optional(),
   discount_cents: z.number().int().min(0).nullable().optional(),
   discount_reason: z.string().nullable().optional(),
 });
+
+// Whitelist of order columns we audit-log diffs for.
+const AUDITED_FIELDS = [
+  'status', 'order_date', 'expedited', 'estimated_turnaround_days', 'tax_province_code',
+  'destination_country', 'authentication_type', 'notarization_required', 'translation_required',
+  'translation_language', 'delivery_method',
+  'service_subtypes', 'service_role', 'performed_by_commissioner_id',
+  'delivery_mode', 'mobile_address', 'travel_fee_cents',
+  'discount_cents', 'discount_reason',
+  'cancelled_reason',
+  'customer_name', 'customer_email', 'customer_phone',
+  'customer_address_street', 'customer_address_unit', 'customer_address_city',
+  'customer_address_province', 'customer_address_postal', 'customer_address_country',
+  'customer_notes',
+  'tracking_to_gov', 'tracking_from_gov',
+  'notes_internal',
+];
 
 export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
   const staff = await verifyStaff(req, 'read');
@@ -41,6 +72,14 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
 
   const { id } = ctx.params;
   const { items, ...orderFields } = parsed.data;
+
+  // Snapshot the order before updating so we can diff for the audit log.
+  const { data: beforeOrder } = await supabaseAdmin
+    .from('co_orders')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (!beforeOrder) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
 
   const updateFields: Record<string, unknown> = { ...orderFields };
   if (orderFields.status === 'cancelled') {
@@ -102,6 +141,49 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
       console.error('Order update error', updErr);
       return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
     }
+  }
+
+  // Audit log
+  const fieldChanges = diffFields(beforeOrder, updateFields, AUDITED_FIELDS);
+  const isCancel = orderFields.status === 'cancelled' && beforeOrder.status !== 'cancelled';
+  const isComplete = orderFields.status === 'completed' && beforeOrder.status !== 'completed';
+
+  if (items) {
+    await logOrderEvent({
+      orderId: id,
+      actor: { id: staff.id, fullName: staff.fullName, email: staff.email, role: staff.role },
+      eventType: 'order.items.update',
+      summary: `Updated line items (${items.length} item${items.length === 1 ? '' : 's'})`,
+      changes: { items_count: items.length, ...(fieldChanges.discount_cents ? { discount_cents: fieldChanges.discount_cents } : {}) },
+    });
+  }
+
+  if (isCancel) {
+    await logOrderEvent({
+      orderId: id,
+      actor: { id: staff.id, fullName: staff.fullName, email: staff.email, role: staff.role },
+      eventType: 'order.cancel',
+      summary: orderFields.cancelled_reason
+        ? `Cancelled order: ${orderFields.cancelled_reason}`
+        : 'Cancelled order',
+      changes: { cancelled_reason: orderFields.cancelled_reason ?? null },
+    });
+  } else if (isComplete) {
+    await logOrderEvent({
+      orderId: id,
+      actor: { id: staff.id, fullName: staff.fullName, email: staff.email, role: staff.role },
+      eventType: 'order.complete',
+      summary: 'Marked order as completed',
+    });
+  } else if (Object.keys(fieldChanges).length > 0) {
+    const summary = `Updated ${Object.keys(fieldChanges).join(', ')}`;
+    await logOrderEvent({
+      orderId: id,
+      actor: { id: staff.id, fullName: staff.fullName, email: staff.email, role: staff.role },
+      eventType: 'order.update',
+      summary,
+      changes: fieldChanges,
+    });
   }
 
   return NextResponse.json({ ok: true });
