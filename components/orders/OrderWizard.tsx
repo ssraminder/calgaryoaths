@@ -13,6 +13,8 @@ import OrderRealtime from './OrderRealtime';
 import TaxProvinceSelect from './TaxProvinceSelect';
 import CustomerInfoForm, { type CustomerFormValues } from './CustomerInfoForm';
 import OrderEventsLog from './OrderEventsLog';
+import OrderEmailsLog from './OrderEmailsLog';
+import SendEmailModal from './SendEmailModal';
 import { computeTotals, formatCents, type TaxRateRow } from '@/lib/orders/pricing';
 import type { Order, OrderItem, OrderIdPhoto, PaymentMethod } from '@/lib/orders/types';
 
@@ -44,6 +46,8 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
   const [error, setError] = useState<string | null>(null);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailsRefreshKey, setEmailsRefreshKey] = useState(0);
   const [editing, setEditing] = useState(false);
   const [eventsRefreshKey, setEventsRefreshKey] = useState(0);
   const [customerEdits, setCustomerEdits] = useState<CustomerFormValues>({
@@ -215,20 +219,28 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
     router.push(`${basePath}/${order.id}/invoice`);
   }
 
-  async function emailCustomer() {
+  function openEmailModal() {
     if (!order.customer_email) {
       alert('No customer email on file for this order.');
       return;
     }
-    if (!confirm(`Send invoice${order.signature_url ? ' and signed terms' : ''} to ${order.customer_email}?`)) return;
+    setEmailModalOpen(true);
+  }
+  async function sendEmailToCustomer(include: { invoice: boolean; terms: boolean }) {
     setEmailSending(true);
     try {
-      const res = await fetch(`/api/orders/${order.id}/send-email`, { method: 'POST' });
+      const res = await fetch(`/api/orders/${order.id}/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ include }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         alert(data.error || 'Failed to send email');
         return;
       }
+      setEmailModalOpen(false);
+      setEmailsRefreshKey((k) => k + 1);
       alert(`Email sent to ${data.sent_to}.`);
     } finally {
       setEmailSending(false);
@@ -674,20 +686,32 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
             </a>
             <button
               type="button"
-              onClick={emailCustomer}
+              onClick={openEmailModal}
               disabled={emailSending || !order.customer_email}
               className="flex items-center gap-1.5 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              title={order.customer_email ? `Email invoice${order.signature_url ? ' & signed terms' : ''} to ${order.customer_email}` : 'No customer email on file'}
+              title={order.customer_email ? `Choose what to email to ${order.customer_email}` : 'No customer email on file'}
             >
-              <Mail className="h-4 w-4" /> {emailSending ? 'Sending…' : 'Email to customer'}
+              <Mail className="h-4 w-4" /> Email to customer
             </button>
           </div>
         </section>
       )}
 
+      <OrderEmailsLog orderId={order.id} refreshKey={emailsRefreshKey} />
+
       <OrderEventsLog orderId={order.id} refreshKey={eventsRefreshKey} />
 
       <HandoffModal orderId={order.id} open={handoffOpen} onClose={() => setHandoffOpen(false)} onTokenIssued={reload} />
+
+      {order.customer_email && (
+        <SendEmailModal
+          open={emailModalOpen}
+          onClose={() => setEmailModalOpen(false)}
+          onSend={sendEmailToCustomer}
+          customerEmail={order.customer_email}
+          hasSignedTerms={Boolean(order.signature_url && order.terms_accepted_at)}
+        />
+      )}
     </div>
   );
 }

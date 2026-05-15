@@ -57,5 +57,6 @@ export async function sendEmail({ to, replyTo, subject, html, fromName, fromEmai
     throw new Error(`Brevo API error ${res.status}: ${text}`);
   }
 
-  return res.json();
+  const json = (await res.json().catch(() => ({}))) as { messageId?: string } & Record<string, unknown>;
+  return json;
 }

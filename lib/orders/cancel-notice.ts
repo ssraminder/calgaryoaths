@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
+import { recordOrderEmail, normalizeMessageId } from '@/lib/orders/email-log';
 
 interface OrderForNotice {
   id: string;
@@ -71,11 +72,18 @@ export async function sendCancellationNotices(order: OrderForNotice): Promise<Se
   // Customer notice
   if (order.customer_email) {
     try {
-      await sendEmail({
+      const resp = await sendEmail({
         to: order.customer_email,
         subject,
         html: customerBody(order),
         replyTo: 'info@calgaryoaths.com',
+      });
+      await recordOrderEmail({
+        orderId: order.id,
+        messageId: normalizeMessageId(resp?.messageId),
+        recipient: order.customer_email,
+        subject,
+        kind: 'cancellation_customer',
       });
       result.customerSent = true;
     } catch (err) {
@@ -93,11 +101,19 @@ export async function sendCancellationNotices(order: OrderForNotice): Promise<Se
         .single();
       if (commissioner?.email) {
         result.partnerEmail = commissioner.email;
-        await sendEmail({
+        const partnerSubject = `${subject} (assigned to you)`;
+        const resp = await sendEmail({
           to: commissioner.email,
-          subject: `${subject} (assigned to you)`,
+          subject: partnerSubject,
           html: partnerBody(order, commissioner.name || null),
           replyTo: 'info@calgaryoaths.com',
+        });
+        await recordOrderEmail({
+          orderId: order.id,
+          messageId: normalizeMessageId(resp?.messageId),
+          recipient: commissioner.email,
+          subject: partnerSubject,
+          kind: 'cancellation_partner',
         });
         result.partnerSent = true;
       }
