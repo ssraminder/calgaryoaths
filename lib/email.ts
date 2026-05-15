@@ -1,3 +1,10 @@
+type EmailAttachment = {
+  /** Filename shown to the recipient (e.g. "signed-terms.pdf"). */
+  name: string;
+  /** Raw bytes; will be base64-encoded for the Brevo API. */
+  content: Buffer | Uint8Array;
+};
+
 type SendEmailOptions = {
   to: string | string[];
   replyTo?: string;
@@ -5,9 +12,10 @@ type SendEmailOptions = {
   html: string;
   fromName?: string;
   fromEmail?: string;
+  attachments?: EmailAttachment[];
 };
 
-export async function sendEmail({ to, replyTo, subject, html, fromName, fromEmail }: SendEmailOptions) {
+export async function sendEmail({ to, replyTo, subject, html, fromName, fromEmail, attachments }: SendEmailOptions) {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) throw new Error('BREVO_API_KEY is not set');
 
@@ -25,6 +33,13 @@ export async function sendEmail({ to, replyTo, subject, html, fromName, fromEmai
 
   if (replyTo) {
     body.replyTo = { email: replyTo };
+  }
+
+  if (attachments && attachments.length > 0) {
+    body.attachment = attachments.map((a) => ({
+      name: a.name,
+      content: Buffer.from(a.content).toString('base64'),
+    }));
   }
 
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
