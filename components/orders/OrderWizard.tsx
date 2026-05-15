@@ -282,8 +282,8 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
         </section>
       )}
 
-      {/* Finalize */}
-      {showFinalize && (
+      {/* Customer details, signature, signed-terms, ID photos — visible from customer submission through to completed */}
+      {(showFinalize || showInvoice) && (
         <>
           <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-5 space-y-3">
             <h2 className="text-sm font-semibold text-gray-700">Customer details</h2>
@@ -323,23 +323,26 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
           <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-5">
             <IdPhotosSection orderId={order.id} required={idPhotosRequired} photos={photos} onChange={setPhotos} />
           </section>
-
-          <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-700">Payment</h2>
-            {idPhotosRequired && photos.length === 0 && (
-              <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
-                Reminder: capture ID photos for this notarization. You can record payment now and upload them after.
-              </div>
-            )}
-            <PaymentSection
-              totalCents={order.total_cents}
-              initialMethod={order.payment_method}
-              initialReference={order.payment_reference}
-              initialAmountCents={order.amount_paid_cents}
-              onRecord={recordPayment}
-            />
-          </section>
         </>
+      )}
+
+      {/* Payment recording — only before the order is paid */}
+      {showFinalize && (
+        <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-gray-700">Payment</h2>
+          {idPhotosRequired && photos.length === 0 && (
+            <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+              Reminder: capture ID photos for this notarization. You can record payment now and upload them after.
+            </div>
+          )}
+          <PaymentSection
+            totalCents={order.total_cents}
+            initialMethod={order.payment_method}
+            initialReference={order.payment_reference}
+            initialAmountCents={order.amount_paid_cents}
+            onRecord={recordPayment}
+          />
+        </section>
       )}
 
       {/* Apostille tracking (visible once paid; staff fill these while shipping) */}
