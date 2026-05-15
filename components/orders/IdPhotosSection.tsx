@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Camera, Trash2, Upload, Check, X } from 'lucide-react';
 import type { OrderIdPhoto } from '@/lib/orders/types';
 
 interface Props {
   orderId: string;
   required: boolean;
+  photos: OrderIdPhoto[];
+  onChange: (next: OrderIdPhoto[]) => void;
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -18,33 +20,17 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-export default function IdPhotosSection({ orderId, required }: Props) {
-  const [photos, setPhotos] = useState<OrderIdPhoto[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function IdPhotosSection({ orderId, required, photos, onChange }: Props) {
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function reload() {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/orders/${orderId}/id-photos`);
-      if (res.ok) {
-        const data = await res.json();
-        setPhotos(data.photos || []);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [orderId]);
-
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setUploading(true);
     try {
+      let next = photos;
       for (const file of Array.from(files)) {
         if (!file.type.startsWith('image/')) continue;
         const dataUrl = await fileToDataUrl(file);
@@ -56,7 +42,8 @@ export default function IdPhotosSection({ orderId, required }: Props) {
         });
         if (res.ok) {
           const data = await res.json();
-          setPhotos((prev) => [...prev, data.photo]);
+          next = [...next, data.photo];
+          onChange(next);
         }
       }
     } finally {
@@ -68,7 +55,7 @@ export default function IdPhotosSection({ orderId, required }: Props) {
   async function deletePhoto(photoId: string) {
     if (!confirm('Remove this ID photo?')) return;
     const res = await fetch(`/api/orders/${orderId}/id-photos/${photoId}`, { method: 'DELETE' });
-    if (res.ok) setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+    if (res.ok) onChange(photos.filter((p) => p.id !== photoId));
   }
 
   function startEdit(p: OrderIdPhoto) {
@@ -83,7 +70,7 @@ export default function IdPhotosSection({ orderId, required }: Props) {
       body: JSON.stringify({ label: editLabel }),
     });
     if (res.ok) {
-      setPhotos((prev) => prev.map((p) => p.id === photoId ? { ...p, label: editLabel } : p));
+      onChange(photos.map((p) => p.id === photoId ? { ...p, label: editLabel } : p));
       setEditingId(null);
     }
   }
@@ -120,9 +107,7 @@ export default function IdPhotosSection({ orderId, required }: Props) {
         onChange={(e) => handleFiles(e.target.files)}
       />
 
-      {loading ? (
-        <div className="text-xs text-gray-400">Loading…</div>
-      ) : photos.length === 0 ? (
+      {photos.length === 0 ? (
         <div className="rounded-md border border-dashed border-gray-300 p-6 text-center">
           <Camera className="mx-auto h-6 w-6 text-gray-400" />
           <p className="mt-2 text-xs text-gray-500">No ID photos uploaded yet</p>
