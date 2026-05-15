@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Smartphone, Tablet, Receipt, Printer, Check, AlertCircle, RefreshCw, FileText, Mail } from 'lucide-react';
+import { Save, Smartphone, Tablet, Receipt, Printer, Check, AlertCircle, RefreshCw, FileText, Mail, Pencil, X, Ban } from 'lucide-react';
 import LineItemsEditor from './LineItemsEditor';
 import ApostilleServiceFields, { apostileInitialFromOrder } from './ApostilleServiceFields';
 import NotarizationServiceFields, { notarizationInitialFromOrder } from './NotarizationServiceFields';
@@ -11,6 +11,8 @@ import PaymentSection from './PaymentSection';
 import HandoffModal from './HandoffModal';
 import OrderRealtime from './OrderRealtime';
 import TaxProvinceSelect from './TaxProvinceSelect';
+import CustomerInfoForm, { type CustomerFormValues } from './CustomerInfoForm';
+import OrderEventsLog from './OrderEventsLog';
 import { computeTotals, formatCents, type TaxRateRow } from '@/lib/orders/pricing';
 import type { Order, OrderItem, OrderIdPhoto, PaymentMethod } from '@/lib/orders/types';
 
@@ -42,6 +44,22 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
   const [error, setError] = useState<string | null>(null);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [eventsRefreshKey, setEventsRefreshKey] = useState(0);
+  const [customerEdits, setCustomerEdits] = useState<CustomerFormValues>({
+    customer_name: initialOrder.customer_name || '',
+    customer_email: initialOrder.customer_email || '',
+    customer_phone: initialOrder.customer_phone || '',
+    customer_address_street: initialOrder.customer_address_street || '',
+    customer_address_unit: initialOrder.customer_address_unit || '',
+    customer_address_city: initialOrder.customer_address_city || '',
+    customer_address_province: initialOrder.customer_address_province || '',
+    customer_address_postal: initialOrder.customer_address_postal || '',
+    customer_address_country: initialOrder.customer_address_country || 'Canada',
+    customer_notes: initialOrder.customer_notes || '',
+  });
+  const [editDiscountCents, setEditDiscountCents] = useState<number>(initialOrder.discount_cents ?? 0);
+  const [editDiscountReason, setEditDiscountReason] = useState<string>(initialOrder.discount_reason ?? '');
 
   // Service field state (controlled)
   const [apostilleFields, setApostilleFields] = useState(() => apostileInitialFromOrder(order));
@@ -84,6 +102,21 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
       setItems(data.items || []);
       if (data.order.order_type === 'apostille') setApostilleFields(apostileInitialFromOrder(data.order));
       else setNotarizationFields(notarizationInitialFromOrder(data.order));
+      setCustomerEdits({
+        customer_name: data.order.customer_name || '',
+        customer_email: data.order.customer_email || '',
+        customer_phone: data.order.customer_phone || '',
+        customer_address_street: data.order.customer_address_street || '',
+        customer_address_unit: data.order.customer_address_unit || '',
+        customer_address_city: data.order.customer_address_city || '',
+        customer_address_province: data.order.customer_address_province || '',
+        customer_address_postal: data.order.customer_address_postal || '',
+        customer_address_country: data.order.customer_address_country || 'Canada',
+        customer_notes: data.order.customer_notes || '',
+      });
+      setEditDiscountCents(data.order.discount_cents ?? 0);
+      setEditDiscountReason(data.order.discount_reason ?? '');
+      setEventsRefreshKey((k) => k + 1);
     }
   }, [order.id]);
 
@@ -202,12 +235,112 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
     }
   }
 
+  async function saveEdits() {
+    if ((order.status === 'paid' || order.status === 'completed')
+      && !confirm('This order is already paid. Editing line items or discount will change the recorded totals. Continue?')) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const payload: Record<string, unknown> = {
+        items: items.map((it, idx) => ({
+          position: idx,
+          item_type: it.item_type,
+          description: it.description || it.item_type || 'Item',
+          quantity: it.quantity,
+          unit_price_cents: it.unit_price_cents,
+          gov_fee_cents: it.gov_fee_cents ?? 0,
+          notes: it.notes,
+        })),
+        tax_province_code: taxProvinceCode,
+        discount_cents: editDiscountCents || 0,
+        discount_reason: editDiscountReason || null,
+        customer_name: customerEdits.customer_name,
+        customer_email: customerEdits.customer_email,
+        customer_phone: customerEdits.customer_phone,
+        customer_address_street: customerEdits.customer_address_street || null,
+        customer_address_unit: customerEdits.customer_address_unit || null,
+        customer_address_city: customerEdits.customer_address_city || null,
+        customer_address_province: customerEdits.customer_address_province || null,
+        customer_address_postal: customerEdits.customer_address_postal || null,
+        customer_address_country: customerEdits.customer_address_country || null,
+        customer_notes: customerEdits.customer_notes || null,
+      };
+      if (order.order_type === 'apostille') {
+        Object.assign(payload, {
+          destination_country: apostilleFields.destination_country || null,
+          authentication_type: apostilleFields.authentication_type || null,
+          notarization_required: apostilleFields.notarization_required,
+          translation_required: apostilleFields.translation_required,
+          translation_language: apostilleFields.translation_language || null,
+          delivery_method: apostilleFields.delivery_method || null,
+          expedited: apostilleFields.expedited,
+          estimated_turnaround_days: apostilleFields.estimated_turnaround_days === '' ? null : apostilleFields.estimated_turnaround_days,
+          notes_internal: apostilleFields.notes_internal || null,
+        });
+      } else {
+        Object.assign(payload, {
+          service_role: notarizationFields.service_role || null,
+          performed_by_commissioner_id: notarizationFields.performed_by_commissioner_id || null,
+          service_subtypes: notarizationFields.service_subtypes,
+          delivery_mode: notarizationFields.delivery_mode || null,
+          mobile_address: notarizationFields.mobile_address || null,
+          travel_fee_cents: notarizationFields.travel_fee_cents,
+          expedited: notarizationFields.expedited,
+          estimated_turnaround_days: notarizationFields.estimated_turnaround_days === '' ? null : notarizationFields.estimated_turnaround_days,
+          notes_internal: notarizationFields.notes_internal || null,
+        });
+      }
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setSavedAt(new Date());
+      setEditing(false);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function cancelOrder() {
+    const reason = prompt('Reason for cancelling this order? (visible in the change log)');
+    if (reason === null) return;
+    const trimmed = reason.trim();
+    if (!trimmed) { alert('A reason is required to cancel an order.'); return; }
+    if (!confirm(`Cancel order ${order.order_number}? This cannot be undone here.`)) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled', cancelled_reason: trimmed }),
+      });
+      if (!res.ok) {
+        alert('Failed to cancel order');
+        return;
+      }
+      setEditing(false);
+      await reload();
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const idPhotosRequired = order.order_type === 'notarization';
 
   const statusLabel = STATUS_LABELS[order.status];
   const showSetup = order.status === 'draft' || order.status === 'awaiting_customer';
   const showFinalize = ['customer_completed', 'awaiting_payment'].includes(order.status);
   const showInvoice = order.status === 'paid' || order.status === 'completed';
+  const isCancelled = order.status === 'cancelled';
+  const canEdit = !isCancelled && !showSetup; // setup section already exposes editing
+  const canCancel = !isCancelled && order.status !== 'completed';
 
   return (
     <div className="space-y-5">
@@ -225,6 +358,23 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-400">
           {savedAt && <span>Saved {savedAt.toLocaleTimeString()}</span>}
+          {canEdit && !editing && (
+            <button
+              onClick={() => setEditing(true)}
+              className="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-gray-700 hover:bg-gray-50"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit order
+            </button>
+          )}
+          {canCancel && (
+            <button
+              onClick={cancelOrder}
+              disabled={saving}
+              className="flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              <Ban className="h-3.5 w-3.5" /> Cancel order
+            </button>
+          )}
           <button
             onClick={reload}
             className="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-gray-600 hover:bg-gray-50"
@@ -234,10 +384,101 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
         </div>
       </div>
 
+      {isCancelled && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p className="font-semibold">Order cancelled</p>
+          {order.cancelled_reason && <p className="text-xs mt-0.5">Reason: {order.cancelled_reason}</p>}
+          {order.cancelled_at && <p className="text-xs">at {new Date(order.cancelled_at).toLocaleString()}</p>}
+        </div>
+      )}
+
       {error && (
         <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           <AlertCircle className="h-4 w-4 mt-0.5" /> {error}
         </div>
+      )}
+
+      {/* Edit order panel */}
+      {editing && canEdit && (
+        <section className="rounded-lg border border-amber-200 bg-amber-50/40 p-4 md:p-5 space-y-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800">Edit order</h2>
+              <p className="text-xs text-gray-600 mt-0.5">Changes are recorded in the change log below.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setEditing(false); reload(); }}
+              className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+            >
+              <X className="h-3.5 w-3.5" /> Discard
+            </button>
+          </div>
+
+          <div className="rounded-md border border-gray-200 bg-white p-4">
+            <CustomerInfoForm initial={customerEdits} onChange={setCustomerEdits} />
+          </div>
+
+          <div className="rounded-md border border-gray-200 bg-white p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700">Service & items</h3>
+            {order.order_type === 'apostille' ? (
+              <ApostilleServiceFields values={apostilleFields} onChange={setApostilleFields} />
+            ) : (
+              <NotarizationServiceFields values={notarizationFields} onChange={setNotarizationFields} />
+            )}
+            <LineItemsEditor orderType={order.order_type} items={items} onChange={setItems} />
+          </div>
+
+          <div className="rounded-md border border-gray-200 bg-white p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <TaxProvinceSelect
+              value={taxProvinceCode}
+              onChange={(code) => setTaxProvinceCode(code)}
+              rates={taxRates}
+            />
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Discount (cents)</label>
+              <input
+                type="number"
+                min={0}
+                value={editDiscountCents}
+                onChange={(e) => setEditDiscountCents(parseInt(e.target.value || '0', 10) || 0)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+              <p className="mt-1 text-[10px] text-gray-500">Entered in cents. {formatCents(editDiscountCents)}</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Discount reason</label>
+              <input
+                type="text"
+                value={editDiscountReason}
+                onChange={(e) => setEditDiscountReason(e.target.value)}
+                placeholder="Optional"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="md:col-span-3 space-y-0.5 md:text-right">
+              <div className="text-xs text-gray-500">Subtotal {formatCents(totals.subtotalCents)}</div>
+              <div className="text-xs text-gray-500">{totals.tax.label} — {formatCents(totals.taxCents)}</div>
+              <div className="text-base font-semibold text-gray-900">Total {formatCents(totals.totalCents)}</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-amber-200 pt-3">
+            <button
+              type="button"
+              onClick={saveEdits}
+              disabled={saving}
+              className="flex items-center gap-1.5 rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save changes'}
+            </button>
+            {showInvoice && (
+              <p className="text-xs text-amber-800">
+                This order is already {order.status}. Saving will update recorded totals.
+              </p>
+            )}
+          </div>
+        </section>
       )}
 
       {/* Setup stage */}
@@ -443,6 +684,8 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
           </div>
         </section>
       )}
+
+      <OrderEventsLog orderId={order.id} refreshKey={eventsRefreshKey} />
 
       <HandoffModal orderId={order.id} open={handoffOpen} onClose={() => setHandoffOpen(false)} onTokenIssued={reload} />
     </div>
