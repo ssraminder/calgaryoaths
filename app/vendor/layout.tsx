@@ -56,6 +56,11 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     );
   }
 
+  // Invoice pages render without vendor chrome (print-ready, customer-facing)
+  if (pathname?.endsWith('/invoice')) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
       <VendorViewportMeta />

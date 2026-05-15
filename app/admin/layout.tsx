@@ -57,6 +57,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  // Invoice pages render without admin chrome (print-ready, customer-facing)
+  if (pathname?.endsWith('/invoice')) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
