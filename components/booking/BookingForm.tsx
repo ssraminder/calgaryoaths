@@ -17,7 +17,7 @@ const detailsSchema = z.object({
   phone: z.string().min(10, 'Phone number required'),
   deliveryMode: z.enum(['in_office', 'mobile', 'virtual']).default('in_office'),
   customerAddress: z.string().optional(),
-  commissionerId: z.string().min(1, 'Please choose a location'),
+  commissionerId: z.string().default(''),
   notes: z.string().max(500).optional(),
 });
 type DetailsForm = z.infer<typeof detailsSchema>;
@@ -293,7 +293,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFilter, timeFilter]);
 
-  const totalSteps = selectedService?.requiresReview ? 3 : 4;
+  const totalSteps = selectedService?.requiresReview ? 2 : 4;
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<DetailsForm>({
     resolver: zodResolver(detailsSchema),
@@ -465,7 +465,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
             />
           )}
 
-          {selectedService?.requiresReview && (
+          {selectedService?.requiresReview && selectedService.reviewReason && (
             <div className="mt-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-card p-3 text-xs text-amber-800">
               <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
               <p>{selectedService.reviewReason}</p>
@@ -475,7 +475,15 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
           <button
             type="button"
             disabled={!selectedService || servicesLoading}
-            onClick={() => { trackServiceSelected(selectedService!.name); loadOptions(selectedService!.slug); setStep(2); }}
+            onClick={() => {
+              trackServiceSelected(selectedService!.name);
+              if (selectedService!.requiresReview) {
+                setStep(2);
+              } else {
+                loadOptions(selectedService!.slug);
+                setStep(2);
+              }
+            }}
             className="btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Continue <ChevronRight size={16} />
@@ -483,8 +491,8 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
         </div>
       )}
 
-      {/* ── Step 2: Choose commissioner ─────────────────────────────── */}
-      {step === 2 && (
+      {/* ── Step 2: Choose commissioner (non-review services only) ── */}
+      {step === 2 && !selectedService?.requiresReview && (
         <div className="p-4 sm:p-6">
           <StepDots step={2} total={totalSteps} />
           <div className="flex items-center gap-2 mb-4">
@@ -722,20 +730,34 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
         </div>
       )}
 
-      {/* ── Step 4: Details & Pay (or Step 3 for requires_review) ── */}
-      {((step === 4 && !selectedService?.requiresReview) || (step === 3 && selectedService?.requiresReview)) && (
+      {/* ── Step 4: Details & Pay (or Step 2 for requires_review) ── */}
+      {((step === 4 && !selectedService?.requiresReview) || (step === 2 && selectedService?.requiresReview)) && (
         <div className="p-4 sm:p-6">
-          <StepDots step={selectedService?.requiresReview ? 3 : 4} total={totalSteps} />
+          <StepDots step={selectedService?.requiresReview ? 2 : 4} total={totalSteps} />
 
           <div className="flex items-center gap-2 mb-4">
-            <button type="button" onClick={() => setStep(selectedService?.requiresReview ? 2 : 3)} className="text-mid-grey hover:text-charcoal transition-colors" aria-label="Back">
+            <button type="button" onClick={() => setStep(selectedService?.requiresReview ? 1 : 3)} className="text-mid-grey hover:text-charcoal transition-colors" aria-label="Back">
               <ChevronLeft size={18} />
             </button>
             <div>
-              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">Your details</h3>
-              <p className="text-xs text-mid-grey">{selectedService?.name} · {selectedOption?.locationName} · {selectedOption?.commissionerName}</p>
+              <h3 className="font-display font-semibold text-lg text-charcoal leading-tight">
+                {selectedService?.requiresReview ? 'Request a consultation' : 'Your details'}
+              </h3>
+              <p className="text-xs text-mid-grey">
+                {selectedService?.name}
+                {selectedOption && <> · {selectedOption.locationName} · {selectedOption.commissionerName}</>}
+              </p>
             </div>
           </div>
+
+          {selectedService?.requiresReview && (
+            <div className="flex items-start gap-2 bg-teal/5 border border-teal/20 rounded-card p-3 text-xs text-charcoal mb-4">
+              <CheckCircle size={14} className="text-teal flex-shrink-0 mt-0.5" />
+              <p>
+                Tell us what you need and we&apos;ll get back to you within 2 hours with pricing, next steps, and available times.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-4">
             <div>
@@ -874,12 +896,15 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1">
-                Notes <span className="text-mid-grey font-normal">(optional)</span>
+                {selectedService?.requiresReview ? 'Tell us what you need' : 'Notes'}{' '}
+                {!selectedService?.requiresReview && <span className="text-mid-grey font-normal">(optional)</span>}
               </label>
               <textarea
                 {...register('notes')}
-                rows={3}
-                placeholder="Any details we should know — urgency, document type, language preference…"
+                rows={selectedService?.requiresReview ? 4 : 3}
+                placeholder={selectedService?.requiresReview
+                  ? 'Describe what you need — document type, destination country, number of documents, urgency, preferred language…'
+                  : 'Any details we should know — urgency, document type, language preference…'}
                 className="w-full border border-border rounded-btn px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 transition resize-none"
               />
             </div>
