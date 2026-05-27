@@ -164,8 +164,10 @@ export default async function ServicesPage() {
           <h2 className="font-display font-bold text-2xl text-white mb-3">
             Not sure which service you need?
           </h2>
-          <p className="text-white/70 mb-6">Call us at <PhoneLink location="services" className="text-gold font-medium" /> and we&apos;ll point you in the right direction.</p>
-          <BookButton label="Book Your Appointment" variant="primary" size="lg" />
+          <p className="text-white/70 mb-6">Call us and we&apos;ll point you in the right direction.</p>
+          <a href="tel:+15876000746" className="btn-primary text-lg px-8 py-3 inline-block">
+            Call (587) 600-0746
+          </a>
         </div>
       </div>
     </div>
