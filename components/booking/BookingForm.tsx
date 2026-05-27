@@ -297,6 +297,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<DetailsForm>({
     resolver: zodResolver(detailsSchema),
+    defaultValues: { deliveryMode: 'in_office', commissionerId: '' },
   });
 
   // Delivery mode + dynamic travel fee
