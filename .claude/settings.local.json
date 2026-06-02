@@ -6,7 +6,11 @@
       "Bash(printf \"\\\\n\\\\n\\\\n\\\\n\\\\n\")",
       "Bash(yes \"\")",
       "Bash(npm install:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__tabs_create_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__browser_batch"
     ]
   }
 }
