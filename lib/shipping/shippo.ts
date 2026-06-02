@@ -157,6 +157,43 @@ async function fetchActiveCarrierAccountIds(apiKey: string): Promise<string[]> {
   return (data.results ?? []).filter((c) => c.active).map((c) => c.object_id);
 }
 
+async function createApostilleCustomsDeclaration(opts: {
+  apiKey: string;
+  parcel: Parcel;
+  originCountry: string;
+}): Promise<string | null> {
+  const { apiKey, parcel, originCountry } = opts;
+  const declaration = {
+    contents_type: 'DOCUMENTS',
+    contents_explanation: 'Apostille / authentication documents',
+    non_delivery_option: 'RETURN',
+    certify: true,
+    certify_signer: 'Calgary Oaths',
+    items: [
+      {
+        description: 'Apostille / authentication documents',
+        quantity: 1,
+        net_weight: parcel.weight_g.toString(),
+        mass_unit: 'g',
+        value_amount: '5.00',
+        value_currency: 'CAD',
+        origin_country: originCountry,
+      },
+    ],
+  };
+  const res = await fetch('https://api.goshippo.com/customs/declarations/', {
+    method: 'POST',
+    headers: {
+      'Authorization': `ShippoToken ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(declaration),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json().catch(() => ({}))) as { object_id?: string };
+  return data.object_id || null;
+}
+
 export async function fetchRates(opts: {
   origin: ShippingAddress;
   destination: ShippingAddress;
@@ -166,6 +203,11 @@ export async function fetchRates(opts: {
   const { origin, destination, parcel, apiKey } = opts;
 
   const carrierAccountIds = await fetchActiveCarrierAccountIds(apiKey);
+
+  const isInternational = origin.country.toUpperCase() !== destination.country.toUpperCase();
+  const customsDeclarationId = isInternational
+    ? await createApostilleCustomsDeclaration({ apiKey, parcel, originCountry: origin.country })
+    : null;
 
   const body: Record<string, unknown> = {
     address_from: toShippoAddress(origin),
@@ -184,6 +226,9 @@ export async function fetchRates(opts: {
   };
   if (carrierAccountIds.length > 0) {
     body.carrier_accounts = carrierAccountIds;
+  }
+  if (customsDeclarationId) {
+    body.customs_declaration = customsDeclarationId;
   }
 
   const res = await fetch('https://api.goshippo.com/shipments/', {
