@@ -223,6 +223,9 @@ export async function fetchRates(opts: {
       },
     ],
     async: false,
+    extra: {
+      billing: { party: 'SENDER' },
+    },
   };
   if (carrierAccountIds.length > 0) {
     body.carrier_accounts = carrierAccountIds;
