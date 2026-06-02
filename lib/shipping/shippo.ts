@@ -134,6 +134,29 @@ export class ShippoError extends Error {
   }
 }
 
+interface ShippoCarrierAccount {
+  object_id: string;
+  carrier: string;
+  active: boolean;
+}
+
+interface ShippoCarrierAccountsResponse {
+  results?: ShippoCarrierAccount[];
+}
+
+async function fetchActiveCarrierAccountIds(apiKey: string): Promise<string[]> {
+  const res = await fetch('https://api.goshippo.com/carrier_accounts/?results=100', {
+    method: 'GET',
+    headers: {
+      'Authorization': `ShippoToken ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) return [];
+  const data = (await res.json().catch(() => ({}))) as ShippoCarrierAccountsResponse;
+  return (data.results ?? []).filter((c) => c.active).map((c) => c.object_id);
+}
+
 export async function fetchRates(opts: {
   origin: ShippingAddress;
   destination: ShippingAddress;
@@ -142,7 +165,9 @@ export async function fetchRates(opts: {
 }): Promise<{ rates: NormalizedRate[]; messages: string[] }> {
   const { origin, destination, parcel, apiKey } = opts;
 
-  const body = {
+  const carrierAccountIds = await fetchActiveCarrierAccountIds(apiKey);
+
+  const body: Record<string, unknown> = {
     address_from: toShippoAddress(origin),
     address_to: toShippoAddress(destination),
     parcels: [
@@ -157,6 +182,9 @@ export async function fetchRates(opts: {
     ],
     async: false,
   };
+  if (carrierAccountIds.length > 0) {
+    body.carrier_accounts = carrierAccountIds;
+  }
 
   const res = await fetch('https://api.goshippo.com/shipments/', {
     method: 'POST',
