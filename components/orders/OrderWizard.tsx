@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Smartphone, Tablet, Receipt, Printer, Check, AlertCircle, RefreshCw, FileText, Mail, Pencil, X, Ban } from 'lucide-react';
+import { Save, Smartphone, Tablet, Receipt, Printer, Check, AlertCircle, RefreshCw, FileText, Mail, Pencil, X, Ban, Truck } from 'lucide-react';
 import LineItemsEditor from './LineItemsEditor';
 import ApostilleServiceFields, { apostileInitialFromOrder } from './ApostilleServiceFields';
 import NotarizationServiceFields, { notarizationInitialFromOrder } from './NotarizationServiceFields';
@@ -15,6 +15,7 @@ import CustomerInfoForm, { type CustomerFormValues } from './CustomerInfoForm';
 import OrderEventsLog from './OrderEventsLog';
 import OrderEmailsLog from './OrderEmailsLog';
 import SendEmailModal from './SendEmailModal';
+import ShippingRatesModal from './ShippingRatesModal';
 import { computeTotals, formatCents, type TaxRateRow } from '@/lib/orders/pricing';
 import type { Order, OrderItem, OrderIdPhoto, PaymentMethod } from '@/lib/orders/types';
 
@@ -47,6 +48,7 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [shippingModalOpen, setShippingModalOpen] = useState(false);
   const [emailsRefreshKey, setEmailsRefreshKey] = useState(0);
   const [editing, setEditing] = useState(false);
   const [eventsRefreshKey, setEventsRefreshKey] = useState(0);
@@ -570,6 +572,16 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
                 <span className="font-medium">
                   {[order.customer_address_unit, order.customer_address_street, order.customer_address_city, order.customer_address_province, order.customer_address_postal, order.customer_address_country].filter(Boolean).join(', ') || '—'}
                 </span>
+                {order.customer_address_street && order.customer_address_city && order.customer_address_postal && order.customer_address_country && (
+                  <button
+                    type="button"
+                    onClick={() => setShippingModalOpen(true)}
+                    className="ml-2 inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    title="Calculate courier shipping rates to this address"
+                  >
+                    <Truck className="h-3 w-3" /> Get shipping rates
+                  </button>
+                )}
               </div>
               {order.customer_notes && <div className="md:col-span-2"><span className="text-gray-500">Notes:</span> <span className="font-medium">{order.customer_notes}</span></div>}
             </div>
@@ -702,6 +714,12 @@ export default function OrderWizard({ order: initialOrder, items: initialItems, 
       <OrderEventsLog orderId={order.id} refreshKey={eventsRefreshKey} />
 
       <HandoffModal orderId={order.id} open={handoffOpen} onClose={() => setHandoffOpen(false)} onTokenIssued={reload} />
+
+      <ShippingRatesModal
+        open={shippingModalOpen}
+        onClose={() => setShippingModalOpen(false)}
+        order={order}
+      />
 
       {order.customer_email && (
         <SendEmailModal

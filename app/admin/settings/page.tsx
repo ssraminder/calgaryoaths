@@ -17,6 +17,15 @@ const REQUIRED_SETTINGS: { key: string; description: string }[] = [
   { key: 'google_ads_id', description: 'Google Ads Conversion ID (AW-XXXXXXXXXX)' },
   { key: 'google_ads_booking_label', description: 'Google Ads conversion label for online bookings' },
   { key: 'google_ads_phone_label', description: 'Google Ads conversion label for phone call clicks' },
+  { key: 'shippo_api_key', description: 'Shippo API key (Live: shippo_live_… / Test: shippo_test_…). Used by the on-demand shipping rate calculator on order pages.' },
+  { key: 'shipping_origin_company', description: 'Shipping origin — company name (default: Calgary Oaths)' },
+  { key: 'shipping_origin_street', description: 'Shipping origin — street address (default: 421 7 Ave SW)' },
+  { key: 'shipping_origin_unit', description: 'Shipping origin — unit / floor (default: Floor 30)' },
+  { key: 'shipping_origin_city', description: 'Shipping origin — city (default: Calgary)' },
+  { key: 'shipping_origin_province', description: 'Shipping origin — province / state code (default: AB)' },
+  { key: 'shipping_origin_postal', description: 'Shipping origin — postal code (default: T2P 4K9)' },
+  { key: 'shipping_origin_country', description: 'Shipping origin — ISO country code (default: CA)' },
+  { key: 'shipping_origin_phone', description: 'Shipping origin — phone (required by some carriers for international)' },
 ];
 
 export default function SettingsPage() {
