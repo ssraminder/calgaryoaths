@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { buildBookingReceiptPdf, receiptNumber } from '@/lib/bookings/receipt-pdf';
+import { buildBookingReceiptPdf, receiptNumber, fetchReceiptLogo } from '@/lib/bookings/receipt-pdf';
 
 // GET — stream the booking receipt PDF (inline in the browser / for download).
 export async function GET(
@@ -33,9 +33,11 @@ export async function GET(
         .single()
     : { data: null };
 
+  const logo = await fetchReceiptLogo();
+
   let pdfBytes: Uint8Array;
   try {
-    pdfBytes = await buildBookingReceiptPdf(booking, commissioner);
+    pdfBytes = await buildBookingReceiptPdf(booking, commissioner, logo);
   } catch (err) {
     console.error('Booking receipt PDF generation failed', err);
     return NextResponse.json({ error: 'Failed to generate receipt PDF' }, { status: 500 });
