@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Download, Mail } from 'lucide-react';
 import StatusBadge from '@/components/admin/StatusBadge';
 
 type Booking = {
@@ -27,6 +27,7 @@ type Booking = {
   cancelled_reason: string | null;
   created_at: string;
   updated_at: string;
+  delivery_mode: string | null;
 };
 
 const VALID_STATUSES = [
@@ -58,6 +59,10 @@ export default function BookingDetailPage() {
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelRefund, setCancelRefund] = useState(false);
+
+  // Receipt
+  const [sendingReceipt, setSendingReceipt] = useState(false);
+  const [receiptMsg, setReceiptMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     fetch(`/api/admin/bookings/${id}`)
@@ -91,6 +96,23 @@ export default function BookingDetailPage() {
       setAdminNotes(updated.admin_notes || '');
     }
     setSaving(false);
+  }
+
+  async function handleSendReceipt() {
+    setSendingReceipt(true);
+    setReceiptMsg(null);
+    try {
+      const res = await fetch(`/api/admin/bookings/${id}/send-receipt`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setReceiptMsg({ ok: true, text: `Receipt emailed to ${data.sent_to || booking?.email}.` });
+      } else {
+        setReceiptMsg({ ok: false, text: data.error || 'Failed to send receipt.' });
+      }
+    } catch {
+      setReceiptMsg({ ok: false, text: 'Failed to send receipt.' });
+    }
+    setSendingReceipt(false);
   }
 
   async function handleCancel() {
@@ -252,6 +274,38 @@ export default function BookingDetailPage() {
               >
                 Set Confirmed Time
               </button>
+            </div>
+          )}
+
+          {/* Receipt — for paid bookings */}
+          {booking.amount_paid != null && booking.status !== 'refunded' && (
+            <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-3">
+              <h2 className="font-medium text-gray-900">Receipt</h2>
+              <p className="text-sm text-gray-600">
+                Paid receipt (PDF) for <span className="font-medium">${(booking.amount_paid / 100).toFixed(2)}</span>, including GST breakdown.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <a
+                  href={`/api/admin/bookings/${id}/receipt`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Download PDF
+                </a>
+                <button
+                  onClick={handleSendReceipt}
+                  disabled={sendingReceipt}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50"
+                >
+                  <Mail className="h-4 w-4" />
+                  {sendingReceipt ? 'Sending...' : 'Email to Customer'}
+                </button>
+              </div>
+              {receiptMsg && (
+                <p className={`text-sm ${receiptMsg.ok ? 'text-green-600' : 'text-red-600'}`}>{receiptMsg.text}</p>
+              )}
             </div>
           )}
 
