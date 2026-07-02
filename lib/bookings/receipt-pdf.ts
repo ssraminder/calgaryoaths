@@ -40,6 +40,24 @@ export function receiptNumber(bookingId: string): string {
   return `RCPT-${bookingId.slice(0, 8).toUpperCase()}`;
 }
 
+/** Canonical Calgary Oaths logo (same asset used in the admin top bar). */
+export const RECEIPT_LOGO_URL =
+  'https://ogxklbdjffbhtlabwonl.supabase.co/storage/v1/object/public/assets/calgaryoaths.png';
+
+/**
+ * Best-effort fetch of the header logo. Returns null on any failure so receipt
+ * generation falls back to the text wordmark rather than breaking.
+ */
+export async function fetchReceiptLogo(): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(RECEIPT_LOGO_URL, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
 function sanitize(text: string): string {
   return text
     .replace(/[‘’‚‛]/g, "'")
@@ -104,10 +122,20 @@ function computeBreakdown(booking: ReceiptBooking) {
 export async function buildBookingReceiptPdf(
   booking: ReceiptBooking,
   commissioner: ReceiptCommissioner | null,
+  logo?: Uint8Array | null,
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  let logoImg: Awaited<ReturnType<typeof pdf.embedPng>> | null = null;
+  if (logo && logo.length > 0) {
+    try {
+      logoImg = await pdf.embedPng(logo);
+    } catch {
+      logoImg = null; // Fall back to the text wordmark on a bad/unsupported image.
+    }
+  }
 
   const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - MARGIN_TOP;
@@ -146,24 +174,46 @@ export async function buildBookingReceiptPdf(
   const isMobile = booking.delivery_mode === 'mobile';
   const recNum = receiptNumber(booking.id);
 
-  // Header: brand block + RECEIPT block
-  drawText('Calgary Oaths', MARGIN_X, { size: 18, font: bold });
-  drawText('RECEIPT', PAGE_WIDTH - MARGIN_X - bold.widthOfTextAtSize('RECEIPT', 14), { size: 14, font: bold });
-  nextLine(18, 2);
-  drawText('Commissioner of Oaths . Notary Public . Apostille', MARGIN_X, { size: 9, color: rgb(0.4, 0.4, 0.4) });
-  drawText(recNum, PAGE_WIDTH - MARGIN_X - font.widthOfTextAtSize(recNum, 10), { size: 10, color: rgb(0.2, 0.2, 0.2) });
-  nextLine(9, 2);
-  drawText('(587) 600-0746 . info@calgaryoaths.com', MARGIN_X, { size: 8, color: rgb(0.5, 0.5, 0.5) });
+  // Header: two independently-positioned columns, both anchored to the top.
+  const topY = y;
+  const rightX = PAGE_WIDTH - MARGIN_X;
   const dateStr = new Date(booking.created_at).toLocaleDateString('en-CA');
-  drawText(dateStr, PAGE_WIDTH - MARGIN_X - font.widthOfTextAtSize(dateStr, 9), { size: 9, color: rgb(0.4, 0.4, 0.4) });
-  nextLine(8, 4);
-  if (commissioner?.gst_number) {
-    const gstLine = `GST/HST No.: ${commissioner.gst_number}`;
-    drawText(gstLine, PAGE_WIDTH - MARGIN_X - font.widthOfTextAtSize(gstLine, 8), { size: 8, color: rgb(0.5, 0.5, 0.5) });
-    nextLine(8, 8);
-  } else {
-    nextLine(0, 8);
-  }
+
+  // Right column: RECEIPT title, number, date, GST no.
+  const rightBottom = (() => {
+    let ry = topY;
+    const put = (text: string, size: number, useFont: typeof font, color: ReturnType<typeof rgb>) => {
+      const s = sanitize(text);
+      page.drawText(s, { x: rightX - useFont.widthOfTextAtSize(s, size), y: ry - size, size, font: useFont, color });
+      ry -= size + 4;
+    };
+    put('RECEIPT', 14, bold, rgb(0.1, 0.1, 0.1));
+    put(recNum, 10, font, rgb(0.2, 0.2, 0.2));
+    put(dateStr, 9, font, rgb(0.4, 0.4, 0.4));
+    if (commissioner?.gst_number) put(`GST/HST No.: ${commissioner.gst_number}`, 8, font, rgb(0.5, 0.5, 0.5));
+    return ry;
+  })();
+
+  // Left column: logo (or text wordmark) + tagline + contact.
+  const leftBottom = (() => {
+    let ly = topY;
+    if (logoImg) {
+      const h = 50;
+      const w = h * (logoImg.width / logoImg.height);
+      page.drawImage(logoImg, { x: MARGIN_X, y: ly - h, width: w, height: h });
+      ly -= h + 6;
+    } else {
+      page.drawText('Calgary Oaths', { x: MARGIN_X, y: ly - 18, size: 18, font: bold, color: rgb(0.1, 0.1, 0.1) });
+      ly -= 18 + 4;
+    }
+    page.drawText('Commissioner of Oaths . Notary Public . Apostille', { x: MARGIN_X, y: ly - 9, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
+    ly -= 9 + 4;
+    page.drawText('(587) 600-0746 . info@calgaryoaths.com', { x: MARGIN_X, y: ly - 8, size: 8, font, color: rgb(0.5, 0.5, 0.5) });
+    ly -= 8 + 4;
+    return ly;
+  })();
+
+  y = Math.min(leftBottom, rightBottom) - 8;
   drawDivider(rgb(0.6, 0.6, 0.6), 1);
 
   // Bill to + Service columns
