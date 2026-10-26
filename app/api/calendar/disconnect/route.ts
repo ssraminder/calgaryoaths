@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyVendor } from '@/lib/vendor-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { clearSyncedBlocks } from '@/lib/calendar-sync';
 
 export async function POST(req: NextRequest) {
   const vendor = await verifyVendor(req);
@@ -21,12 +22,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Remove calendar-synced blocks from co_custom_times
-  await supabaseAdmin
-    .from('co_custom_times')
-    .delete()
-    .eq('commissioner_id', vendor.commissionerId)
-    .eq('source', 'calendar');
+  // Remove this connection's synced busy blocks (other connected calendars keep theirs)
+  await clearSyncedBlocks({ id: conn.id, commissioner_id: vendor.commissionerId });
 
   // Delete the connection
   await supabaseAdmin.from('co_calendar_connections').delete().eq('id', connectionId);
