@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { syncBookingCalendarEvents } from '@/lib/calendar-sync';
+import { withBookingLocations } from '@/lib/booking-location';
 
 export async function GET(
   req: NextRequest,
@@ -21,7 +22,8 @@ export async function GET(
     return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
   }
 
-  return NextResponse.json(data);
+  const [withLocation] = await withBookingLocations([data]);
+  return NextResponse.json(withLocation);
 }
 
 export async function PATCH(

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, ExternalLink, Download, Mail } from 'lucide-react';
 import StatusBadge from '@/components/admin/StatusBadge';
+import BookingLocation from '@/components/shared/BookingLocation';
 
 type Booking = {
   id: string;
@@ -28,6 +29,10 @@ type Booking = {
   created_at: string;
   updated_at: string;
   delivery_mode: string | null;
+  customer_address?: string | null;
+  facility_name?: string | null;
+  location_name?: string | null;
+  location_address?: string | null;
 };
 
 const VALID_STATUSES = [
@@ -181,6 +186,13 @@ export default function BookingDetailPage() {
             <Row label="Service" value={booking.service_name} />
             <Row label="Commissioner" value={booking.commissioner_id} />
             <Row label="Appointment" value={fmtDate(booking.appointment_datetime)} />
+            <BookingLocation
+              deliveryMode={booking.delivery_mode}
+              locationName={booking.location_name ?? null}
+              locationAddress={booking.location_address ?? null}
+              customerAddress={booking.customer_address}
+              facilityName={booking.facility_name}
+            />
             <Row label="Documents" value={String(booking.num_documents)} />
             <Row label="Requires Review" value={booking.requires_review ? 'Yes' : 'No'} />
             <Row label="Created" value={fmtDate(booking.created_at)} />

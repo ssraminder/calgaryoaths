@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyVendor } from '@/lib/vendor-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { withBookingLocations } from '@/lib/booking-location';
 
 export async function GET(req: NextRequest) {
   const vendor = await verifyVendor(req);
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('co_bookings')
-    .select('id, name, email, phone, service_name, appointment_datetime, proposed_datetime, status, commissioner_id, vendor_payout_cents, vendor_gst_cents, vendor_total_payout_cents, notes, num_documents, delivery_mode, customer_address, facility_name, created_at')
+    .select('id, name, email, phone, service_name, appointment_datetime, proposed_datetime, status, commissioner_id, vendor_payout_cents, vendor_gst_cents, vendor_total_payout_cents, notes, num_documents, delivery_mode, customer_address, facility_name, location_id, created_at')
     .eq('commissioner_id', vendor.commissionerId)
     .order('created_at', { ascending: false });
 
@@ -19,5 +20,5 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+  return NextResponse.json(await withBookingLocations(data ?? []));
 }

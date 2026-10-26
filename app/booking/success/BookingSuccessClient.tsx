@@ -2,15 +2,34 @@
 // Displays pending commissioner review notice, next steps, and cancellation info.
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle, Clock, Phone } from 'lucide-react';
+import { CheckCircle, Clock, Phone, MapPin, Calendar, ExternalLink } from 'lucide-react';
 import { trackBookingConversion, trackPhoneClick } from '@/lib/analytics';
+
+type BookingSummary = {
+  serviceName: string | null;
+  appointmentDatetime: string | null;
+  deliveryMode: string | null;
+  locationName: string | null;
+  locationAddress: string | null;
+  commissionerName: string | null;
+};
 
 export default function BookingSuccessClient() {
   const params = useSearchParams();
   const confirmed = params.get('appointment') === 'confirmed';
+  const bookingId = params.get('booking');
+  const [summary, setSummary] = useState<BookingSummary | null>(null);
+
+  useEffect(() => {
+    if (!bookingId) return;
+    fetch(`/api/booking/summary?id=${encodeURIComponent(bookingId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setSummary(d))
+      .catch(() => {});
+  }, [bookingId]);
 
   useEffect(() => {
     if (confirmed) {
@@ -42,6 +61,9 @@ export default function BookingSuccessClient() {
             Your payment was successful and your appointment request has been submitted.
           </p>
         </div>
+
+        {/* Appointment details */}
+        {summary && <AppointmentCard summary={summary} />}
 
         {/* Commissioner review notice */}
         <div className="bg-amber-50 border border-amber-200 rounded-card p-5 mb-8">
@@ -103,6 +125,59 @@ export default function BookingSuccessClient() {
         <div className="text-center mt-6">
           <Link href="/" className="btn-primary inline-flex">Back to Calgary Oaths</Link>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AppointmentCard({ summary }: { summary: BookingSummary }) {
+  const when = summary.appointmentDatetime
+    ? new Date(summary.appointmentDatetime).toLocaleString('en-CA', {
+        timeZone: 'America/Edmonton',
+        dateStyle: 'full',
+        timeStyle: 'short',
+      })
+    : null;
+  const isMobile = summary.deliveryMode === 'mobile';
+  const isVirtual = summary.deliveryMode === 'virtual';
+
+  return (
+    <div className="card mb-8 space-y-4" data-testid="appointment-summary">
+      <h2 className="font-display font-semibold text-lg text-charcoal">Your appointment</h2>
+      {summary.serviceName && (
+        <p className="text-sm text-charcoal">
+          <strong>{summary.serviceName}</strong>
+          {summary.commissionerName && <> with {summary.commissionerName}</>}
+        </p>
+      )}
+      {when && (
+        <div className="flex items-start gap-3 text-sm text-charcoal">
+          <Calendar size={18} className="mt-0.5 flex-shrink-0 text-gold" />
+          <span>{when} <span className="text-mid-grey">(requested)</span></span>
+        </div>
+      )}
+      <div className="flex items-start gap-3 text-sm text-charcoal">
+        <MapPin size={18} className="mt-0.5 flex-shrink-0 text-gold" />
+        {isMobile ? (
+          <span>Mobile service — your commissioner will come to the address you provided.</span>
+        ) : isVirtual ? (
+          <span>Virtual appointment — you&apos;ll receive video call details by email.</span>
+        ) : summary.locationAddress ? (
+          <div>
+            {summary.locationName && <p className="font-medium">{summary.locationName}</p>}
+            <p>{summary.locationAddress}</p>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(summary.locationAddress)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-flex items-center gap-1 text-gold hover:underline"
+            >
+              Get directions <ExternalLink size={12} />
+            </a>
+          </div>
+        ) : (
+          <span>The address will be included in your confirmation email.</span>
+        )}
       </div>
     </div>
   );

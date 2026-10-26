@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
   // Fetch vendor's location
   const { data: locations } = await supabase
     .from('co_locations')
-    .select('id')
+    .select('id, name, address')
     .eq('commissioner_id', vendorId)
     .eq('active', true)
     .limit(1);
@@ -83,5 +83,7 @@ export async function GET(req: NextRequest) {
     vendor,
     services: enrichedServices,
     locationId: locations?.[0]?.id ?? null,
+    locationName: locations?.[0]?.name ?? null,
+    locationAddress: locations?.[0]?.address ?? vendor?.address ?? null,
   });
 }
