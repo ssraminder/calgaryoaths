@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         bookingId,
         serviceSlug: booking.service_slug,
       },
-      success_url: `${siteUrl}/booking/success?appointment=confirmed`,
+      success_url: `${siteUrl}/booking/success?appointment=confirmed&booking=${bookingId}`,
       cancel_url: `${siteUrl}/?booking_cancelled=1`,
     });
 

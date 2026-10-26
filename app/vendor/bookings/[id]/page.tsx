@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, AlertTriangle, CheckCircle, Clock, ClipboardCheck } from 'lucide-react';
 import StatusBadge from '@/components/admin/StatusBadge';
 import DocumentUpload from '@/components/vendor/DocumentUpload';
+import BookingLocation from '@/components/shared/BookingLocation';
 
 type Booking = {
   id: string;
@@ -23,6 +24,8 @@ type Booking = {
   delivery_mode: string | null;
   customer_address: string | null;
   facility_name: string | null;
+  location_name: string | null;
+  location_address: string | null;
   created_at: string;
 };
 
@@ -184,13 +187,13 @@ export default function VendorBookingDetailPage() {
             <div className="flex justify-between"><dt className="text-gray-500">Proposed Time</dt><dd className="font-medium text-orange-600">{fmtDate(booking.proposed_datetime)}</dd></div>
           )}
           <div className="flex justify-between"><dt className="text-gray-500">Documents</dt><dd>{booking.num_documents}</dd></div>
-          {booking.delivery_mode === 'mobile' && (
-            <>
-              <div className="flex justify-between"><dt className="text-gray-500">Delivery</dt><dd className="font-medium text-navy">Mobile Service</dd></div>
-              {booking.customer_address && <div className="flex justify-between"><dt className="text-gray-500">Address</dt><dd className="text-right max-w-[200px]">{booking.customer_address}</dd></div>}
-              {booking.facility_name && <div className="flex justify-between"><dt className="text-gray-500">Facility</dt><dd>{booking.facility_name}</dd></div>}
-            </>
-          )}
+          <BookingLocation
+            deliveryMode={booking.delivery_mode}
+            locationName={booking.location_name}
+            locationAddress={booking.location_address}
+            customerAddress={booking.customer_address}
+            facilityName={booking.facility_name}
+          />
           <div className="flex justify-between"><dt className="text-gray-500">Service Payout</dt><dd>{booking.vendor_payout_cents != null ? `$${(booking.vendor_payout_cents / 100).toFixed(2)}` : '—'}</dd></div>
           {(booking.vendor_gst_cents ?? 0) > 0 && (
             <div className="flex justify-between"><dt className="text-gray-500">GST (5%)</dt><dd>${((booking.vendor_gst_cents ?? 0) / 100).toFixed(2)}</dd></div>

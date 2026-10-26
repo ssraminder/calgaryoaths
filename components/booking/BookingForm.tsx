@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2, Calendar, Search } from 'lucide-react';
+import { ChevronRight, ChevronLeft, CheckCircle, Clock, AlertCircle, Loader2, Calendar, Search, MapPin } from 'lucide-react';
 import { BOOKING_FEES, type BookingService } from '@/lib/data/booking';
 import SlotPicker from '@/components/booking/SlotPicker';
 import BookingAddressInput from '@/components/booking/BookingAddressInput';
@@ -396,7 +396,7 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
 
       if (schedJson.paymentTransferred) {
         setRedirecting(true);
-        window.location.href = `${window.location.origin}/booking/success?appointment=confirmed`;
+        window.location.href = `${window.location.origin}/booking/success?appointment=confirmed&booking=${bid}`;
       } else if (schedJson.checkoutUrl) {
         const fee = BOOKING_FEES[selectedCommIdForSlots] ?? 0;
         trackSlotConfirmed(fee);
@@ -748,6 +748,12 @@ export default function BookingForm({ onClose, rebookToken }: { onClose: () => v
                 {selectedService?.name}
                 {selectedOption && <> · {selectedOption.locationName} · {selectedOption.commissionerName}</>}
               </p>
+              {selectedOption?.locationAddress && deliveryTab === 'in_office' && (
+                <p className="mt-0.5 flex items-start gap-1 text-xs text-charcoal">
+                  <MapPin size={12} className="mt-0.5 flex-shrink-0 text-gold" />
+                  {selectedOption.locationAddress}
+                </p>
+              )}
             </div>
           </div>
 

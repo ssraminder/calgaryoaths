@@ -202,7 +202,7 @@ export async function createCheckoutSessionForBooking(
     customer_email: booking.email,
     line_items: lineItems,
     metadata: { bookingId, serviceSlug: booking.service_slug },
-    success_url: opts.successUrl || `${siteUrl}/booking/success?appointment=confirmed`,
+    success_url: opts.successUrl || `${siteUrl}/booking/success?appointment=confirmed&booking=${bookingId}`,
     cancel_url: opts.cancelUrl || `${siteUrl}/?booking_cancelled=1`,
   });
 

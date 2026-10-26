@@ -89,6 +89,7 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
   const [vendor, setVendor] = useState<VendorProfile | null>(null);
   const [services, setServices] = useState<VendorService[]>([]);
   const [locationId, setLocationId] = useState<string | null>(null);
+  const [locationAddress, setLocationAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<VendorService | null>(null);
@@ -127,6 +128,7 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
       setVendor(data.vendor);
       setServices(data.services ?? []);
       setLocationId(data.locationId);
+      setLocationAddress(data.locationAddress ?? null);
       if (pricingData) setPricing(pricingData);
       setLoading(false);
     }).catch(() => { setError('Failed to load'); setLoading(false); });
@@ -196,7 +198,7 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
       }
       if (schedJson.paymentTransferred) {
         setRedirecting(true);
-        window.location.href = '/booking/success?appointment=confirmed';
+        window.location.href = `/booking/success?appointment=confirmed&booking=${bid}`;
       } else if (schedJson.checkoutUrl) {
         trackSlotConfirmed(bookingFee ?? 0);
         trackConversion(bookingFee ?? 0);
@@ -351,6 +353,16 @@ export default function VendorBookingForm({ vendorId }: { vendorId: string }) {
                       </button>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {deliveryTab === 'in_office' && locationAddress && (
+              <div className="flex items-start gap-2 rounded-card border border-border bg-bg p-3 text-sm text-charcoal">
+                <MapPin size={15} className="mt-0.5 flex-shrink-0 text-gold" />
+                <div>
+                  <p className="text-xs text-mid-grey">Appointment location</p>
+                  <p>{locationAddress}</p>
                 </div>
               </div>
             )}
