@@ -7,6 +7,7 @@ import StatCard from '@/components/admin/StatCard';
 import StatusBadge from '@/components/admin/StatusBadge';
 import PullToRefresh from '@/components/vendor/PullToRefresh';
 import PushNotificationPrompt from '@/components/vendor/PushNotificationPrompt';
+import CalendarStatusCard from '@/components/vendor/CalendarStatusCard';
 
 type Booking = {
   id: string;
@@ -56,6 +57,9 @@ export default function VendorDashboard() {
           <StatCard label="Today's Appointments" value={today.length} icon={CalendarCheck} href="/vendor/bookings" />
           <StatCard label="Confirmed Upcoming" value={confirmed.length} icon={Clock} href="/vendor/bookings?status=confirmed" />
         </div>
+
+        {/* Calendar connection status */}
+        <CalendarStatusCard />
 
         {/* Booking link */}
         <BookingLinkCard bookings={bookings} />

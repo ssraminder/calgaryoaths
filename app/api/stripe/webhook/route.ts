@@ -320,23 +320,10 @@ export async function POST(req: NextRequest) {
       }
 
       // ──────── PUSH BOOKING TO CONNECTED CALENDARS ────────
-      if (booking.commissioner_id && booking.appointment_datetime) {
-        try {
-          const { pushBookingToCalendars } = await import('@/lib/calendar-sync');
-          const apptStart = new Date(booking.appointment_datetime);
-          const apptEnd = new Date(apptStart.getTime() + 30 * 60 * 1000);
-          await pushBookingToCalendars(booking.commissioner_id, {
-            title: `${booking.service_name} — ${booking.name}`,
-            description: `Customer: ${booking.name}\nPhone: ${booking.phone}\nEmail: ${booking.email}${booking.notes ? `\nNotes: ${booking.notes}` : ''}`,
-            location: isMobile
-              ? booking.customer_address || 'Mobile service'
-              : location?.address || commissioner?.address || 'Calgary, AB',
-            startTime: apptStart.toISOString(),
-            endTime: apptEnd.toISOString(),
-          });
-        } catch (calErr) {
-          console.error('Calendar push error (non-blocking):', calErr);
-        }
+      // syncBookingCalendarEvents re-reads the booking, so it sees the status set above (never throws)
+      {
+        const { syncBookingCalendarEvents } = await import('@/lib/calendar-sync');
+        await syncBookingCalendarEvents(bookingId);
       }
 
       // ──────── PUSH NOTIFICATION TO VENDOR ────────
@@ -419,6 +406,12 @@ export async function POST(req: NextRequest) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', booking.id);
+
+        if (isFullRefund) {
+          // Remove the appointment from the vendor's connected calendars (never throws)
+          const { syncBookingCalendarEvents } = await import('@/lib/calendar-sync');
+          await syncBookingCalendarEvents(booking.id);
+        }
 
         // Notify admin of dashboard-initiated refund
         try {

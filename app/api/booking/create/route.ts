@@ -102,6 +102,10 @@ export async function POST(req: NextRequest) {
           })
           .eq('id', originalBooking.id);
 
+        // Payment carried over, so the new booking holds a time: push it to connected calendars (never throws)
+        const { syncBookingCalendarEvents } = await import('@/lib/calendar-sync');
+        await syncBookingCalendarEvents(booking.id);
+
         return NextResponse.json({ bookingId: booking.id, requiresReview: false, paymentTransferred: true });
       }
     }

@@ -5,22 +5,13 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { LayoutDashboard, CalendarCheck, Clock, Calendar, DollarSign, Settings, LogOut, FileText } from 'lucide-react';
+import { LogOut } from 'lucide-react';
+import { vendorNavItems, isVendorNavActive } from '@/components/vendor/nav-items';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
-const navItems = [
-  { label: 'Dashboard', href: '/vendor', icon: LayoutDashboard },
-  { label: 'Bookings', href: '/vendor/bookings', icon: CalendarCheck },
-  { label: 'Orders', href: '/vendor/orders', icon: FileText },
-  { label: 'Earnings', href: '/vendor/earnings', icon: DollarSign },
-  { label: 'Availability', href: '/vendor/availability', icon: Clock },
-  { label: 'Calendar', href: '/vendor/calendar', icon: Calendar },
-  { label: 'Settings', href: '/vendor/rates', icon: Settings },
-];
 
 export default function VendorSidebar({ userName }: { userName?: string }) {
   const pathname = usePathname();
@@ -50,8 +41,8 @@ export default function VendorSidebar({ userName }: { userName?: string }) {
         </Link>
       </div>
       <nav className="flex-1 space-y-1 px-2 py-3">
-        {navItems.map(({ label, href, icon: Icon }) => {
-          const active = href === '/vendor' ? pathname === '/vendor' : pathname.startsWith(href);
+        {vendorNavItems.map(({ label, href, icon: Icon }) => {
+          const active = isVendorNavActive(pathname, href);
           return (
             <Link
               key={href}

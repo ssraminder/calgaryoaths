@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { syncBookingCalendarEvents } from '@/lib/calendar-sync';
 import { sendEmail } from '@/lib/email';
 import { calendarLinksHtml, locationHtml } from '@/lib/calendar';
 import crypto from 'crypto';
@@ -80,6 +81,9 @@ export async function POST(req: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', booking.id);
+
+    // Push booking to vendor's connected calendars (never throws)
+    await syncBookingCalendarEvents(booking.id);
 
     // Get commissioner details for email
     const { data: commDetail } = await supabaseAdmin
