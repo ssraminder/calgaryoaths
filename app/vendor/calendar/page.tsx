@@ -2,24 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Calendar, Check, Trash2, RefreshCw, ExternalLink } from 'lucide-react';
+import { Calendar, Check, RefreshCw, ExternalLink, AlertTriangle, XCircle, Unplug } from 'lucide-react';
+import {
+  CalendarConnectionView as Connection,
+  connectionHealth,
+  formatLastSync,
+  oauthErrorMessage,
+  startOAuthConnect,
+} from '@/lib/calendar-ui';
 
-type Connection = {
-  id: string;
-  provider: 'google' | 'microsoft' | 'apple';
-  calendar_id: string;
-  display_name: string | null;
-  sync_enabled: boolean;
-  push_bookings: boolean;
-  pull_busy_times: boolean;
-  last_synced_at: string | null;
-  created_at: string;
-};
-
-const PROVIDER_LABELS: Record<string, { name: string; color: string; bg: string }> = {
-  google: { name: 'Google Calendar', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
-  microsoft: { name: 'Outlook / Microsoft 365', color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-200' },
-  apple: { name: 'Apple Calendar (iCloud)', color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' },
+const PROVIDER_LABELS: Record<string, { name: string; short: string; color: string; bg: string }> = {
+  google: { name: 'Google Calendar', short: 'Google Calendar', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+  microsoft: { name: 'Outlook / Microsoft 365', short: 'Outlook', color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-200' },
+  apple: { name: 'Apple Calendar (iCloud)', short: 'Apple Calendar', color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' },
 };
 
 export default function VendorCalendarPage() {
@@ -40,7 +35,7 @@ export default function VendorCalendarPage() {
     const connected = searchParams.get('connected');
     const err = searchParams.get('error');
     if (connected) setSuccess(`${PROVIDER_LABELS[connected]?.name || connected} connected successfully.`);
-    if (err) setError(`Connection failed: ${err.replace(/_/g, ' ')}`);
+    if (err) setError(oauthErrorMessage(err));
     fetchConnections();
   }, [searchParams]);
 
@@ -56,23 +51,10 @@ export default function VendorCalendarPage() {
     }
   }
 
-  async function connectProvider(provider: string) {
+  async function connectProvider(provider: 'google' | 'microsoft') {
     setError('');
-    try {
-      const res = await fetch('/api/calendar/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else if (data.error) {
-        setError(data.error);
-      }
-    } catch {
-      setError('Failed to start connection');
-    }
+    const err = await startOAuthConnect(provider);
+    if (err) setError(err);
   }
 
   async function connectApple() {
@@ -121,18 +103,22 @@ export default function VendorCalendarPage() {
     }
   }
 
-  async function toggleSetting(connectionId: string, field: string, value: boolean) {
+  async function toggleSetting(connectionId: string, field: 'sync_enabled' | 'push_bookings' | 'pull_busy_times', value: boolean) {
+    setError('');
+    setConnections((prev) => prev.map((c) => (c.id === connectionId ? { ...c, [field]: value } : c)));
     try {
-      await fetch('/api/calendar/connections', {
+      const res = await fetch('/api/calendar/connections', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connectionId, [field]: value }),
       });
-      setConnections((prev) =>
-        prev.map((c) => (c.id === connectionId ? { ...c, [field]: value } : c))
-      );
-    } catch {
-      setError('Failed to update setting');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to update setting');
+      if (data.warning) setError(data.warning);
+      fetchConnections();
+    } catch (e) {
+      setConnections((prev) => prev.map((c) => (c.id === connectionId ? { ...c, [field]: !value } : c)));
+      setError(e instanceof Error ? e.message : 'Failed to update setting');
     }
   }
 
@@ -142,8 +128,10 @@ export default function VendorCalendarPage() {
     try {
       const res = await fetch('/api/calendar/sync?push=true', { method: 'POST' });
       const data = await res.json();
-      if (data.errors > 0) {
-        setError(`Synced with ${data.errors} error(s). ${data.totalBlocks} busy blocks imported.`);
+      if (!res.ok) {
+        setError(data.error || 'Sync failed');
+      } else if (data.errors > 0) {
+        setError(`Sync finished with ${data.errors} problem(s) — see the calendar status below.`);
       } else {
         const parts = [];
         if (data.totalBlocks > 0) parts.push(`${data.totalBlocks} busy time blocks imported`);
@@ -159,6 +147,8 @@ export default function VendorCalendarPage() {
   }
 
   const connectedProviders = new Set(connections.map((c) => c.provider));
+  const needsReconnect = connections.filter((c) => connectionHealth(c) === 'needs_reconnect');
+  const configError = connections.filter((c) => connectionHealth(c) === 'config_error');
 
   if (loading) {
     return (
@@ -173,13 +163,13 @@ export default function VendorCalendarPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-gray-900">Calendar Integration</h1>
         {connections.length > 0 && (
           <button
             onClick={syncNow}
             disabled={syncing}
-            className="flex items-center gap-2 rounded-lg bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
+            className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Syncing...' : 'Sync Now'}
@@ -206,51 +196,115 @@ export default function VendorCalendarPage() {
         </div>
       )}
 
+      {/* Health banners — a broken connection must never be silent */}
+      {needsReconnect.map((conn) => (
+        <div key={`reconnect-${conn.id}`} role="alert" data-testid="reconnect-banner" className="rounded-lg border border-red-300 bg-red-50 p-4">
+          <div className="flex items-start gap-3">
+            <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-red-900">Reconnect {PROVIDER_LABELS[conn.provider].short}</p>
+              <p className="mt-1 text-sm text-red-800">
+                Your {PROVIDER_LABELS[conn.provider].short} connection stopped working. New bookings aren&apos;t being added to your
+                calendar and your busy times aren&apos;t blocking booking slots.
+              </p>
+              {conn.provider === 'apple' ? (
+                <button onClick={() => setShowAppleForm(true)} className="mt-3 min-h-[44px] rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+                  Re-enter Apple password
+                </button>
+              ) : (
+                <button onClick={() => connectProvider(conn.provider as 'google' | 'microsoft')} className="mt-3 min-h-[44px] rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+                  Reconnect {PROVIDER_LABELS[conn.provider].short}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+      {configError.map((conn) => (
+        <div key={`config-${conn.id}`} role="status" data-testid="config-error-banner" className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+            <div>
+              <p className="font-medium text-amber-900">{PROVIDER_LABELS[conn.provider].short} sync is paused</p>
+              <p className="mt-1 text-sm text-amber-800">
+                A problem on our side is stopping calendar sync. Our team has been notified and it will resume automatically —
+                you don&apos;t need to reconnect. Until then, please check new bookings in the portal.
+              </p>
+            </div>
+          </div>
+        </div>
+      ))}
+
       {/* Connected calendars */}
       {connections.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-medium text-gray-900">Connected Calendars</h2>
           {connections.map((conn) => {
             const label = PROVIDER_LABELS[conn.provider];
+            const health = connectionHealth(conn);
+            const badge = {
+              ok: { text: 'Connected', cls: 'bg-green-100 text-green-800' },
+              stale: { text: 'Sync delayed', cls: 'bg-amber-100 text-amber-800' },
+              paused: { text: 'Sync off', cls: 'bg-gray-200 text-gray-700' },
+              needs_reconnect: { text: 'Needs reconnect', cls: 'bg-red-100 text-red-800' },
+              config_error: { text: 'Paused', cls: 'bg-amber-100 text-amber-800' },
+            }[health];
             return (
-              <div key={conn.id} className={`rounded-lg border p-4 ${label.bg}`}>
-                <div className="flex items-start justify-between">
-                  <div>
+              <div key={conn.id} className={`rounded-lg border p-4 ${label.bg}`} data-testid={`connection-${conn.provider}`}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
                     <p className={`font-medium ${label.color}`}>{label.name}</p>
-                    <p className="text-sm text-gray-600">{conn.display_name || conn.calendar_id}</p>
-                    {conn.last_synced_at && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Last synced: {new Date(conn.last_synced_at).toLocaleString('en-CA', { timeZone: 'America/Edmonton' })}
-                      </p>
-                    )}
+                    <p className="truncate text-sm text-gray-600">{conn.display_name || conn.calendar_id}</p>
+                    <p className="mt-1 text-xs text-gray-500">Last synced: {formatLastSync(conn.last_synced_at)}</p>
                   </div>
-                  <button
-                    onClick={() => disconnect(conn.id)}
-                    className="text-red-500 hover:text-red-700 p-1"
-                    title="Disconnect"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge.cls}`}>{badge.text}</span>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-4 text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                <div className="mt-3 flex flex-col gap-3 text-sm sm:flex-row sm:flex-wrap sm:gap-4">
+                  <label className="flex min-h-[32px] cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={conn.sync_enabled}
+                      onChange={(e) => toggleSetting(conn.id, 'sync_enabled', e.target.checked)}
+                      className="h-4 w-4 rounded"
+                    />
+                    <span className="text-gray-700">Sync on</span>
+                  </label>
+                  <label className={`flex min-h-[32px] cursor-pointer items-center gap-2 ${conn.sync_enabled ? '' : 'opacity-50'}`}>
                     <input
                       type="checkbox"
                       checked={conn.pull_busy_times}
+                      disabled={!conn.sync_enabled}
                       onChange={(e) => toggleSetting(conn.id, 'pull_busy_times', e.target.checked)}
-                      className="rounded"
+                      className="h-4 w-4 rounded"
                     />
                     <span className="text-gray-700">Block busy times</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className={`flex min-h-[32px] cursor-pointer items-center gap-2 ${conn.sync_enabled ? '' : 'opacity-50'}`}>
                     <input
                       type="checkbox"
                       checked={conn.push_bookings}
+                      disabled={!conn.sync_enabled}
                       onChange={(e) => toggleSetting(conn.id, 'push_bookings', e.target.checked)}
-                      className="rounded"
+                      className="h-4 w-4 rounded"
                     />
                     <span className="text-gray-700">Add bookings to calendar</span>
                   </label>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() =>
+                      conn.provider === 'apple' ? setShowAppleForm(true) : connectProvider(conn.provider as 'google' | 'microsoft')
+                    }
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                  >
+                    <RefreshCw className="h-4 w-4" /> Reconnect
+                  </button>
+                  <button
+                    onClick={() => disconnect(conn.id)}
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <Unplug className="h-4 w-4" /> Disconnect
+                  </button>
                 </div>
               </div>
             );
@@ -268,13 +322,13 @@ export default function VendorCalendarPage() {
         {!connectedProviders.has('google') && (
           <button
             onClick={() => connectProvider('google')}
-            className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left hover:bg-gray-50 transition-colors"
+            className="flex min-h-[64px] w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left hover:bg-gray-50 transition-colors"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
               <Calendar className="h-5 w-5 text-blue-600" />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-gray-900">Google Calendar</p>
+              <p className="font-medium text-gray-900">Connect Google Calendar</p>
               <p className="text-sm text-gray-500">Sign in with Google to sync your calendar</p>
             </div>
             <ExternalLink className="h-4 w-4 text-gray-400" />
@@ -285,13 +339,13 @@ export default function VendorCalendarPage() {
         {!connectedProviders.has('microsoft') && (
           <button
             onClick={() => connectProvider('microsoft')}
-            className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left hover:bg-gray-50 transition-colors"
+            className="flex min-h-[64px] w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left hover:bg-gray-50 transition-colors"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50">
               <Calendar className="h-5 w-5 text-indigo-600" />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-gray-900">Outlook / Microsoft 365</p>
+              <p className="font-medium text-gray-900">Connect Outlook / Microsoft 365</p>
               <p className="text-sm text-gray-500">Sign in with Microsoft to sync your calendar</p>
             </div>
             <ExternalLink className="h-4 w-4 text-gray-400" />
@@ -302,23 +356,23 @@ export default function VendorCalendarPage() {
         {!connectedProviders.has('apple') && !showAppleForm && (
           <button
             onClick={() => setShowAppleForm(true)}
-            className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left hover:bg-gray-50 transition-colors"
+            className="flex min-h-[64px] w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left hover:bg-gray-50 transition-colors"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
               <Calendar className="h-5 w-5 text-gray-600" />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-gray-900">Apple Calendar (iCloud)</p>
+              <p className="font-medium text-gray-900">Connect Apple Calendar (iCloud)</p>
               <p className="text-sm text-gray-500">Connect with your Apple ID and app-specific password</p>
             </div>
           </button>
         )}
 
         {/* Apple CalDAV form */}
-        {showAppleForm && !connectedProviders.has('apple') && (
+        {showAppleForm && (
           <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <p className="font-medium text-gray-900">Connect Apple Calendar</p>
+              <p className="font-medium text-gray-900">{connectedProviders.has('apple') ? 'Reconnect' : 'Connect'} Apple Calendar</p>
               <button onClick={() => setShowAppleForm(false)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
             </div>
 
@@ -367,7 +421,8 @@ export default function VendorCalendarPage() {
         <ul className="text-sm text-blue-800 space-y-1 list-disc pl-4">
           <li><strong>Block busy times (pull):</strong> Your existing calendar events will automatically block matching time slots so customers can't double-book you.</li>
           <li><strong>Add bookings (push):</strong> When a customer books and pays, the appointment is automatically added to your connected calendar.</li>
-          <li>Busy times sync automatically. You can also tap "Sync Now" for an immediate refresh.</li>
+          <li>Busy times sync automatically every 15 minutes. You can also tap &quot;Sync Now&quot; for an immediate refresh.</li>
+          <li>If a connection stops working you&apos;ll get an email and a notification, and a Reconnect button will appear here.</li>
         </ul>
       </div>
 
