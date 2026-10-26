@@ -6,6 +6,7 @@
 // Uses cancel_token from the booking confirmation email for authentication.
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { syncBookingCalendarEvents } from '@/lib/calendar-sync';
 import Stripe from 'stripe';
 import { sendEmail } from '@/lib/email';
 import { sendPushToCommissioner } from '@/lib/push';
@@ -234,6 +235,9 @@ export async function POST(req: NextRequest) {
       updated_at: now.toISOString(),
     })
     .eq('id', booking.id);
+
+  // Remove the appointment from the vendor's connected calendars (never throws)
+  await syncBookingCalendarEvents(booking.id);
 
   // Notify admin
   try {

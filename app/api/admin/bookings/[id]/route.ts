@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { syncBookingCalendarEvents } from '@/lib/calendar-sync';
 
 export async function GET(
   req: NextRequest,
@@ -57,6 +58,9 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // A status change (e.g. to cancelled/confirmed) may add or remove the calendar event (never throws)
+  if (allowed.status !== undefined) await syncBookingCalendarEvents(id);
 
   return NextResponse.json(data);
 }

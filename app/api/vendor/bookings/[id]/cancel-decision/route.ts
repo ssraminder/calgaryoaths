@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyVendor } from '@/lib/vendor-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { syncBookingCalendarEvents } from '@/lib/calendar-sync';
 import { sendEmail } from '@/lib/email';
 import Stripe from 'stripe';
 
@@ -63,6 +64,9 @@ export async function POST(
         updated_at: now,
       })
       .eq('id', id);
+
+    // Remove the appointment from the vendor's connected calendars (never throws)
+    await syncBookingCalendarEvents(id);
 
     // Notify customer
     try {

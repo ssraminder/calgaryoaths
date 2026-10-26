@@ -3,7 +3,7 @@ import { verifyAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
 import { calendarLinksHtml, locationHtml } from '@/lib/calendar';
-import { pushBookingToCalendars } from '@/lib/calendar-sync';
+import { syncBookingCalendarEvents } from '@/lib/calendar-sync';
 
 const ALLOWED_STATUSES = ['paid', 'pending_scheduling', 'confirmed'];
 
@@ -108,21 +108,8 @@ export async function POST(
     });
   } catch (e) { console.error('Set-time email error:', e); }
 
-  if (booking.commissioner_id) {
-    try {
-      const apptStart = new Date(appointment_datetime);
-      const apptEnd = new Date(apptStart.getTime() + 30 * 60 * 1000);
-      await pushBookingToCalendars(booking.commissioner_id, {
-        title: `${booking.service_name} — ${booking.name}`,
-        description: `Customer: ${booking.name}\nPhone: ${booking.phone}\nEmail: ${booking.email}${booking.notes ? `\nNotes: ${booking.notes}` : ''}`,
-        location: locationText,
-        startTime: apptStart.toISOString(),
-        endTime: apptEnd.toISOString(),
-      });
-    } catch (calErr) {
-      console.error('Calendar push error (non-blocking):', calErr);
-    }
-  }
+  // Create the event, or move it if this was a reschedule (never throws)
+  await syncBookingCalendarEvents(id);
 
   return NextResponse.json({ success: true, rescheduled: wasRescheduled });
 }

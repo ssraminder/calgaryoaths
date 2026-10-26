@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { syncBookingCalendarEvents } from '@/lib/calendar-sync';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -64,6 +65,9 @@ export async function POST(
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
+
+  // Remove the appointment from the vendor's connected calendars (never throws)
+  await syncBookingCalendarEvents(id);
 
   return NextResponse.json({ success: true, refundId });
 }
