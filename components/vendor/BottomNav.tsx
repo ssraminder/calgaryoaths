@@ -4,19 +4,16 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { LayoutDashboard, CalendarCheck, DollarSign, Settings, HelpCircle, Phone, MessageSquare, X, LogOut } from 'lucide-react';
+import { MoreHorizontal, Phone, MessageSquare, X, LogOut, ChevronRight } from 'lucide-react';
+import { vendorNavItems, isVendorNavActive } from '@/components/vendor/nav-items';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const navItems = [
-  { label: 'Dashboard', href: '/vendor', icon: LayoutDashboard },
-  { label: 'Bookings', href: '/vendor/bookings', icon: CalendarCheck },
-  { label: 'Earnings', href: '/vendor/earnings', icon: DollarSign },
-  { label: 'Settings', href: '/vendor/rates', icon: Settings },
-];
+const primaryItems = vendorNavItems.filter((i) => i.primaryMobile);
+const moreItems = vendorNavItems.filter((i) => !i.primaryMobile);
 
 const ADMIN_PHONE = 'tel:5876000746';
 const ADMIN_SMS = 'sms:5876000746?body=Hi%2C%20I%20need%20help%20with%20the%20Partner%20Portal.';
@@ -25,7 +22,8 @@ const ADMIN_EMAIL = 'mailto:info@calgaryoaths.com?subject=Partner%20Portal%20Hel
 export default function BottomNav({ userName }: { userName?: string }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreActive = moreItems.some((i) => isVendorNavActive(pathname, i.href));
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -34,26 +32,49 @@ export default function BottomNav({ userName }: { userName?: string }) {
 
   return (
     <>
-      {/* Help sheet */}
-      {helpOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" onClick={() => setHelpOpen(false)}>
+      {/* More sheet: pages that don't fit in the bar, plus help and logout */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="absolute bottom-0 left-0 right-0 rounded-t-2xl bg-white p-5 pb-8 shadow-xl animate-slide-up"
+            className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white p-5 pb-8 shadow-xl animate-slide-up"
+            role="dialog"
+            aria-label="More"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-semibold text-gray-900">Need Help?</h3>
+                <h3 className="text-base font-semibold text-gray-900">More</h3>
                 {userName && <p className="text-xs text-gray-500 mt-0.5">{userName}</p>}
               </div>
               <button
-                onClick={() => setHelpOpen(false)}
+                onClick={() => setMoreOpen(false)}
+                aria-label="Close menu"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
+            <nav className="mb-4 divide-y divide-gray-100 rounded-xl border border-gray-200" aria-label="More pages">
+              {moreItems.map(({ label, href, icon: Icon }) => {
+                const active = isVendorNavActive(pathname, href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setMoreOpen(false)}
+                    className={`flex min-h-[48px] items-center gap-3 px-4 py-3 text-sm font-medium active:bg-gray-50 ${
+                      active ? 'text-navy' : 'text-gray-800'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5 text-gray-500" />
+                    <span className="flex-1">{label}</span>
+                    <ChevronRight className="h-4 w-4 text-gray-300" />
+                  </Link>
+                );
+              })}
+            </nav>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Need help?</p>
             <div className="space-y-2">
               <a
                 href={ADMIN_PHONE}
@@ -112,16 +133,17 @@ export default function BottomNav({ userName }: { userName?: string }) {
 
       {/* Bottom navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white md:hidden">
-        <div className="flex items-center justify-around px-4 pt-2.5 pb-2">
-          {navItems.map(({ label, href, icon: Icon }) => {
-            const active = href === '/vendor' ? pathname === '/vendor' : pathname.startsWith(href);
+        <div className="flex items-center justify-around px-2 pt-2.5 pb-2">
+          {primaryItems.map(({ label, href, icon: Icon }) => {
+            const active = isVendorNavActive(pathname, href);
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex flex-col items-center gap-1 px-3 py-1 text-[10px] font-medium transition-colors ${
+                className={`flex min-w-0 flex-1 flex-col items-center gap-1 px-1 py-1 text-[10px] font-medium transition-colors ${
                   active ? 'text-navy' : 'text-gray-400'
                 }`}
+                aria-current={active ? 'page' : undefined}
               >
                 <Icon className="h-[22px] w-[22px]" />
                 {label}
@@ -129,11 +151,15 @@ export default function BottomNav({ userName }: { userName?: string }) {
             );
           })}
           <button
-            onClick={() => setHelpOpen(true)}
-            className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] font-medium text-gray-400 transition-colors"
+            onClick={() => setMoreOpen(true)}
+            className={`flex min-w-0 flex-1 flex-col items-center gap-1 px-1 py-1 text-[10px] font-medium transition-colors ${
+              moreActive ? 'text-navy' : 'text-gray-400'
+            }`}
+            aria-haspopup="dialog"
+            aria-expanded={moreOpen}
           >
-            <HelpCircle className="h-[22px] w-[22px]" />
-            Help
+            <MoreHorizontal className="h-[22px] w-[22px]" />
+            More
           </button>
         </div>
         {/* Safe area padding for iPhones with home indicator */}

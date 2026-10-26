@@ -2,29 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  CalendarCheck,
-  ClipboardCheck,
-  Users,
-  Wrench,
-  MapPin,
-  BarChart3,
-  Settings,
-  FileText,
-} from 'lucide-react';
-
-const navItems = [
-  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  { label: 'Bookings', href: '/admin/bookings', icon: CalendarCheck },
-  { label: 'Orders', href: '/admin/orders', icon: FileText },
-  { label: 'Reviews', href: '/admin/reviews', icon: ClipboardCheck },
-  { label: 'Vendors', href: '/admin/vendors', icon: Users },
-  { label: 'Services', href: '/admin/services', icon: Wrench },
-  { label: 'Locations', href: '/admin/locations', icon: MapPin },
-  { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
-  { label: 'Settings', href: '/admin/settings', icon: Settings },
-];
+import { adminNavItems, isAdminNavActive } from '@/components/admin/nav-items';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -38,9 +16,8 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-2 py-3">
-        {navItems.map(({ label, href, icon: Icon }) => {
-          const active =
-            href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+        {adminNavItems.map(({ label, href, icon: Icon }) => {
+          const active = isAdminNavActive(pathname, href);
 
           return (
             <Link
